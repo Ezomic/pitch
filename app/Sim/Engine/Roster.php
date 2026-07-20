@@ -14,28 +14,17 @@ final class Roster
     public const int KICKOFF_CARRIER_ID = 2;
 
     /**
-     * The fixed ten-outfielder formation: slot id => [zone, nominal position].
+     * The default (balanced) formation layout: slot id => [zone, nominal position].
      *
      * @return array<int, array{Zone, Position}>
      */
     public static function formation(): array
     {
-        return [
-            1 => [new Zone(1, 0), Position::Defender],
-            2 => [new Zone(1, 1), Position::Defender],
-            3 => [new Zone(1, 2), Position::Defender],
-            4 => [new Zone(2, 0), Position::Midfielder],
-            5 => [new Zone(2, 1), Position::Midfielder],
-            6 => [new Zone(2, 2), Position::Midfielder],
-            7 => [new Zone(3, 1), Position::Midfielder],
-            8 => [new Zone(4, 0), Position::Forward],
-            9 => [new Zone(4, 1), Position::Forward],
-            10 => [new Zone(4, 2), Position::Forward],
-        ];
+        return Formation::balanced()->layout;
     }
 
     /**
-     * The formation's slot ids in order.
+     * The formation's slot ids in order (always 1..10).
      *
      * @return list<int>
      */
@@ -50,14 +39,16 @@ final class Roster
      *
      * @return array<int, Player>
      */
-    public static function build(Attributes $template): array
+    public static function build(Attributes $template, ?Formation $formation = null): array
     {
+        $formation ??= Formation::balanced();
+
         $bySlot = [];
-        foreach (self::slots() as $slot) {
+        foreach ($formation->slots() as $slot) {
             $bySlot[$slot] = $template;
         }
 
-        return self::fromAttributes($bySlot);
+        return self::fromAttributes($bySlot, $formation);
     }
 
     /**
@@ -67,10 +58,12 @@ final class Roster
      * @param  array<int, Attributes>  $bySlot  slot id => attributes
      * @return array<int, Player>
      */
-    public static function fromAttributes(array $bySlot): array
+    public static function fromAttributes(array $bySlot, ?Formation $formation = null): array
     {
+        $formation ??= Formation::balanced();
+
         $players = [];
-        foreach (self::formation() as $slot => [$zone, $position]) {
+        foreach ($formation->layout as $slot => [$zone, $position]) {
             $players[$slot] = new Player($slot, 'P'.$slot, $position, $zone, $bySlot[$slot]);
         }
 
@@ -79,6 +72,6 @@ final class Roster
 
     public static function kickoffZone(): Zone
     {
-        return new Zone(1, 1);
+        return Formation::balanced()->kickoffZone();
     }
 }

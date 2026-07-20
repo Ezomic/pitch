@@ -5,14 +5,36 @@ import BudgetBar from '@/components/squad/BudgetBar.vue';
 import PitchFormation from '@/components/squad/PitchFormation.vue';
 import PlayerPoolItem from '@/components/squad/PlayerPoolItem.vue';
 import TeamProfile from '@/components/squad/TeamProfile.vue';
-import { assign, edit } from '@/routes/squad';
-import type { PoolPlayer, Squad, SquadProfile } from '@/types/squad';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import { assign, edit, tactics } from '@/routes/squad';
+import type {
+    PoolPlayer,
+    Squad,
+    SquadProfile,
+    TacticOption,
+} from '@/types/squad';
 
 const props = defineProps<{
     squad: Squad;
     pool: PoolPlayer[];
     profile: SquadProfile;
+    formations: TacticOption[];
+    mentalities: TacticOption[];
 }>();
+
+function changeTactics(formation: string, mentality: string): void {
+    router.patch(
+        tactics().url,
+        { formation, mentality },
+        { preserveScroll: true, preserveState: true },
+    );
+}
 
 defineOptions({
     layout: {
@@ -81,6 +103,66 @@ function pick(playerId: number): void {
 
         <div class="grid flex-1 gap-4 lg:grid-cols-[1.4fr_1fr]">
             <div class="flex flex-col gap-3">
+                <div
+                    class="flex gap-3 rounded-xl border border-sidebar-border/70 p-3 dark:border-sidebar-border"
+                >
+                    <div class="flex-1">
+                        <label class="mb-1 block text-xs text-muted-foreground"
+                            >Formation</label
+                        >
+                        <Select
+                            :model-value="props.squad.formation"
+                            @update:model-value="
+                                (v) =>
+                                    changeTactics(
+                                        String(v),
+                                        props.squad.mentality,
+                                    )
+                            "
+                        >
+                            <SelectTrigger class="w-full">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem
+                                    v-for="f in props.formations"
+                                    :key="f.id"
+                                    :value="f.id"
+                                >
+                                    {{ f.name }}
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div class="flex-1">
+                        <label class="mb-1 block text-xs text-muted-foreground"
+                            >Mentality</label
+                        >
+                        <Select
+                            :model-value="props.squad.mentality"
+                            @update:model-value="
+                                (v) =>
+                                    changeTactics(
+                                        props.squad.formation,
+                                        String(v),
+                                    )
+                            "
+                        >
+                            <SelectTrigger class="w-full">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem
+                                    v-for="m in props.mentalities"
+                                    :key="m.id"
+                                    :value="m.id"
+                                >
+                                    {{ m.name }}
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                </div>
                 <BudgetBar
                     :budget="props.squad.budget"
                     :spent="props.squad.spent"

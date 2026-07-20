@@ -15,20 +15,20 @@ final class Resolver
 
     private const float PRESSURE_WEIGHT = 0.30;
 
-    public function resolve(Option $option, Zone $ballZone, Attributes $actor, Defense $defense, Rng $rng): ResolveOutcome
+    public function resolve(Option $option, Zone $ballZone, Attributes $actor, Defense $defense, Rng $rng, float $attackBias = 1.0): ResolveOutcome
     {
         return match ($option->type) {
-            EventType::Pass => $this->resolvePass($option, $ballZone, $actor, $defense, $rng),
-            EventType::Dribble => $this->resolveDribble($option, $ballZone, $actor, $defense, $rng),
-            EventType::Shot => $this->resolveShot($ballZone, $actor, $defense, $rng),
+            EventType::Pass => $this->resolvePass($option, $ballZone, $actor, $defense, $rng, $attackBias),
+            EventType::Dribble => $this->resolveDribble($option, $ballZone, $actor, $defense, $rng, $attackBias),
+            EventType::Shot => $this->resolveShot($ballZone, $actor, $defense, $rng, $attackBias),
             default => throw new \LogicException('Unresolvable option type: '.$option->type->value),
         };
     }
 
-    private function resolvePass(Option $option, Zone $ballZone, Attributes $actor, Defense $defense, Rng $rng): ResolveOutcome
+    private function resolvePass(Option $option, Zone $ballZone, Attributes $actor, Defense $defense, Rng $rng, float $attackBias): ResolveOutcome
     {
         $difficulty = max(0, $option->resultZone->x - $ballZone->x) * 0.08;
-        $skill = $actor->passing / self::SKILL_SCALE;
+        $skill = $actor->passing / self::SKILL_SCALE * $attackBias;
         $pressure = $ballZone->threat() * self::PRESSURE_WEIGHT + $defense->pressureBonus($ballZone);
         $threshold = $this->clamp($skill - $pressure - $difficulty + $defense->paceContest($actor->pace, $ballZone));
         $draw = $rng->next();
@@ -45,10 +45,10 @@ final class Resolver
         );
     }
 
-    private function resolveDribble(Option $option, Zone $ballZone, Attributes $actor, Defense $defense, Rng $rng): ResolveOutcome
+    private function resolveDribble(Option $option, Zone $ballZone, Attributes $actor, Defense $defense, Rng $rng, float $attackBias): ResolveOutcome
     {
         $difficulty = 0.05;
-        $skill = $actor->dribbling / self::SKILL_SCALE;
+        $skill = $actor->dribbling / self::SKILL_SCALE * $attackBias;
         $pressure = $ballZone->threat() * self::PRESSURE_WEIGHT + $defense->pressureBonus($ballZone);
         $threshold = $this->clamp($skill - $pressure - $difficulty + $defense->paceContest($actor->pace, $ballZone));
         $draw = $rng->next();
@@ -65,9 +65,9 @@ final class Resolver
         );
     }
 
-    private function resolveShot(Zone $ballZone, Attributes $actor, Defense $defense, Rng $rng): ResolveOutcome
+    private function resolveShot(Zone $ballZone, Attributes $actor, Defense $defense, Rng $rng, float $attackBias): ResolveOutcome
     {
-        $skill = $actor->finishing / self::SKILL_SCALE;
+        $skill = $actor->finishing / self::SKILL_SCALE * $attackBias;
         $threshold = $this->clamp($skill * 0.9 - $defense->shotSuppression($ballZone), 0.05, 0.75);
         $draw = $rng->next();
         $goal = $draw <= $threshold;

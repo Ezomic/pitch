@@ -7,8 +7,8 @@ namespace App\Actions\Season;
 use App\Actions\Squad\EnsureSquad;
 use App\Models\Season;
 use App\Models\Team;
-use App\Sim\Domain\Attributes;
 use App\Sim\Squad\FixtureResolver;
+use App\Sim\Squad\TeamSetup;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -38,13 +38,13 @@ class PlayMatchday
 
         /** @var Collection<int, Team> $teams */
         $teams = Team::all()->keyBy('id');
-        $userBySlot = $this->ensureSquad->handle($season->user)->attributesBySlot();
+        $userSetup = $this->ensureSquad->handle($season->user)->setup();
 
-        DB::transaction(function () use ($fixtures, $teams, $userBySlot): void {
+        DB::transaction(function () use ($fixtures, $teams, $userSetup): void {
             foreach ($fixtures as $fixture) {
                 $result = $this->resolver->resolve(
-                    $this->sideBySlot($fixture->home_team_id, $teams, $userBySlot),
-                    $this->sideBySlot($fixture->away_team_id, $teams, $userBySlot),
+                    $this->sideSetup($fixture->home_team_id, $teams, $userSetup),
+                    $this->sideSetup($fixture->away_team_id, $teams, $userSetup),
                     $fixture->seed,
                 );
 
@@ -59,13 +59,11 @@ class PlayMatchday
 
     /**
      * @param  Collection<int, Team>  $teams
-     * @param  array<int, Attributes>  $userBySlot
-     * @return array<int, Attributes>
      */
-    private function sideBySlot(?int $teamId, Collection $teams, array $userBySlot): array
+    private function sideSetup(?int $teamId, Collection $teams, TeamSetup $userSetup): TeamSetup
     {
         if ($teamId === null) {
-            return $userBySlot;
+            return $userSetup;
         }
 
         $team = $teams->get($teamId);
@@ -74,6 +72,6 @@ class PlayMatchday
             throw new \RuntimeException("Missing team {$teamId} in fixture.");
         }
 
-        return $team->bySlot();
+        return $team->setup();
     }
 }

@@ -4,10 +4,7 @@ declare(strict_types=1);
 
 namespace App\Sim\Squad;
 
-use App\Sim\Domain\Attributes;
-use App\Sim\Engine\Defense;
 use App\Sim\Engine\MatchEngine;
-use App\Sim\Engine\Roster;
 
 final class FixtureResolver
 {
@@ -17,26 +14,29 @@ final class FixtureResolver
 
     /**
      * Resolve a single fixture between two teams: each side attacks the other's
-     * defence for the same seed. Deterministic.
+     * defence for the same seed, using its own formation and mentality.
+     * Deterministic.
      *
-     * @param  array<int, Attributes>  $homeBySlot
-     * @param  array<int, Attributes>  $awayBySlot
      * @return array{home: int, away: int}
      */
-    public function resolve(array $homeBySlot, array $awayBySlot, int $seed): array
+    public function resolve(TeamSetup $home, TeamSetup $away, int $seed): array
     {
-        $home = $this->engine->simulate(
-            Roster::fromAttributes($homeBySlot),
+        $homeGoals = $this->engine->simulate(
+            $home->attackers(),
             $seed,
-            Defense::fromAttributes($awayBySlot),
+            $away->defence(),
+            $home->formation,
+            $home->attackBias(),
         )->goals;
 
-        $away = $this->engine->simulate(
-            Roster::fromAttributes($awayBySlot),
+        $awayGoals = $this->engine->simulate(
+            $away->attackers(),
             $seed,
-            Defense::fromAttributes($homeBySlot),
+            $home->defence(),
+            $away->formation,
+            $away->attackBias(),
         )->goals;
 
-        return ['home' => $home, 'away' => $away];
+        return ['home' => $homeGoals, 'away' => $awayGoals];
     }
 }

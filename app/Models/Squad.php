@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Sim\Domain\Attributes;
+use App\Sim\Engine\Formation;
+use App\Sim\Engine\Mentality;
 use App\Sim\Engine\Roster;
+use App\Sim\Squad\TeamSetup;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -17,13 +20,23 @@ use Illuminate\Support\Carbon;
  * @property int $user_id
  * @property string $name
  * @property int $budget
+ * @property string $formation
+ * @property string $mentality
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['user_id', 'name', 'budget'])]
+#[Fillable(['user_id', 'name', 'budget', 'formation', 'mentality'])]
 class Squad extends Model
 {
     public const int DEFAULT_BUDGET = 220;
+
+    /**
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'formation' => 'balanced',
+        'mentality' => 'balanced',
+    ];
 
     /**
      * @return BelongsTo<User, $this>
@@ -62,5 +75,14 @@ class Squad extends Model
         }
 
         return $bySlot;
+    }
+
+    public function setup(): TeamSetup
+    {
+        return new TeamSetup(
+            $this->attributesBySlot(),
+            Formation::fromId($this->formation),
+            Mentality::fromId($this->mentality),
+        );
     }
 }

@@ -29,6 +29,13 @@ export interface Squad {
     budget: number;
     spent: number;
     remaining: number;
+    formation: string;
+    mentality: string;
+}
+
+export interface TacticOption {
+    id: string;
+    name: string;
 }
 
 export interface SquadProfile {

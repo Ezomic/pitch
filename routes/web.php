@@ -23,6 +23,7 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('squad', [SquadController::class, 'edit'])->name('squad.edit');
     Route::patch('squad/slot', [SquadController::class, 'assign'])->name('squad.assign');
+    Route::patch('squad/tactics', [SquadController::class, 'tactics'])->name('squad.tactics');
 
     Route::get('match', [MatchController::class, 'show'])->name('match.show');
 

@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Sim\Domain\Attributes;
+use App\Sim\Engine\Formation;
+use App\Sim\Engine\Mentality;
 use App\Sim\Engine\Roster;
+use App\Sim\Squad\TeamSetup;
 use Database\Factories\TeamFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -15,6 +18,8 @@ use Illuminate\Database\Eloquent\Model;
  * @property int $id
  * @property string $name
  * @property string $style
+ * @property string $formation
+ * @property string $mentality
  * @property int $vision
  * @property int $passing
  * @property int $dribbling
@@ -22,7 +27,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property int $tackling
  * @property int $pace
  */
-#[Fillable(['name', 'style', 'vision', 'passing', 'dribbling', 'finishing', 'tackling', 'pace'])]
+#[Fillable(['name', 'style', 'formation', 'mentality', 'vision', 'passing', 'dribbling', 'finishing', 'tackling', 'pace'])]
 class Team extends Model
 {
     /** @use HasFactory<TeamFactory> */
@@ -55,5 +60,14 @@ class Team extends Model
         }
 
         return $bySlot;
+    }
+
+    public function setup(): TeamSetup
+    {
+        return new TeamSetup(
+            $this->bySlot(),
+            Formation::fromId($this->formation),
+            Mentality::fromId($this->mentality),
+        );
     }
 }

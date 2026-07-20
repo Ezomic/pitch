@@ -4,10 +4,7 @@ declare(strict_types=1);
 
 namespace App\Sim\Squad;
 
-use App\Sim\Domain\Attributes;
-use App\Sim\Engine\Defense;
 use App\Sim\Engine\MatchEngine;
-use App\Sim\Engine\Roster;
 
 final class SquadEvaluator
 {
@@ -16,22 +13,19 @@ final class SquadEvaluator
     ) {}
 
     /**
-     * Play the squad both ways against a fixed baseline opponent and average the
+     * Play the user's setup both ways against an opponent setup and average the
      * legibility metrics. The attack leg (user attacking the opponent's defence)
      * yields chances created; the defence leg (opponent attacking the user's
-     * defence) yields chances conceded. Deterministic: the same squad always
-     * yields the same profile, so a single swap produces a clean delta.
-     *
-     * @param  array<int, Attributes>  $bySlot  slot id => attributes
+     * defence) yields chances conceded. Deterministic: the same setups always
+     * yield the same profile, so a single swap or tactical change produces a
+     * clean delta.
      */
-    public function evaluate(array $bySlot, int $matches = 200): SquadProfile
+    public function evaluate(TeamSetup $user, TeamSetup $opponent, int $matches = 200): SquadProfile
     {
-        $baseline = $this->baseline();
-
-        $userAttackers = Roster::fromAttributes($bySlot);
-        $opponentAttackers = Roster::fromAttributes($baseline);
-        $userDefense = Defense::fromAttributes($bySlot);
-        $opponentDefense = Defense::fromAttributes($baseline);
+        $userAttackers = $user->attackers();
+        $opponentAttackers = $opponent->attackers();
+        $userDefence = $user->defence();
+        $opponentDefence = $opponent->defence();
 
         $gapSum = 0.0;
         $decisions = 0;
@@ -45,8 +39,8 @@ final class SquadEvaluator
         for ($i = 0; $i < $matches; $i++) {
             $seed = $i + 1;
 
-            $attack = $this->engine->simulate($userAttackers, $seed, $opponentDefense);
-            $defence = $this->engine->simulate($opponentAttackers, $seed, $userDefense);
+            $attack = $this->engine->simulate($userAttackers, $seed, $opponentDefence, $user->formation, $user->attackBias());
+            $defence = $this->engine->simulate($opponentAttackers, $seed, $userDefence, $opponent->formation, $opponent->attackBias());
 
             $gapSum += $attack->decisionGapSum;
             $decisions += $attack->decisionCount;
@@ -67,20 +61,5 @@ final class SquadEvaluator
             chancesConcededPer90: $matches > 0 ? $shotsConceded / $matches : 0.0,
             goalsConcededPer90: $matches > 0 ? $goalsConceded / $matches : 0.0,
         );
-    }
-
-    /**
-     * A fixed, average opponent: every slot rated 11 across the board.
-     *
-     * @return array<int, Attributes>
-     */
-    private function baseline(): array
-    {
-        $bySlot = [];
-        foreach (Roster::slots() as $slot) {
-            $bySlot[$slot] = new Attributes(11, 11, 11, 11, 11, 11);
-        }
-
-        return $bySlot;
     }
 }

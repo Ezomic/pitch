@@ -11,10 +11,12 @@ use App\Http\Requests\AssignSquadSlotRequest;
 use App\Models\Player;
 use App\Models\Squad;
 use App\Models\User;
-use App\Sim\Engine\Roster;
+use App\Sim\Engine\Formation;
+use App\Sim\Engine\Mentality;
 use App\Sim\Squad\SquadProfile;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -34,9 +36,19 @@ class SquadController extends Controller
                 'budget' => $squad->budget,
                 'spent' => $spent,
                 'remaining' => $squad->budget - $spent,
+                'formation' => $squad->formation,
+                'mentality' => $squad->mentality,
             ],
             'pool' => $this->pool($squad),
             'profile' => $this->profile($evaluateSquad->handle($squad)),
+            'formations' => array_values(array_map(
+                fn (Formation $formation) => ['id' => $formation->id, 'name' => $formation->name],
+                Formation::all(),
+            )),
+            'mentalities' => array_map(
+                fn (Mentality $mentality) => ['id' => $mentality->value, 'name' => $mentality->label()],
+                Mentality::cases(),
+            ),
         ]);
     }
 
@@ -48,6 +60,18 @@ class SquadController extends Controller
         $squad = $ensureSquad->handle($this->user($request));
 
         $assignSquadSlot->handle($squad, $request->slot(), $request->playerId());
+
+        return to_route('squad.edit');
+    }
+
+    public function tactics(Request $request, EnsureSquad $ensureSquad): RedirectResponse
+    {
+        $data = $request->validate([
+            'formation' => ['required', Rule::in(array_keys(Formation::all()))],
+            'mentality' => ['required', Rule::in(array_column(Mentality::cases(), 'value'))],
+        ]);
+
+        $ensureSquad->handle($this->user($request))->update($data);
 
         return to_route('squad.edit');
     }
@@ -71,7 +95,7 @@ class SquadController extends Controller
         $bySlot = $squad->assignments->keyBy('slot');
 
         $slots = [];
-        foreach (Roster::formation() as $slot => [$zone, $position]) {
+        foreach (Formation::fromId($squad->formation)->layout as $slot => [$zone, $position]) {
             $player = $bySlot->get($slot)?->player;
 
             $slots[] = [

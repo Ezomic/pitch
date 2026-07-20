@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 use App\Sim\Domain\Attributes;
 use App\Sim\Engine\Defense;
+use App\Sim\Engine\Formation;
 use App\Sim\Engine\MatchEngine;
+use App\Sim\Engine\Mentality;
 use App\Sim\Engine\Roster;
 use App\Sim\Squad\SquadEvaluator;
+use App\Sim\Squad\TeamSetup;
 
 function attackers(): array
 {
@@ -23,14 +26,14 @@ function defenseOf(int $tackling, int $pace): Defense
     return Defense::fromAttributes($bySlot);
 }
 
-function squadWith(int $tackling, int $pace): array
+function squadWith(int $tackling, int $pace): TeamSetup
 {
     $bySlot = [];
     foreach (Roster::slots() as $slot) {
         $bySlot[$slot] = new Attributes(11, 12, 12, 12, $tackling, $pace);
     }
 
-    return $bySlot;
+    return new TeamSetup($bySlot, Formation::balanced(), Mentality::Balanced);
 }
 
 it('leaves resolution unchanged with no defense', function () {
@@ -77,8 +80,8 @@ it('concedes fewer chances against a quicker defence', function () {
 it('makes a high tackling and pace squad concede less than a poor one', function () {
     $evaluator = new SquadEvaluator;
 
-    $solid = $evaluator->evaluate(squadWith(18, 17), 120);
-    $porous = $evaluator->evaluate(squadWith(4, 6), 120);
+    $solid = $evaluator->evaluate(squadWith(18, 17), TeamSetup::baseline(), 120);
+    $porous = $evaluator->evaluate(squadWith(4, 6), TeamSetup::baseline(), 120);
 
     expect($solid->chancesConcededPer90)->toBeLessThan($porous->chancesConcededPer90)
         ->and($solid->goalsConcededPer90)->toBeLessThanOrEqual($porous->goalsConcededPer90);
