@@ -131,6 +131,8 @@ class SquadController extends Controller
             'progressivePassShare' => $profile->progressivePassShare,
             'chancesPer90' => $profile->chancesPer90,
             'goalsPer90' => $profile->goalsPer90,
+            'chancesConcededPer90' => $profile->chancesConcededPer90,
+            'goalsConcededPer90' => $profile->goalsConcededPer90,
         ];
     }
 }

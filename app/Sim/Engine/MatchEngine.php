@@ -23,13 +23,15 @@ final class MatchEngine
     ) {}
 
     /**
-     * Simulate one match for a single attacking side. Same players + same seed
-     * always produce the identical event log.
+     * Simulate one match for a single attacking side against a defending team.
+     * Same players + same seed + same defense always produce the identical event
+     * log. With no defense the attack meets only zone-based pressure.
      *
      * @param  array<int, Player>  $players  keyed by player id
      */
-    public function simulate(array $players, int $seed): MatchResult
+    public function simulate(array $players, int $seed, ?Defense $defense = null): MatchResult
     {
+        $defense ??= Defense::none();
         $rng = new Rng($seed);
         $events = [];
 
@@ -42,7 +44,7 @@ final class MatchEngine
                 $actor = $players[$state->carrierId]->attributes;
 
                 $choice = $this->decisionMaker->decide($options, $actor->vision, $rng);
-                $outcome = $this->resolver->resolve($choice->option, $state->ballZone, $actor, $rng);
+                $outcome = $this->resolver->resolve($choice->option, $state->ballZone, $actor, $defense, $rng);
 
                 $events[] = new MatchEvent(
                     $state->minute,

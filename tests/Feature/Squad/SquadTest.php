@@ -35,7 +35,9 @@ it('creates and renders a default squad on first visit', function () {
             ->has('squad.slots', 10)
             ->has('pool')
             ->has('profile.meanDecisionGap')
-            ->has('profile.chancesPer90'),
+            ->has('profile.chancesPer90')
+            ->has('profile.chancesConcededPer90')
+            ->has('profile.goalsConcededPer90'),
         );
 
     $squad = $user->squad()->first();

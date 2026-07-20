@@ -45,6 +45,20 @@ const metrics: Metric[] = [
         higherIsBetter: true,
         format: (v) => v.toFixed(2),
     },
+    {
+        key: 'chancesConcededPer90',
+        label: 'Chances conceded / 90',
+        hint: 'Chances the opponent creates. Lower means a tighter defence.',
+        higherIsBetter: false,
+        format: (v) => v.toFixed(2),
+    },
+    {
+        key: 'goalsConcededPer90',
+        label: 'Goals conceded / 90',
+        hint: 'Goals the opponent scores per match.',
+        higherIsBetter: false,
+        format: (v) => v.toFixed(2),
+    },
 ];
 
 function delta(key: keyof SquadProfile): number | null {
@@ -62,12 +76,13 @@ function improved(metric: Metric, d: number): boolean {
 }
 
 const read = computed(() => {
-    const { chancesPer90, meanDecisionGap } = props.profile;
+    const { chancesPer90, meanDecisionGap, chancesConcededPer90 } =
+        props.profile;
 
     const creation =
-        chancesPer90 >= 4
+        chancesPer90 >= 2.8
             ? 'creates chances freely'
-            : chancesPer90 >= 2.8
+            : chancesPer90 >= 2
               ? 'creates a healthy number of chances'
               : 'struggles to create chances';
 
@@ -78,7 +93,14 @@ const read = computed(() => {
               ? 'generally picks good options'
               : 'often misses the better pass';
 
-    return `This squad ${creation} and ${vision}.`;
+    const defence =
+        chancesConcededPer90 < 0.8
+            ? 'hard to break down'
+            : chancesConcededPer90 < 1.7
+              ? 'reasonably solid'
+              : 'leaky at the back';
+
+    return `This squad ${creation} and ${vision}. At the back it is ${defence}.`;
 });
 </script>
 
@@ -89,7 +111,7 @@ const read = computed(() => {
         <h2 class="text-sm font-medium text-muted-foreground">Team profile</h2>
         <p class="mt-1 mb-4 text-base">{{ read }}</p>
 
-        <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div class="grid grid-cols-2 gap-3 lg:grid-cols-3">
             <div
                 v-for="metric in metrics"
                 :key="metric.key"
@@ -127,11 +149,5 @@ const read = computed(() => {
                 </p>
             </div>
         </div>
-
-        <p class="mt-3 text-[11px] text-muted-foreground">
-            The current engine models vision, passing, dribbling and finishing.
-            Tackling and pace do not yet move these numbers, they arrive with a
-            defensive model later.
-        </p>
     </div>
 </template>
