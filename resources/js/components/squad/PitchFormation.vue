@@ -13,7 +13,7 @@ const emit = defineEmits<{
 function position(slot: SquadSlot): Record<string, string> {
     return {
         left: `${(slot.zone.x / 5) * 100}%`,
-        top: `${12 + (slot.zone.y / 2) * 76}%`,
+        top: `${12 + (slot.zone.y / 4) * 76}%`,
     };
 }
 

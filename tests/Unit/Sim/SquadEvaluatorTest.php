@@ -43,7 +43,7 @@ it('makes a high-vision squad measurably sharper than a low-vision one', functio
         ->and($high->chancesPer90)->toBeGreaterThan($low->chancesPer90);
 });
 
-it('keeps the Roster formation stable after the refactor', function () {
+it('lays the default 4-3-3 roster out back to front', function () {
     $players = Roster::build(new Attributes(10, 12, 12, 12, 12, 12));
 
     expect($players)->toHaveCount(10)
@@ -51,6 +51,6 @@ it('keeps the Roster formation stable after the refactor', function () {
 
     expect($players[2]->zone->equals(new Zone(1, 1)))->toBeTrue()
         ->and($players[2]->position)->toBe(Position::Defender)
-        ->and($players[8]->zone->equals(new Zone(4, 0)))->toBeTrue()
+        ->and($players[8]->zone->equals(new Zone(4, 1)))->toBeTrue()
         ->and($players[8]->position)->toBe(Position::Forward);
 });

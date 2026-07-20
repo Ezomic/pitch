@@ -112,9 +112,9 @@ it('exposes tactics and options on the squad page', function () {
     $this->actingAs($user)
         ->get(route('squad.edit'))
         ->assertInertia(fn (Assert $page) => $page
-            ->where('squad.formation', 'balanced')
+            ->where('squad.formation', '433')
             ->where('squad.mentality', 'balanced')
-            ->has('formations', 3)
+            ->has('formations', 6)
             ->has('mentalities', 3),
         );
 });
@@ -124,11 +124,11 @@ it('updates tactics and changes the evaluated profile', function () {
     $this->actingAs($user)->get(route('squad.edit'));
 
     $this->actingAs($user)
-        ->patch(route('squad.tactics'), ['formation' => 'attacking', 'mentality' => 'attacking'])
+        ->patch(route('squad.tactics'), ['formation' => '343', 'mentality' => 'attacking'])
         ->assertRedirect(route('squad.edit'));
 
     $squad = $user->squad()->first();
-    expect($squad->formation)->toBe('attacking')
+    expect($squad->formation)->toBe('343')
         ->and($squad->mentality)->toBe('attacking');
 });
 

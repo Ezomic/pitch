@@ -13,9 +13,9 @@ it('raises threat as the ball advances toward the opponent goal', function () {
 
 it('rates the central lane at least as high as a wide lane at equal advancement', function () {
     foreach (range(0, Zone::MAX_X) as $x) {
-        $central = (new Zone($x, 1))->threat();
+        $central = (new Zone($x, Zone::CENTRE_Y))->threat();
         expect($central)->toBeGreaterThanOrEqual((new Zone($x, 0))->threat());
-        expect($central)->toBeGreaterThanOrEqual((new Zone($x, 2))->threat());
+        expect($central)->toBeGreaterThanOrEqual((new Zone($x, Zone::MAX_Y))->threat());
     }
 });
 
