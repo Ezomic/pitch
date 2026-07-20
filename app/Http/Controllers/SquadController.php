@@ -117,7 +117,7 @@ class SquadController extends Controller
         $assignedSlot = $squad->assignments->keyBy('player_id');
 
         $players = Player::query()
-            ->where('is_youth', false)
+            ->selectableFor($squad->user_id)
             ->orderBy('position')
             ->orderBy('name')
             ->get();
