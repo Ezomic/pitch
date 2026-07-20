@@ -10,8 +10,9 @@ use App\Sim\Domain\Zone;
 
 /**
  * The resistance an attacking action meets, derived from the defending team's
- * tackling and pace. Defense::none() contributes nothing, reproducing the
- * original zone-only pressure exactly.
+ * tackling and pace, its formation (how many cover each band) and its mentality
+ * (defenceBias). Defense::none() contributes nothing, reproducing the original
+ * zone-only pressure exactly, as does a balanced formation at bias 1.0.
  */
 final readonly class Defense
 {
@@ -30,26 +31,31 @@ final readonly class Defense
     /**
      * @param  array<string, float>  $tackling  line => average tackling
      * @param  array<string, float>  $pace  line => average pace
+     * @param  array<string, float>  $coverage  line => 0..1 fraction of a full line
      */
     private function __construct(
         private array $tackling,
         private array $pace,
+        private array $coverage,
+        private float $defenceBias,
         private bool $active,
     ) {}
 
     public static function none(): self
     {
-        return new self([], [], false);
+        return new self([], [], [], 1.0, false);
     }
 
     /**
      * @param  array<int, Attributes>  $bySlot  slot id => attributes
      */
-    public static function fromAttributes(array $bySlot): self
+    public static function fromAttributes(array $bySlot, ?Formation $formation = null, float $defenceBias = 1.0): self
     {
+        $formation ??= Formation::balanced();
+
         $lines = [self::BACK => [], self::MID => [], self::FORWARD => []];
 
-        foreach (Roster::formation() as $slot => [, $position]) {
+        foreach ($formation->layout as $slot => [, $position]) {
             if (! isset($bySlot[$slot])) {
                 continue;
             }
@@ -59,12 +65,17 @@ final readonly class Defense
 
         $tackling = [];
         $pace = [];
+        $coverage = [];
         foreach ($lines as $line => $attributes) {
             $tackling[$line] = self::average($attributes, fn (Attributes $a) => $a->tackling);
             $pace[$line] = self::average($attributes, fn (Attributes $a) => $a->pace);
+            // Only the back line's numbers matter for defending the final third,
+            // where chances are conceded; forwards and midfielders press rather
+            // than hold, so their coverage is treated as full.
+            $coverage[$line] = $line === self::BACK ? min(count($attributes), 3) / 3 : 1.0;
         }
 
-        return new self($tackling, $pace, true);
+        return new self($tackling, $pace, $coverage, $defenceBias, true);
     }
 
     public function pressureBonus(Zone $ballZone): float
@@ -73,7 +84,9 @@ final readonly class Defense
             return 0.0;
         }
 
-        return ($this->tackling[$this->lineForZone($ballZone)] / 20) * self::TACKLE_WEIGHT;
+        $line = $this->lineForZone($ballZone);
+
+        return ($this->tackling[$line] / 20) * $this->coverage[$line] * self::TACKLE_WEIGHT * $this->defenceBias;
     }
 
     public function paceContest(int $attackerPace, Zone $ballZone): float
@@ -82,7 +95,9 @@ final readonly class Defense
             return 0.0;
         }
 
-        return (($attackerPace - $this->pace[$this->lineForZone($ballZone)]) / 20) * self::PACE_WEIGHT;
+        $line = $this->lineForZone($ballZone);
+
+        return (($attackerPace - $this->pace[$line]) / 20) * self::PACE_WEIGHT * $this->coverage[$line];
     }
 
     public function shotSuppression(Zone $ballZone): float
@@ -91,7 +106,9 @@ final readonly class Defense
             return 0.0;
         }
 
-        return ($this->tackling[$this->lineForZone($ballZone)] / 20) * self::SHOT_WEIGHT;
+        $line = $this->lineForZone($ballZone);
+
+        return ($this->tackling[$line] / 20) * $this->coverage[$line] * self::SHOT_WEIGHT * $this->defenceBias;
     }
 
     private function lineForZone(Zone $ballZone): string

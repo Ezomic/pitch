@@ -24,27 +24,31 @@ final class MatchEngine
 
     /**
      * Simulate one match for a single attacking side against a defending team.
-     * Same players + same seed + same defense always produce the identical event
-     * log. With no defense the attack meets only zone-based pressure.
+     * Same players + seed + defense + formation + attackBias always produce the
+     * identical event log. With no defense the attack meets only zone pressure;
+     * a null formation and attackBias 1.0 reproduce the original behaviour.
      *
      * @param  array<int, Player>  $players  keyed by player id
      */
-    public function simulate(array $players, int $seed, ?Defense $defense = null): MatchResult
+    public function simulate(array $players, int $seed, ?Defense $defense = null, ?Formation $formation = null, float $attackBias = 1.0): MatchResult
     {
         $defense ??= Defense::none();
+        $formation ??= Formation::balanced();
+        $kickoffZone = $formation->kickoffZone();
+        $kickoffSlot = $formation->kickoffSlot;
         $rng = new Rng($seed);
         $events = [];
 
         for ($possession = 0; $possession < self::POSSESSIONS_PER_MATCH; $possession++) {
             $minute = intdiv($possession * self::MATCH_MINUTES, self::POSSESSIONS_PER_MATCH);
-            $state = new MatchState(Roster::kickoffZone(), Roster::KICKOFF_CARRIER_ID, $minute);
+            $state = new MatchState($kickoffZone, $kickoffSlot, $minute);
 
             for ($tick = 0; $tick < self::MAX_TICKS_PER_POSSESSION; $tick++) {
                 $options = $this->optionBuilder->build($state, $players);
                 $actor = $players[$state->carrierId]->attributes;
 
                 $choice = $this->decisionMaker->decide($options, $actor->vision, $rng);
-                $outcome = $this->resolver->resolve($choice->option, $state->ballZone, $actor, $defense, $rng);
+                $outcome = $this->resolver->resolve($choice->option, $state->ballZone, $actor, $defense, $rng, $attackBias);
 
                 $events[] = new MatchEvent(
                     $state->minute,

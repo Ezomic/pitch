@@ -67,7 +67,7 @@ class SeasonController extends Controller
         abort_unless($fixture->season_id === $season->id && $fixture->involvesUser() && $fixture->played, 404);
 
         $opponent = Team::findOrFail($fixture->userIsHome() ? $fixture->away_team_id : $fixture->home_team_id);
-        $report = $simulateMatch->handle($ensureSquad->handle($user), $fixture->seed, $opponent->bySlot());
+        $report = $simulateMatch->handle($ensureSquad->handle($user), $fixture->seed, $opponent->setup());
 
         return Inertia::render('Match', [
             'seed' => $fixture->seed,

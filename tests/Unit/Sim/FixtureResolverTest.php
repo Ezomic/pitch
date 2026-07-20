@@ -3,17 +3,20 @@
 declare(strict_types=1);
 
 use App\Sim\Domain\Attributes;
+use App\Sim\Engine\Formation;
+use App\Sim\Engine\Mentality;
 use App\Sim\Engine\Roster;
 use App\Sim\Squad\FixtureResolver;
+use App\Sim\Squad\TeamSetup;
 
-function team(int $rating): array
+function team(int $rating): TeamSetup
 {
     $bySlot = [];
     foreach (Roster::slots() as $slot) {
         $bySlot[$slot] = new Attributes($rating, $rating, $rating, $rating, $rating, $rating);
     }
 
-    return $bySlot;
+    return new TeamSetup($bySlot, Formation::balanced(), Mentality::Balanced);
 }
 
 it('resolves a fixture deterministically for a fixed seed', function () {
