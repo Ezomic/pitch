@@ -72,7 +72,8 @@ const columns: { key: keyof StandingRow; label: string }[] = [
                         {{ formatDate(props.currentDate) }} &middot; Matchday
                         {{ props.currentMatchday
                         }}<template v-if="props.nextFixtureDate">
-                            plays {{ formatDate(props.nextFixtureDate) }}</template
+                            plays
+                            {{ formatDate(props.nextFixtureDate) }}</template
                         >
                     </p>
                     <p class="text-lg font-medium">
