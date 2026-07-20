@@ -114,4 +114,18 @@ return [
 
     'password_timeout' => env('AUTH_PASSWORD_TIMEOUT', 10800),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Fixed Local Dev Login Code
+    |--------------------------------------------------------------------------
+    |
+    | When set and running in the local environment, SendLoginCode issues this
+    | code instead of a random one, so signing in during development does not
+    | require digging the code out of the mail log. Ignored everywhere but
+    | local.
+    |
+    */
+
+    'dev_login_code' => env('PITCH_DEV_LOGIN_CODE'),
+
 ];

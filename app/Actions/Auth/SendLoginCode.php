@@ -14,7 +14,7 @@ class SendLoginCode
 {
     public function handle(User $user): void
     {
-        $code = (string) random_int(100000, 999999);
+        $code = $this->fixedDevCode() ?? (string) random_int(100000, 999999);
 
         $user->forceFill([
             'login_code_hash' => Hash::make($code),
@@ -22,5 +22,16 @@ class SendLoginCode
         ])->save();
 
         Mail::to($user->email)->send(new LoginCodeMail($code));
+    }
+
+    private function fixedDevCode(): ?string
+    {
+        if (! app()->environment('local')) {
+            return null;
+        }
+
+        $code = config('auth.dev_login_code');
+
+        return is_string($code) && $code !== '' ? $code : null;
     }
 }
