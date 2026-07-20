@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
-import { BookOpen, FolderGit2, LayoutGrid, Shirt } from '@lucide/vue';
+import {
+    BookOpen,
+    Clapperboard,
+    FolderGit2,
+    LayoutGrid,
+    Shirt,
+} from '@lucide/vue';
 import AppLogo from '@/components/AppLogo.vue';
 import NavFooter from '@/components/NavFooter.vue';
 import NavMain from '@/components/NavMain.vue';
@@ -15,6 +21,7 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
+import { show as matchShow } from '@/routes/match';
 import { edit as squadEdit } from '@/routes/squad';
 import type { NavItem } from '@/types';
 
@@ -28,6 +35,11 @@ const mainNavItems: NavItem[] = [
         title: 'Squad',
         href: squadEdit(),
         icon: Shirt,
+    },
+    {
+        title: 'Match',
+        href: matchShow(),
+        icon: Clapperboard,
     },
 ];
 
