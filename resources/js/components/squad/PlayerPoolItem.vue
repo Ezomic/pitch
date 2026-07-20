@@ -5,6 +5,7 @@ import type { PoolPlayer } from '@/types/squad';
 const props = defineProps<{
     player: PoolPlayer;
     canPick: boolean;
+    unaffordable: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -33,9 +34,19 @@ const stats: { key: keyof PoolPlayer; label: string; key_metric: boolean }[] = [
                 props.player.name
             }}</span>
             <div class="flex shrink-0 items-center gap-1">
+                <span class="text-xs font-medium tabular-nums"
+                    >£{{ props.player.value }}m</span
+                >
                 <Badge variant="secondary">{{ props.player.position }}</Badge>
                 <Badge v-if="props.player.slot !== null" variant="outline">
                     Slot {{ props.player.slot }}
+                </Badge>
+                <Badge
+                    v-else-if="props.unaffordable"
+                    variant="outline"
+                    class="border-red-500/40 text-red-600 dark:text-red-400"
+                >
+                    Over budget
                 </Badge>
             </div>
         </div>

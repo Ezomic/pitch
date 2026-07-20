@@ -26,9 +26,12 @@ class EnsureSquad
         }
 
         return DB::transaction(function () use ($user): Squad {
-            $squad = Squad::create(['user_id' => $user->id]);
+            $squad = Squad::create([
+                'user_id' => $user->id,
+                'budget' => Squad::DEFAULT_BUDGET,
+            ]);
 
-            $pool = Player::all();
+            $pool = Player::all()->sortBy(fn (Player $p) => $p->value())->values();
             $used = [];
 
             foreach (Roster::formation() as $slot => [, $position]) {

@@ -8,6 +8,7 @@ export interface Player {
     finishing: number;
     tackling: number;
     pace: number;
+    value: number;
 }
 
 export interface PoolPlayer extends Player {
@@ -25,6 +26,9 @@ export interface Squad {
     id: number;
     name: string;
     slots: SquadSlot[];
+    budget: number;
+    spent: number;
+    remaining: number;
 }
 
 export interface SquadProfile {

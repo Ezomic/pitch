@@ -33,7 +33,10 @@ it('creates and renders a default squad on first visit', function () {
         ->assertInertia(fn (Assert $page) => $page
             ->component('Squad')
             ->has('squad.slots', 10)
-            ->has('pool')
+            ->has('squad.budget')
+            ->has('squad.spent')
+            ->has('squad.remaining')
+            ->has('pool.0.value')
             ->has('profile.meanDecisionGap')
             ->has('profile.chancesPer90')
             ->has('profile.chancesConcededPer90')
@@ -99,4 +102,51 @@ it('rejects an unknown player', function () {
 
 it('requires authentication', function () {
     $this->get(route('squad.edit'))->assertRedirect(route('login'));
+});
+
+it('rejects a swap that would exceed the budget and leaves the squad unchanged', function () {
+    $elite = Player::factory()->create([
+        'position' => Position::Forward,
+        'vision' => 20, 'passing' => 20, 'dribbling' => 20,
+        'finishing' => 20, 'tackling' => 20, 'pace' => 20,
+    ]);
+
+    $user = User::factory()->create();
+    $this->actingAs($user)->get(route('squad.edit'));
+    $squad = $user->squad()->first();
+
+    $spent = (int) $squad->assignments()->with('player')->get()->sum(fn ($a) => $a->player->value());
+    $squad->update(['budget' => $spent]);
+
+    $before = slotMap($squad);
+
+    $this->actingAs($user)
+        ->from(route('squad.edit'))
+        ->patch(route('squad.assign'), ['slot' => 8, 'player_id' => $elite->id])
+        ->assertSessionHasErrors('player_id');
+
+    expect(slotMap($squad->refresh()))->toBe($before);
+});
+
+it('allows an affordable swap and updates spend by the price difference', function () {
+    $user = User::factory()->create();
+    $this->actingAs($user)->get(route('squad.edit'));
+    $squad = $user->squad()->first();
+
+    $spentBefore = (int) $squad->assignments()->with('player')->get()->sum(fn ($a) => $a->player->value());
+    $outgoing = $squad->assignments()->where('slot', 3)->with('player')->firstOrFail()->player;
+
+    $assignedIds = $squad->assignments()->pluck('player_id')->all();
+    // Cheapest available player is always affordable against a cheapest-fill squad.
+    $incoming = Player::query()->whereNotIn('id', $assignedIds)->get()
+        ->sortBy(fn (Player $p) => $p->value())->first();
+
+    $this->actingAs($user)
+        ->patch(route('squad.assign'), ['slot' => 3, 'player_id' => $incoming->id])
+        ->assertRedirect(route('squad.edit'));
+
+    $spentAfter = (int) $squad->refresh()->assignments()->with('player')->get()->sum(fn ($a) => $a->player->value());
+
+    expect(slotMap($squad)[3])->toBe($incoming->id)
+        ->and($spentAfter)->toBe($spentBefore - $outgoing->value() + $incoming->value());
 });

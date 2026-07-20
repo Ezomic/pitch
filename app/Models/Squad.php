@@ -14,12 +14,15 @@ use Illuminate\Support\Carbon;
  * @property int $id
  * @property int $user_id
  * @property string $name
+ * @property int $budget
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['user_id', 'name'])]
+#[Fillable(['user_id', 'name', 'budget'])]
 class Squad extends Model
 {
+    public const int DEFAULT_BUDGET = 220;
+
     /**
      * @return BelongsTo<User, $this>
      */
