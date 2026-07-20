@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Auth\LoginCodeController;
+use App\Http\Controllers\MatchController;
 use App\Http\Controllers\SquadController;
 use Illuminate\Support\Facades\Route;
 
@@ -21,6 +22,8 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('squad', [SquadController::class, 'edit'])->name('squad.edit');
     Route::patch('squad/slot', [SquadController::class, 'assign'])->name('squad.assign');
+
+    Route::get('match', [MatchController::class, 'show'])->name('match.show');
 });
 
 require __DIR__.'/settings.php';
