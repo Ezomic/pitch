@@ -8,6 +8,7 @@ use App\Sim\Domain\Attributes;
 use App\Sim\Domain\Position;
 use Database\Factories\PlayerFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -44,10 +45,36 @@ class Player extends Model
         return $this->belongsTo(User::class);
     }
 
+    /** Ability at or above this, or turning eighteen, makes a prospect first-team ready. */
+    public const int PROMOTION_OVERALL = 14;
+
+    public function overall(): int
+    {
+        return $this->attributes()->overall();
+    }
+
     /** A young prospect still short of its ceiling, so still improving. */
     public function isDeveloping(): bool
     {
-        return $this->is_youth && $this->attributes()->overall() < $this->potential;
+        return $this->is_youth && $this->overall() < $this->potential;
+    }
+
+    /** A prospect good enough, or old enough, to step up to the first team. */
+    public function isPromotable(): bool
+    {
+        return $this->is_youth && ($this->age >= 18 || $this->overall() >= self::PROMOTION_OVERALL);
+    }
+
+    /**
+     * Players a user can field: the shared senior pool plus their own promoted
+     * academy graduates, never another club's players nor anyone's youth.
+     *
+     * @param  Builder<Player>  $query
+     */
+    public function scopeSelectableFor(Builder $query, int $userId): void
+    {
+        $query->where('is_youth', false)
+            ->where(fn (Builder $scoped) => $scoped->whereNull('user_id')->orWhere('user_id', $userId));
     }
 
     public function attributes(): Attributes

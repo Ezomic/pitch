@@ -31,7 +31,8 @@ class EnsureSquad
                 'budget' => Squad::DEFAULT_BUDGET,
             ]);
 
-            $pool = Player::all()->sortBy(fn (Player $p) => $p->value())->values();
+            $pool = Player::query()->selectableFor($user->id)->get()
+                ->sortBy(fn (Player $p) => $p->value())->values();
             $used = [];
 
             foreach (Roster::formation() as $slot => [, $position]) {

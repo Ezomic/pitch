@@ -6,6 +6,7 @@ import {
     FolderGit2,
     LayoutGrid,
     Shirt,
+    Sprout,
     Telescope,
     Trophy,
 } from '@lucide/vue';
@@ -27,6 +28,7 @@ import { show as matchShow } from '@/routes/match';
 import { index as scoutsIndex } from '@/routes/scouts';
 import { show as seasonShow } from '@/routes/season';
 import { edit as squadEdit } from '@/routes/squad';
+import { index as youthIndex } from '@/routes/youth';
 import type { NavItem } from '@/types';
 
 const mainNavItems: NavItem[] = [
@@ -49,6 +51,11 @@ const mainNavItems: NavItem[] = [
         title: 'Scouting',
         href: scoutsIndex(),
         icon: Telescope,
+    },
+    {
+        title: 'Academy',
+        href: youthIndex(),
+        icon: Sprout,
     },
     {
         title: 'Match',

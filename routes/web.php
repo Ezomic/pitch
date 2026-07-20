@@ -5,6 +5,7 @@ use App\Http\Controllers\MatchController;
 use App\Http\Controllers\ScoutController;
 use App\Http\Controllers\SeasonController;
 use App\Http\Controllers\SquadController;
+use App\Http\Controllers\YouthController;
 use Illuminate\Support\Facades\Route;
 
 Route::inertia('/', 'Welcome')->name('home');
@@ -37,6 +38,9 @@ Route::middleware(['auth'])->group(function () {
     Route::post('scouts/{scout}/hire', [ScoutController::class, 'hire'])->name('scouts.hire');
     Route::post('scouts/{scout}/assign', [ScoutController::class, 'assign'])->name('scouts.assign');
     Route::post('scouts/{scout}/recall', [ScoutController::class, 'recall'])->name('scouts.recall');
+
+    Route::get('youth', [YouthController::class, 'index'])->name('youth.index');
+    Route::post('youth/{player}/promote', [YouthController::class, 'promote'])->name('youth.promote');
 });
 
 require __DIR__.'/settings.php';
