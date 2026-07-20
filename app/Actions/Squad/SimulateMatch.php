@@ -19,31 +19,30 @@ class SimulateMatch
         private readonly MatchNarrator $narrator = new MatchNarrator,
     ) {}
 
-    public function handle(Squad $squad, int $seed): MatchReport
+    /**
+     * @param  array<int, Attributes>|null  $opponentBySlot  defaults to the average baseline
+     */
+    public function handle(Squad $squad, int $seed, ?array $opponentBySlot = null): MatchReport
     {
-        $bySlot = [];
-        $names = [];
+        $bySlot = $squad->attributesBySlot();
+        $opponent = $opponentBySlot ?? $this->baseline();
 
+        $names = [];
         foreach ($squad->assignments()->with('player')->get() as $assignment) {
-            $bySlot[$assignment->slot] = $assignment->player->attributes();
             $names[$assignment->slot] = $assignment->player->name;
         }
-
         foreach (Roster::slots() as $slot) {
-            $bySlot[$slot] ??= new Attributes(10, 10, 10, 10, 10, 10);
             $names[$slot] ??= "Slot {$slot}";
         }
-
-        $baseline = $this->baseline();
 
         $attack = $this->engine->simulate(
             Roster::fromAttributes($bySlot),
             $seed,
-            Defense::fromAttributes($baseline),
+            Defense::fromAttributes($opponent),
         );
 
         $defence = $this->engine->simulate(
-            Roster::fromAttributes($baseline),
+            Roster::fromAttributes($opponent),
             $seed,
             Defense::fromAttributes($bySlot),
         );

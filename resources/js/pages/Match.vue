@@ -5,10 +5,18 @@ import { Button } from '@/components/ui/button';
 import { show } from '@/routes/match';
 import type { MatchReport } from '@/types/match';
 
-const props = defineProps<{
-    seed: number;
-    report: MatchReport;
-}>();
+const props = withDefaults(
+    defineProps<{
+        seed: number;
+        report: MatchReport;
+        opponentName?: string;
+        hideReseed?: boolean;
+    }>(),
+    {
+        opponentName: 'Opposition',
+        hideReseed: false,
+    },
+);
 
 defineOptions({
     layout: {
@@ -47,7 +55,9 @@ const stats = [
                 </div>
                 <span class="text-2xl text-muted-foreground">-</span>
                 <div class="text-center">
-                    <p class="text-sm text-muted-foreground">Opposition</p>
+                    <p class="text-sm text-muted-foreground">
+                        {{ props.opponentName }}
+                    </p>
                     <p class="text-4xl font-medium tabular-nums">
                         {{ props.report.awayGoals }}
                     </p>
@@ -69,7 +79,12 @@ const stats = [
                 </div>
             </div>
 
-            <Button class="mt-6 w-full" variant="outline" @click="watchAnother">
+            <Button
+                v-if="!props.hideReseed"
+                class="mt-6 w-full"
+                variant="outline"
+                @click="watchAnother"
+            >
                 <RefreshCw class="h-4 w-4" />
                 Watch another match
             </Button>

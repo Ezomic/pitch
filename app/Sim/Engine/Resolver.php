@@ -68,7 +68,7 @@ final class Resolver
     private function resolveShot(Zone $ballZone, Attributes $actor, Defense $defense, Rng $rng): ResolveOutcome
     {
         $skill = $actor->finishing / self::SKILL_SCALE;
-        $threshold = $this->clamp($skill * 0.35 - $defense->shotSuppression($ballZone), 0.02, 0.5);
+        $threshold = $this->clamp($skill * 0.9 - $defense->shotSuppression($ballZone), 0.05, 0.75);
         $draw = $rng->next();
         $goal = $draw <= $threshold;
 

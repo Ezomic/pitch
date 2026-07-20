@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Sim\Domain\Attributes;
+use App\Sim\Engine\Roster;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -39,5 +41,26 @@ class Squad extends Model
     public function assignments(): HasMany
     {
         return $this->hasMany(SquadPlayer::class)->orderBy('slot');
+    }
+
+    /**
+     * The squad's attributes keyed by formation slot, with empty slots filled by
+     * an average placeholder so the engine always has a full eleven.
+     *
+     * @return array<int, Attributes>
+     */
+    public function attributesBySlot(): array
+    {
+        $bySlot = [];
+
+        foreach ($this->assignments()->with('player')->get() as $assignment) {
+            $bySlot[$assignment->slot] = $assignment->player->attributes();
+        }
+
+        foreach (Roster::slots() as $slot) {
+            $bySlot[$slot] ??= new Attributes(10, 10, 10, 10, 10, 10);
+        }
+
+        return $bySlot;
     }
 }
