@@ -24,11 +24,16 @@ class SquadController extends Controller
     {
         $squad = $ensureSquad->handle($this->user($request))->load('assignments.player');
 
+        $spent = (int) $squad->assignments->sum(fn ($assignment) => $assignment->player->value());
+
         return Inertia::render('Squad', [
             'squad' => [
                 'id' => $squad->id,
                 'name' => $squad->name,
                 'slots' => $this->slots($squad),
+                'budget' => $squad->budget,
+                'spent' => $spent,
+                'remaining' => $squad->budget - $spent,
             ],
             'pool' => $this->pool($squad),
             'profile' => $this->profile($evaluateSquad->handle($squad)),
@@ -118,6 +123,7 @@ class SquadController extends Controller
             'finishing' => $player->finishing,
             'tackling' => $player->tackling,
             'pace' => $player->pace,
+            'value' => $player->value(),
         ];
     }
 

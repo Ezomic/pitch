@@ -44,6 +44,22 @@ class Player extends Model
     }
 
     /**
+     * A convex price derived from the six attributes, so elite players cost
+     * disproportionately more than average ones.
+     */
+    public function value(): int
+    {
+        $attrs = [$this->vision, $this->passing, $this->dribbling, $this->finishing, $this->tackling, $this->pace];
+
+        $score = 0.0;
+        foreach ($attrs as $attr) {
+            $score += ($attr / 20) ** 2;
+        }
+
+        return max(1, (int) round($score * 10));
+    }
+
+    /**
      * @return array<string, string>
      */
     protected function casts(): array
