@@ -2,6 +2,7 @@ export interface Player {
     id: number;
     name: string;
     position: string;
+    age: number;
     vision: number;
     passing: number;
     dribbling: number;

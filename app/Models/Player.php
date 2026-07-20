@@ -10,12 +10,17 @@ use Database\Factories\PlayerFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
 
 /**
  * @property int $id
+ * @property int|null $user_id
  * @property string $name
  * @property Position $position
+ * @property int $age
+ * @property int $potential
+ * @property bool $is_youth
  * @property int $vision
  * @property int $passing
  * @property int $dribbling
@@ -25,11 +30,25 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['name', 'position', 'vision', 'passing', 'dribbling', 'finishing', 'tackling', 'pace'])]
+#[Fillable(['user_id', 'name', 'position', 'age', 'potential', 'is_youth', 'vision', 'passing', 'dribbling', 'finishing', 'tackling', 'pace'])]
 class Player extends Model
 {
     /** @use HasFactory<PlayerFactory> */
     use HasFactory;
+
+    /**
+     * @return BelongsTo<User, $this>
+     */
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    /** A young prospect still short of its ceiling, so still improving. */
+    public function isDeveloping(): bool
+    {
+        return $this->is_youth && $this->attributes()->overall() < $this->potential;
+    }
 
     public function attributes(): Attributes
     {
@@ -66,6 +85,9 @@ class Player extends Model
     {
         return [
             'position' => Position::class,
+            'age' => 'integer',
+            'potential' => 'integer',
+            'is_youth' => 'boolean',
         ];
     }
 }

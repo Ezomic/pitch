@@ -19,15 +19,24 @@ class PlayerSeeder extends Seeder
         mt_srand(1);
 
         foreach ($this->roster() as [$name, $position]) {
-            Player::create([
-                'name' => $name,
-                'position' => $position,
+            $attributes = [
                 'vision' => mt_rand(4, 18),
                 'passing' => mt_rand(6, 18),
                 'dribbling' => mt_rand(6, 18),
                 'finishing' => mt_rand(4, 18),
                 'tackling' => mt_rand(6, 18),
                 'pace' => mt_rand(6, 18),
+            ];
+
+            $overall = (int) round(array_sum($attributes) / count($attributes));
+
+            Player::create([
+                ...$attributes,
+                'name' => $name,
+                'position' => $position,
+                'age' => mt_rand(18, 33),
+                'potential' => min(20, $overall + mt_rand(0, 3)),
+                'is_youth' => false,
             ]);
         }
 
