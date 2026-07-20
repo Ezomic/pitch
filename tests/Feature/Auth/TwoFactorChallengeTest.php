@@ -1,49 +1,38 @@
 <?php
 
-namespace Tests\Feature\Auth;
+declare(strict_types=1);
 
+use App\Mail\LoginCodeMail;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Mail;
 use Inertia\Testing\AssertableInertia as Assert;
-use Laravel\Fortify\Features;
-use Tests\TestCase;
+use PragmaRX\Google2FA\Google2FA;
 
-class TwoFactorChallengeTest extends TestCase
-{
-    use RefreshDatabase;
+uses(RefreshDatabase::class);
 
-    protected function setUp(): void
-    {
-        parent::setUp();
+it('redirects the challenge to login when there is no pending user', function () {
+    $this->get(route('two-factor.login'))->assertRedirect(route('login'));
+});
 
-        $this->skipUnlessFortifyHas(Features::twoFactorAuthentication());
-    }
+it('renders the challenge for a pending two-factor user', function () {
+    $user = User::factory()->create([
+        'two_factor_secret' => encrypt(app(Google2FA::class)->generateSecretKey()),
+        'two_factor_confirmed_at' => now(),
+    ]);
 
-    public function test_two_factor_challenge_redirects_to_login_when_not_authenticated(): void
-    {
-        $response = $this->get(route('two-factor.login'));
+    Mail::fake();
+    $this->post(route('login.code.send'), ['email' => $user->email]);
+    $code = null;
+    Mail::assertSent(LoginCodeMail::class, function (LoginCodeMail $mail) use (&$code) {
+        $code = $mail->code;
 
-        $response->assertRedirect(route('login'));
-    }
+        return true;
+    });
 
-    public function test_two_factor_challenge_can_be_rendered(): void
-    {
-        Features::twoFactorAuthentication([
-            'confirm' => true,
-            'confirmPassword' => true,
-        ]);
+    $this->post(route('login.code.verify'), ['email' => $user->email, 'code' => $code]);
 
-        $user = User::factory()->withTwoFactor()->create();
-
-        $this->post(route('login'), [
-            'email' => $user->email,
-            'password' => 'password',
-        ]);
-
-        $this->get(route('two-factor.login'))
-            ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page
-                ->component('auth/TwoFactorChallenge'),
-            );
-    }
-}
+    $this->get(route('two-factor.login'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page->component('auth/TwoFactorChallenge'));
+});

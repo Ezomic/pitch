@@ -1,39 +1,35 @@
 <?php
 
-namespace Tests\Feature\Auth;
+declare(strict_types=1);
 
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Laravel\Fortify\Features;
-use Tests\TestCase;
 
-class RegistrationTest extends TestCase
-{
-    use RefreshDatabase;
+uses(RefreshDatabase::class);
 
-    protected function setUp(): void
-    {
-        parent::setUp();
+it('renders the registration screen', function () {
+    $this->get(route('register'))->assertOk();
+});
 
-        $this->skipUnlessFortifyHas(Features::registration());
-    }
+it('creates a passwordless account from name and email', function () {
+    $this->post(route('register.store'), [
+        'name' => 'Test User',
+        'email' => 'test@example.com',
+    ])->assertRedirect(route('dashboard', absolute: false));
 
-    public function test_registration_screen_can_be_rendered()
-    {
-        $response = $this->get(route('register'));
+    $user = User::where('email', 'test@example.com')->first();
 
-        $response->assertOk();
-    }
+    expect($user)->not->toBeNull()
+        ->and($user->name)->toBe('Test User');
 
-    public function test_new_users_can_register()
-    {
-        $response = $this->post(route('register.store'), [
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-            'password' => 'password',
-            'password_confirmation' => 'password',
-        ]);
+    $this->assertAuthenticatedAs($user);
+});
 
-        $this->assertAuthenticated();
-        $response->assertRedirect(route('dashboard', absolute: false));
-    }
-}
+it('rejects registration with a duplicate email', function () {
+    User::factory()->create(['email' => 'taken@example.com']);
+
+    $this->post(route('register.store'), [
+        'name' => 'Test User',
+        'email' => 'taken@example.com',
+    ])->assertSessionHasErrors('email');
+});
