@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Auth\LoginCodeController;
+use App\Http\Controllers\SquadController;
 use Illuminate\Support\Facades\Route;
 
 Route::inertia('/', 'Welcome')->name('home');
@@ -17,6 +18,9 @@ Route::middleware('guest')->group(function () {
 
 Route::middleware(['auth'])->group(function () {
     Route::inertia('dashboard', 'Dashboard')->name('dashboard');
+
+    Route::get('squad', [SquadController::class, 'edit'])->name('squad.edit');
+    Route::patch('squad/slot', [SquadController::class, 'assign'])->name('squad.assign');
 });
 
 require __DIR__.'/settings.php';

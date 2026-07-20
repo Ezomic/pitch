@@ -14,15 +14,13 @@ final class Roster
     public const int KICKOFF_CARRIER_ID = 2;
 
     /**
-     * A fixed ten-outfielder formation spread across the pitch. Every player
-     * shares the same attribute template, so the only thing that varies between
-     * experiment arms is vision.
+     * The fixed ten-outfielder formation: slot id => [zone, nominal position].
      *
-     * @return array<int, Player>
+     * @return array<int, array{Zone, Position}>
      */
-    public static function build(Attributes $template): array
+    public static function formation(): array
     {
-        $layout = [
+        return [
             1 => [new Zone(1, 0), Position::Defender],
             2 => [new Zone(1, 1), Position::Defender],
             3 => [new Zone(1, 2), Position::Defender],
@@ -34,10 +32,46 @@ final class Roster
             9 => [new Zone(4, 1), Position::Forward],
             10 => [new Zone(4, 2), Position::Forward],
         ];
+    }
 
+    /**
+     * The formation's slot ids in order.
+     *
+     * @return list<int>
+     */
+    public static function slots(): array
+    {
+        return array_keys(self::formation());
+    }
+
+    /**
+     * Build the roster from a single shared attribute template. Used by the
+     * paired experiment, where only vision varies between arms.
+     *
+     * @return array<int, Player>
+     */
+    public static function build(Attributes $template): array
+    {
+        $bySlot = [];
+        foreach (self::slots() as $slot) {
+            $bySlot[$slot] = $template;
+        }
+
+        return self::fromAttributes($bySlot);
+    }
+
+    /**
+     * Build the roster from per-slot attributes, placing each slot's player at
+     * that slot's formation zone.
+     *
+     * @param  array<int, Attributes>  $bySlot  slot id => attributes
+     * @return array<int, Player>
+     */
+    public static function fromAttributes(array $bySlot): array
+    {
         $players = [];
-        foreach ($layout as $id => [$zone, $position]) {
-            $players[$id] = new Player($id, 'P'.$id, $position, $zone, $template);
+        foreach (self::formation() as $slot => [$zone, $position]) {
+            $players[$slot] = new Player($slot, 'P'.$slot, $position, $zone, $bySlot[$slot]);
         }
 
         return $players;
