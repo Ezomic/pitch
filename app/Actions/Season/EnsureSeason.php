@@ -7,6 +7,7 @@ namespace App\Actions\Season;
 use App\Models\Season;
 use App\Models\Team;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 
 class EnsureSeason
@@ -25,7 +26,11 @@ class EnsureSeason
         }
 
         return DB::transaction(function () use ($user): Season {
-            $season = Season::create(['user_id' => $user->id]);
+            $season = Season::create([
+                'user_id' => $user->id,
+                'starts_on' => Season::STARTS_ON,
+                'current_date' => Season::STARTS_ON,
+            ]);
 
             $teamIds = [];
             foreach (Team::query()->orderBy('id')->get() as $team) {
@@ -84,6 +89,7 @@ class EnsureSeason
     {
         $season->fixtures()->create([
             'matchday' => $matchday,
+            'scheduled_on' => CarbonImmutable::parse($season->starts_on)->addWeeks($matchday),
             'home_team_id' => $home,
             'away_team_id' => $away,
             'seed' => $season->id * 1000 + $index + 1,
