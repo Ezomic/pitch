@@ -11,6 +11,8 @@ final readonly class SquadProfile
         public float $progressivePassShare,
         public float $chancesPer90,
         public float $goalsPer90,
+        public float $chancesConcededPer90,
+        public float $goalsConcededPer90,
     ) {}
 
     /**
@@ -23,6 +25,8 @@ final readonly class SquadProfile
             'progressive_pass_share' => $this->progressivePassShare,
             'chances_per_90' => $this->chancesPer90,
             'goals_per_90' => $this->goalsPer90,
+            'chances_conceded_per_90' => $this->chancesConcededPer90,
+            'goals_conceded_per_90' => $this->goalsConcededPer90,
         ];
     }
 }

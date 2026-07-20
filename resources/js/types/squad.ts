@@ -32,4 +32,6 @@ export interface SquadProfile {
     progressivePassShare: number;
     chancesPer90: number;
     goalsPer90: number;
+    chancesConcededPer90: number;
+    goalsConcededPer90: number;
 }
