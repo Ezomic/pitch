@@ -45,6 +45,10 @@ defineOptions({
 const selectedSlot = ref<number | null>(null);
 const previousProfile = ref<SquadProfile | null>(null);
 
+function toggleSlot(slot: number): void {
+    selectedSlot.value = selectedSlot.value === slot ? null : slot;
+}
+
 watch(
     () => props.profile,
     (_next, prev) => {
@@ -171,7 +175,7 @@ function pick(playerId: number): void {
                 <PitchFormation
                     :slots="props.squad.slots"
                     :selected-slot="selectedSlot"
-                    @select="(slot) => (selectedSlot = slot)"
+                    @select="toggleSlot"
                 />
                 <p class="text-sm text-muted-foreground">
                     <template v-if="selectedSlot === null">
