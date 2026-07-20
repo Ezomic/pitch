@@ -52,6 +52,8 @@ it('swaps a pool player into a slot', function () {
     $user = User::factory()->create();
     $this->actingAs($user)->get(route('squad.edit'));
     $squad = $user->squad()->first();
+    // Isolate the swap mechanic from pricing: any pool player is affordable here.
+    $squad->update(['budget' => 100000]);
 
     $assignedIds = $squad->assignments()->pluck('player_id')->all();
     $incoming = Player::query()->whereNotIn('id', $assignedIds)->firstOrFail();
@@ -132,12 +134,13 @@ it('allows an affordable swap and updates spend by the price difference', functi
     $user = User::factory()->create();
     $this->actingAs($user)->get(route('squad.edit'));
     $squad = $user->squad()->first();
+    // Ample budget so the swap succeeds regardless of the random pool's prices.
+    $squad->update(['budget' => 100000]);
 
     $spentBefore = (int) $squad->assignments()->with('player')->get()->sum(fn ($a) => $a->player->value());
     $outgoing = $squad->assignments()->where('slot', 3)->with('player')->firstOrFail()->player;
 
     $assignedIds = $squad->assignments()->pluck('player_id')->all();
-    // Cheapest available player is always affordable against a cheapest-fill squad.
     $incoming = Player::query()->whereNotIn('id', $assignedIds)->get()
         ->sortBy(fn (Player $p) => $p->value())->first();
 
