@@ -44,6 +44,14 @@ class User extends Authenticatable implements PasskeyUser
     }
 
     /**
+     * @return HasOne<Season, $this>
+     */
+    public function season(): HasOne
+    {
+        return $this->hasOne(Season::class);
+    }
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>

@@ -15,7 +15,7 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        $this->call(PlayerSeeder::class);
+        $this->call([PlayerSeeder::class, TeamSeeder::class]);
 
         User::factory()->create([
             'name' => 'Test User',

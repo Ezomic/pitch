@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Auth\LoginCodeController;
 use App\Http\Controllers\MatchController;
+use App\Http\Controllers\SeasonController;
 use App\Http\Controllers\SquadController;
 use Illuminate\Support\Facades\Route;
 
@@ -24,6 +25,11 @@ Route::middleware(['auth'])->group(function () {
     Route::patch('squad/slot', [SquadController::class, 'assign'])->name('squad.assign');
 
     Route::get('match', [MatchController::class, 'show'])->name('match.show');
+
+    Route::get('season', [SeasonController::class, 'show'])->name('season.show');
+    Route::post('season/play', [SeasonController::class, 'play'])->name('season.play');
+    Route::post('season/reset', [SeasonController::class, 'reset'])->name('season.reset');
+    Route::get('season/fixtures/{fixture}/report', [SeasonController::class, 'report'])->name('season.report');
 });
 
 require __DIR__.'/settings.php';

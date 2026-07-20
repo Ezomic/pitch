@@ -6,6 +6,7 @@ import {
     FolderGit2,
     LayoutGrid,
     Shirt,
+    Trophy,
 } from '@lucide/vue';
 import AppLogo from '@/components/AppLogo.vue';
 import NavFooter from '@/components/NavFooter.vue';
@@ -22,6 +23,7 @@ import {
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
 import { show as matchShow } from '@/routes/match';
+import { show as seasonShow } from '@/routes/season';
 import { edit as squadEdit } from '@/routes/squad';
 import type { NavItem } from '@/types';
 
@@ -35,6 +37,11 @@ const mainNavItems: NavItem[] = [
         title: 'Squad',
         href: squadEdit(),
         icon: Shirt,
+    },
+    {
+        title: 'Season',
+        href: seasonShow(),
+        icon: Trophy,
     },
     {
         title: 'Match',
