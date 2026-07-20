@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Actions\Season\AdvanceWeek;
 use App\Actions\Season\EnsureSeason;
-use App\Actions\Season\PlayMatchday;
 use App\Actions\Season\Standings;
 use App\Actions\Squad\EnsureSquad;
 use App\Actions\Squad\SimulateMatch;
@@ -27,22 +27,25 @@ class SeasonController extends Controller
         /** @var Collection<int, Team> $teams */
         $teams = Team::all()->keyBy('id');
 
-        $current = $season->fixtures->firstWhere('played', false)?->matchday;
+        $nextUnplayed = $season->fixtures->firstWhere('played', false);
+        $current = $nextUnplayed?->matchday;
 
         return Inertia::render('Season', [
             'standings' => $standings->handle($season),
             'matchdays' => $this->matchdays($season, $teams),
             'currentMatchday' => $current,
+            'currentDate' => $season->current_date->toDateString(),
+            'nextFixtureDate' => $nextUnplayed?->scheduled_on?->toDateString(),
             'nextFixture' => $this->nextFixture($season, $teams, $current),
             'complete' => $current === null,
         ]);
     }
 
-    public function play(Request $request, EnsureSeason $ensureSeason, PlayMatchday $playMatchday): RedirectResponse
+    public function advance(Request $request, EnsureSeason $ensureSeason, AdvanceWeek $advanceWeek): RedirectResponse
     {
         $season = $ensureSeason->handle($this->user($request));
 
-        $playMatchday->handle($season);
+        $advanceWeek->handle($season);
 
         return to_route('season.show');
     }

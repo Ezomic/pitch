@@ -2,10 +2,12 @@
 
 declare(strict_types=1);
 
+use App\Actions\Season\AdvanceWeek;
 use App\Actions\Season\EnsureSeason;
 use App\Actions\Season\PlayMatchday;
 use App\Actions\Season\Standings;
 use App\Models\Player;
+use App\Models\Season;
 use App\Models\Team;
 use App\Models\User;
 use App\Sim\Domain\Position;
@@ -41,6 +43,32 @@ it('generates a full double round-robin schedule', function () {
     expect(array_unique(array_values($counts)))->toBe([14]);
 });
 
+it('schedules the season on a weekly calendar', function () {
+    $season = app(EnsureSeason::class)->handle(User::factory()->create());
+
+    expect($season->starts_on->toDateString())->toBe(Season::STARTS_ON)
+        ->and($season->current_date->toDateString())->toBe(Season::STARTS_ON);
+
+    $first = $season->fixtures()->where('matchday', 1)->first();
+    $second = $season->fixtures()->where('matchday', 2)->first();
+
+    expect($first->scheduled_on->toDateString())->toBe($season->starts_on->copy()->addWeek()->toDateString())
+        ->and($second->scheduled_on->toDateString())->toBe($first->scheduled_on->copy()->addWeek()->toDateString());
+});
+
+it('advances the calendar a week and plays the matchday now due', function () {
+    $user = User::factory()->create();
+    $season = app(EnsureSeason::class)->handle($user);
+    $start = $season->current_date->copy();
+
+    app(AdvanceWeek::class)->handle($season);
+    $season->refresh();
+
+    expect($season->current_date->toDateString())->toBe($start->addWeek()->toDateString())
+        ->and($season->fixtures()->where('matchday', 1)->where('played', false)->count())->toBe(0)
+        ->and($season->fixtures()->where('matchday', 2)->where('played', true)->count())->toBe(0);
+});
+
 it('renders the season page with standings and fixtures', function () {
     $user = User::factory()->create();
 
@@ -52,6 +80,8 @@ it('renders the season page with standings and fixtures', function () {
             ->has('standings', 8)
             ->has('matchdays', 14)
             ->where('currentMatchday', 1)
+            ->where('currentDate', Season::STARTS_ON)
+            ->has('nextFixtureDate')
             ->where('complete', false),
         );
 });
@@ -60,7 +90,7 @@ it('plays a matchday and advances the table', function () {
     $user = User::factory()->create();
     $this->actingAs($user)->get(route('season.show'));
 
-    $this->actingAs($user)->post(route('season.play'))->assertRedirect(route('season.show'));
+    $this->actingAs($user)->post(route('season.advance'))->assertRedirect(route('season.show'));
 
     $season = $user->season()->first();
     expect($season->fixtures()->where('played', true)->count())->toBe(4)
@@ -94,7 +124,7 @@ it('orders the standings by points then goal difference', function () {
 it('shows a report for a played user fixture', function () {
     $user = User::factory()->create();
     $this->actingAs($user)->get(route('season.show'));
-    $this->actingAs($user)->post(route('season.play'));
+    $this->actingAs($user)->post(route('season.advance'));
 
     $season = $user->season()->first();
     $userFixture = $season->fixtures()->where('played', true)->get()
@@ -109,7 +139,7 @@ it('shows a report for a played user fixture', function () {
 it('does not show a report for a rival-only fixture', function () {
     $user = User::factory()->create();
     $this->actingAs($user)->get(route('season.show'));
-    $this->actingAs($user)->post(route('season.play'));
+    $this->actingAs($user)->post(route('season.advance'));
 
     $season = $user->season()->first();
     $rivalFixture = $season->fixtures()->where('played', true)->get()

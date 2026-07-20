@@ -1,13 +1,15 @@
 <script setup lang="ts">
 import { Head, Link, router } from '@inertiajs/vue3';
 import { Button } from '@/components/ui/button';
-import { play, reset, show } from '@/routes/season';
+import { advance, reset, show } from '@/routes/season';
 import type { Matchday, NextFixture, StandingRow } from '@/types/season';
 
 const props = defineProps<{
     standings: StandingRow[];
     matchdays: Matchday[];
     currentMatchday: number | null;
+    currentDate: string;
+    nextFixtureDate: string | null;
     nextFixture: NextFixture | null;
     complete: boolean;
 }>();
@@ -18,8 +20,17 @@ defineOptions({
     },
 });
 
-function playMatchday(): void {
-    router.post(play().url, {}, { preserveScroll: true });
+function advanceWeek(): void {
+    router.post(advance().url, {}, { preserveScroll: true });
+}
+
+function formatDate(iso: string): string {
+    return new Date(iso).toLocaleDateString(undefined, {
+        weekday: 'short',
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+    });
 }
 
 function newSeason(): void {
@@ -58,7 +69,11 @@ const columns: { key: keyof StandingRow; label: string }[] = [
             <div class="flex flex-wrap items-center justify-between gap-3">
                 <div v-if="!props.complete && props.nextFixture">
                     <p class="text-sm text-muted-foreground">
-                        Matchday {{ props.currentMatchday }}
+                        {{ formatDate(props.currentDate) }} &middot; Matchday
+                        {{ props.currentMatchday
+                        }}<template v-if="props.nextFixtureDate">
+                            plays {{ formatDate(props.nextFixtureDate) }}</template
+                        >
                     </p>
                     <p class="text-lg font-medium">
                         Your squad
@@ -67,15 +82,18 @@ const columns: { key: keyof StandingRow; label: string }[] = [
                     </p>
                 </div>
                 <div v-else>
-                    <p class="text-sm text-muted-foreground">Season complete</p>
+                    <p class="text-sm text-muted-foreground">
+                        {{ formatDate(props.currentDate) }} &middot; Season
+                        complete
+                    </p>
                     <p class="text-lg font-medium">
                         You finished {{ userPosition() }} of
                         {{ props.standings.length }}
                     </p>
                 </div>
 
-                <Button v-if="!props.complete" @click="playMatchday">
-                    Play matchday
+                <Button v-if="!props.complete" @click="advanceWeek">
+                    Advance week
                 </Button>
                 <Button v-else variant="outline" @click="newSeason">
                     Start new season
