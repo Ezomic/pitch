@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Auth\LoginCodeController;
 use App\Http\Controllers\MatchController;
+use App\Http\Controllers\ScoutController;
 use App\Http\Controllers\SeasonController;
 use App\Http\Controllers\SquadController;
 use Illuminate\Support\Facades\Route;
@@ -31,6 +32,11 @@ Route::middleware(['auth'])->group(function () {
     Route::post('season/advance', [SeasonController::class, 'advance'])->name('season.advance');
     Route::post('season/reset', [SeasonController::class, 'reset'])->name('season.reset');
     Route::get('season/fixtures/{fixture}/report', [SeasonController::class, 'report'])->name('season.report');
+
+    Route::get('scouts', [ScoutController::class, 'index'])->name('scouts.index');
+    Route::post('scouts/{scout}/hire', [ScoutController::class, 'hire'])->name('scouts.hire');
+    Route::post('scouts/{scout}/assign', [ScoutController::class, 'assign'])->name('scouts.assign');
+    Route::post('scouts/{scout}/recall', [ScoutController::class, 'recall'])->name('scouts.recall');
 });
 
 require __DIR__.'/settings.php';
