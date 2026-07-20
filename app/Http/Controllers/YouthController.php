@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Actions\Season\EnsureSeason;
+use App\Actions\Season\Standings;
 use App\Actions\Youth\PromoteYouth;
+use App\Models\Fixture;
 use App\Models\Player;
+use App\Models\Team;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -14,9 +18,10 @@ use Inertia\Response;
 
 class YouthController extends Controller
 {
-    public function index(Request $request): Response
+    public function index(Request $request, EnsureSeason $ensureSeason, Standings $standings): Response
     {
         $user = $this->user($request);
+        $season = $ensureSeason->handle($user);
 
         $prospects = Player::query()
             ->where('user_id', $user->id)
@@ -24,6 +29,8 @@ class YouthController extends Controller
             ->orderByDesc('potential')
             ->orderByDesc('age')
             ->get();
+
+        $teams = Team::query()->where('is_youth', true)->get()->keyBy('id');
 
         return Inertia::render('Youth', [
             'prospects' => $prospects->map(fn (Player $player) => [
@@ -35,6 +42,15 @@ class YouthController extends Controller
                 'potential' => $player->potential,
                 'promotable' => $player->isPromotable(),
             ])->all(),
+            'leagueTable' => $standings->handle($season, youth: true),
+            'fixtures' => $season->fixtures()->where('youth', true)->orderBy('matchday')->get()
+                ->map(fn (Fixture $fixture) => [
+                    'id' => $fixture->id,
+                    'opponent' => $teams->get($fixture->away_team_id)->name,
+                    'played' => $fixture->played,
+                    'goalsFor' => $fixture->home_goals,
+                    'goalsAgainst' => $fixture->away_goals,
+                ])->all(),
         ]);
     }
 

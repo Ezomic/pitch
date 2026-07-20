@@ -33,11 +33,18 @@ class EnsureSeason
             ]);
 
             $teamIds = [];
-            foreach (Team::query()->orderBy('id')->get() as $team) {
+            foreach (Team::query()->where('is_youth', false)->orderBy('id')->get() as $team) {
                 $teamIds[] = $team->id;
             }
 
             $this->generateSchedule($season, $teamIds);
+
+            $youthTeamIds = [];
+            foreach (Team::query()->where('is_youth', true)->orderBy('id')->get() as $team) {
+                $youthTeamIds[] = $team->id;
+            }
+
+            $this->generateYouthSchedule($season, $youthTeamIds);
 
             return $season;
         });
@@ -95,5 +102,25 @@ class EnsureSeason
             'seed' => $season->id * 1000 + $index + 1,
             'played' => false,
         ]);
+    }
+
+    /**
+     * The academy plays each youth side once, week by week alongside the seniors.
+     *
+     * @param  list<int>  $youthTeamIds
+     */
+    private function generateYouthSchedule(Season $season, array $youthTeamIds): void
+    {
+        foreach ($youthTeamIds as $matchday => $teamId) {
+            $season->fixtures()->create([
+                'matchday' => $matchday + 1,
+                'youth' => true,
+                'scheduled_on' => CarbonImmutable::parse($season->starts_on)->addWeeks($matchday + 1),
+                'home_team_id' => null,
+                'away_team_id' => $teamId,
+                'seed' => $season->id * 1000 + 900 + $matchday,
+                'played' => false,
+            ]);
+        }
     }
 }

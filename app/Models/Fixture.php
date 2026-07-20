@@ -13,6 +13,7 @@ use Illuminate\Support\Carbon;
  * @property int $id
  * @property int $season_id
  * @property int $matchday
+ * @property bool $youth
  * @property Carbon|null $scheduled_on
  * @property int|null $home_team_id
  * @property int|null $away_team_id
@@ -26,6 +27,7 @@ use Illuminate\Support\Carbon;
 #[Fillable([
     'season_id',
     'matchday',
+    'youth',
     'scheduled_on',
     'home_team_id',
     'away_team_id',
@@ -77,6 +79,7 @@ class Fixture extends Model
     {
         return [
             'played' => 'boolean',
+            'youth' => 'boolean',
             'scheduled_on' => 'date',
         ];
     }

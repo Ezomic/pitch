@@ -4,42 +4,45 @@ declare(strict_types=1);
 
 namespace App\Actions\Season;
 
-use App\Actions\Squad\EnsureSquad;
+use App\Actions\Youth\BuildYouthTeam;
 use App\Models\Season;
 use App\Models\Team;
 use App\Sim\Squad\FixtureResolver;
 use App\Sim\Squad\TeamSetup;
+use Carbon\CarbonImmutable;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
-class PlayMatchday
+/**
+ * Play any youth-league fixtures now due. The user's academy XI takes on the
+ * scheduled youth side; prospects who feature get an extra week of development
+ * from the match minutes.
+ */
+class PlayYouthFixtures
 {
     public function __construct(
         private readonly FixtureResolver $resolver = new FixtureResolver,
-        private readonly EnsureSquad $ensureSquad = new EnsureSquad,
+        private readonly BuildYouthTeam $buildYouthTeam = new BuildYouthTeam,
+        private readonly DevelopPlayers $developPlayers = new DevelopPlayers,
     ) {}
 
-    /**
-     * Resolve every fixture on the next unplayed matchday. The user's fixture is
-     * played with their current squad; the rest are auto-simulated.
-     */
     public function handle(Season $season): void
     {
-        $matchday = $season->fixtures()->where('youth', false)->where('played', false)->min('matchday');
+        $current = CarbonImmutable::parse($season->current_date);
 
-        if ($matchday === null) {
+        $fixtures = $season->fixtures()
+            ->where('youth', true)
+            ->where('played', false)
+            ->whereDate('scheduled_on', '<=', $current)
+            ->get();
+
+        if ($fixtures->isEmpty()) {
             return;
         }
 
-        $fixtures = $season->fixtures()
-            ->where('youth', false)
-            ->where('matchday', $matchday)
-            ->where('played', false)
-            ->get();
-
         /** @var Collection<int, Team> $teams */
-        $teams = Team::all()->keyBy('id');
-        $userSetup = $this->ensureSquad->handle($season->user)->setup();
+        $teams = Team::query()->where('is_youth', true)->get()->keyBy('id');
+        $userSetup = $this->buildYouthTeam->forUser($season->user);
 
         DB::transaction(function () use ($fixtures, $teams, $userSetup): void {
             foreach ($fixtures as $fixture) {
@@ -56,6 +59,8 @@ class PlayMatchday
                 ]);
             }
         });
+
+        $this->developPlayers->handle($this->buildYouthTeam->featured($season->user));
     }
 
     /**
@@ -70,7 +75,7 @@ class PlayMatchday
         $team = $teams->get($teamId);
 
         if (! $team instanceof Team) {
-            throw new \RuntimeException("Missing team {$teamId} in fixture.");
+            throw new \RuntimeException("Missing youth team {$teamId} in fixture.");
         }
 
         return $team->setup();
