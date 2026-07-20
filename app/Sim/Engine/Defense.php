@@ -71,8 +71,9 @@ final readonly class Defense
             $pace[$line] = self::average($attributes, fn (Attributes $a) => $a->pace);
             // Only the back line's numbers matter for defending the final third,
             // where chances are conceded; forwards and midfielders press rather
-            // than hold, so their coverage is treated as full.
-            $coverage[$line] = $line === self::BACK ? min(count($attributes), 3) / 3 : 1.0;
+            // than hold, so their coverage is treated as full. A back four is the
+            // baseline (1.0), so a back three is leakier and a back five tighter.
+            $coverage[$line] = $line === self::BACK ? count($attributes) / 4 : 1.0;
         }
 
         return new self($tackling, $pace, $coverage, $defenceBias, true);

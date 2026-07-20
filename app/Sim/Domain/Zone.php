@@ -8,7 +8,9 @@ final readonly class Zone
 {
     public const int MAX_X = 5;
 
-    public const int MAX_Y = 2;
+    public const int MAX_Y = 4;
+
+    public const int CENTRE_Y = 2;
 
     public function __construct(
         public int $x,
@@ -18,7 +20,7 @@ final readonly class Zone
     public function threat(): float
     {
         $advance = ($this->x / self::MAX_X) * 0.85;
-        $central = $this->y === 1 ? 0.15 : 0.0;
+        $central = $this->y === self::CENTRE_Y ? 0.15 : 0.0;
 
         return $advance + $central;
     }

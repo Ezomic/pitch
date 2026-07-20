@@ -20,7 +20,7 @@ class TeamFactory extends Factory
         return [
             'name' => fake()->unique()->company(),
             'style' => fake()->randomElement(['Balanced', 'Defensive', 'Attacking']),
-            'formation' => fake()->randomElement(['balanced', 'defensive', 'attacking']),
+            'formation' => fake()->randomElement(['442', '433', '352', '4231', '532', '343']),
             'mentality' => fake()->randomElement(['balanced', 'defensive', 'attacking']),
             'vision' => fake()->numberBetween(6, 16),
             'passing' => fake()->numberBetween(6, 16),

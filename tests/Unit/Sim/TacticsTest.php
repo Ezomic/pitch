@@ -19,7 +19,7 @@ function setupOf(Formation $formation, Mentality $mentality): TeamSetup
     return new TeamSetup($bySlot, $formation, $mentality);
 }
 
-it('defines valid formations of ten players, at most three per column', function () {
+it('defines valid formations of ten players, at most five per column', function () {
     $ids = [];
     foreach (Formation::all() as $id => $formation) {
         $ids[] = $id;
@@ -31,7 +31,7 @@ it('defines valid formations of ten players, at most three per column', function
         foreach ($formation->layout as [$zone]) {
             $perColumn[$zone->x] = ($perColumn[$zone->x] ?? 0) + 1;
         }
-        expect(max($perColumn))->toBeLessThanOrEqual(3);
+        expect(max($perColumn))->toBeLessThanOrEqual(5);
     }
 
     expect($ids)->toBe(array_unique($ids));

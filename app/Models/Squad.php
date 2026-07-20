@@ -34,7 +34,7 @@ class Squad extends Model
      * @var array<string, mixed>
      */
     protected $attributes = [
-        'formation' => 'balanced',
+        'formation' => '433',
         'mentality' => 'balanced',
     ];
 
