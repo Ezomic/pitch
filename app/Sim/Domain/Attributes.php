@@ -19,4 +19,12 @@ final readonly class Attributes
     {
         return new self($vision, $this->passing, $this->dribbling, $this->finishing, $this->tackling, $this->pace);
     }
+
+    /** The rounded mean of the six attributes: a player's overall ability. */
+    public function overall(): int
+    {
+        $sum = $this->vision + $this->passing + $this->dribbling + $this->finishing + $this->tackling + $this->pace;
+
+        return (int) round($sum / 6);
+    }
 }

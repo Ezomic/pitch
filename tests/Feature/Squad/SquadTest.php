@@ -37,6 +37,7 @@ it('creates and renders a default squad on first visit', function () {
             ->has('squad.spent')
             ->has('squad.remaining')
             ->has('pool.0.value')
+            ->has('pool.0.age')
             ->has('profile.meanDecisionGap')
             ->has('profile.chancesPer90')
             ->has('profile.chancesConcededPer90')

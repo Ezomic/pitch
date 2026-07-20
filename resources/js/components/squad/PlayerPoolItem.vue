@@ -34,6 +34,9 @@ const stats: { key: keyof PoolPlayer; label: string; key_metric: boolean }[] = [
                 props.player.name
             }}</span>
             <div class="flex shrink-0 items-center gap-1">
+                <span class="text-xs text-muted-foreground tabular-nums"
+                    >{{ props.player.age }}y</span
+                >
                 <span class="text-xs font-medium tabular-nums"
                     >£{{ props.player.value }}m</span
                 >
