@@ -9,9 +9,9 @@ use App\Models\Season;
 use Carbon\CarbonImmutable;
 
 /**
- * Advance the club calendar by one week. This is the single tick the rest of the
- * management layer hangs off: later steps (youth-league fixtures) are appended
- * here so they all run on the same clock.
+ * Advance the club calendar by one week. This is the single tick the whole
+ * management layer hangs off: the senior matchday, scout deliveries, youth
+ * development and the youth league all run on the same clock.
  */
 class AdvanceWeek
 {
@@ -19,6 +19,7 @@ class AdvanceWeek
         private readonly PlayMatchday $playMatchday = new PlayMatchday,
         private readonly DeliverProspects $deliverProspects = new DeliverProspects,
         private readonly DevelopPlayers $developPlayers = new DevelopPlayers,
+        private readonly PlayYouthFixtures $playYouthFixtures = new PlayYouthFixtures,
     ) {}
 
     public function handle(Season $season): void
@@ -33,5 +34,7 @@ class AdvanceWeek
         $this->developPlayers->handle(
             Player::query()->where('user_id', $season->user_id)->where('is_youth', true)->get()
         );
+
+        $this->playYouthFixtures->handle($season);
     }
 }

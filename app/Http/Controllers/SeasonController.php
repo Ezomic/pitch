@@ -23,7 +23,8 @@ class SeasonController extends Controller
 {
     public function show(Request $request, EnsureSeason $ensureSeason, Standings $standings): Response
     {
-        $season = $ensureSeason->handle($this->user($request))->load('fixtures');
+        $season = $ensureSeason->handle($this->user($request))
+            ->load(['fixtures' => fn ($query) => $query->where('youth', false)]);
         /** @var Collection<int, Team> $teams */
         $teams = Team::all()->keyBy('id');
 

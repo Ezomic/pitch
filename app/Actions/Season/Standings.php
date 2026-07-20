@@ -16,15 +16,15 @@ class Standings
      *
      * @return list<array<string, mixed>>
      */
-    public function handle(Season $season): array
+    public function handle(Season $season, bool $youth = false): array
     {
-        $rows = ['user' => $this->emptyRow('Your squad', true)];
+        $rows = ['user' => $this->emptyRow($youth ? 'Your academy' : 'Your squad', true)];
 
-        foreach (Team::query()->orderBy('id')->get() as $team) {
+        foreach (Team::query()->where('is_youth', $youth)->orderBy('id')->get() as $team) {
             $rows[$team->id] = $this->emptyRow($team->name, false);
         }
 
-        foreach ($season->fixtures()->where('played', true)->get() as $fixture) {
+        foreach ($season->fixtures()->where('youth', $youth)->where('played', true)->get() as $fixture) {
             $homeKey = $fixture->home_team_id ?? 'user';
             $awayKey = $fixture->away_team_id ?? 'user';
 

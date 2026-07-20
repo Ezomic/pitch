@@ -18,6 +18,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property int $id
  * @property string $name
  * @property string $style
+ * @property bool $is_youth
  * @property string $formation
  * @property string $mentality
  * @property int $vision
@@ -27,11 +28,21 @@ use Illuminate\Database\Eloquent\Model;
  * @property int $tackling
  * @property int $pace
  */
-#[Fillable(['name', 'style', 'formation', 'mentality', 'vision', 'passing', 'dribbling', 'finishing', 'tackling', 'pace'])]
+#[Fillable(['name', 'style', 'is_youth', 'formation', 'mentality', 'vision', 'passing', 'dribbling', 'finishing', 'tackling', 'pace'])]
 class Team extends Model
 {
     /** @use HasFactory<TeamFactory> */
     use HasFactory;
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'is_youth' => 'boolean',
+        ];
+    }
 
     public function attributes(): Attributes
     {

@@ -7,3 +7,11 @@ export interface Prospect {
     potential: number;
     promotable: boolean;
 }
+
+export interface YouthFixture {
+    id: number;
+    opponent: string;
+    played: boolean;
+    goalsFor: number | null;
+    goalsAgainst: number | null;
+}
