@@ -47,7 +47,7 @@ class TeamSeeder extends Seeder
     {
         return [
             // name, style, formation, mentality, vision, passing, dribbling, finishing, tackling, pace
-            ['name' => 'Old Harbour', 'style' => 'Balanced', 'formation' => '442', 'mentality' => 'balanced', 'vision' => 75, 'passing' => 75, 'dribbling' => 70, 'finishing' => 70, 'tackling' => 75, 'pace' => 70],
+            ['name' => 'Old Harbour', 'style' => 'Balanced', 'is_derby' => true, 'formation' => '442', 'mentality' => 'balanced', 'vision' => 75, 'passing' => 75, 'dribbling' => 70, 'finishing' => 70, 'tackling' => 75, 'pace' => 70],
             ['name' => 'Tiki Rovers', 'style' => 'Possession', 'formation' => '433', 'mentality' => 'attacking', 'vision' => 85, 'passing' => 80, 'dribbling' => 65, 'finishing' => 55, 'tackling' => 50, 'pace' => 50],
             ['name' => 'Blaze United', 'style' => 'Attacking', 'formation' => '343', 'mentality' => 'attacking', 'vision' => 60, 'passing' => 60, 'dribbling' => 75, 'finishing' => 80, 'tackling' => 40, 'pace' => 70],
             ['name' => 'Ferrous Wall', 'style' => 'Defensive', 'formation' => '532', 'mentality' => 'defensive', 'vision' => 50, 'passing' => 55, 'dribbling' => 45, 'finishing' => 45, 'tackling' => 85, 'pace' => 75],

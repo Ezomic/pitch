@@ -247,10 +247,19 @@ const columns: { key: keyof StandingRow; label: string }[] = [
                             fixture.isUser ? 'bg-accent/40 font-medium' : ''
                         "
                     >
-                        <span class="truncate">
-                            {{ fixture.homeName }}
-                            <span class="text-muted-foreground">v</span>
-                            {{ fixture.awayName }}
+                        <span
+                            class="flex min-w-0 items-center gap-1.5 truncate"
+                        >
+                            <span class="truncate">
+                                {{ fixture.homeName }}
+                                <span class="text-muted-foreground">v</span>
+                                {{ fixture.awayName }}
+                            </span>
+                            <span
+                                v-if="fixture.isDerby"
+                                class="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400"
+                                >Derby</span
+                            >
                         </span>
                         <span class="flex shrink-0 items-center gap-2">
                             <span v-if="fixture.played" class="tabular-nums">

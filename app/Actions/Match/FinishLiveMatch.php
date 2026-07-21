@@ -6,6 +6,7 @@ namespace App\Actions\Match;
 
 use App\Actions\Season\ApplyMatchCondition;
 use App\Models\MatchSession;
+use App\Models\Team;
 
 /**
  * Blow the full-time whistle: write the played-out score onto the fixture (mapped
@@ -32,11 +33,15 @@ class FinishLiveMatch
             'played' => true,
         ]);
 
+        $opponentId = $fixture->userIsHome() ? $fixture->away_team_id : $fixture->home_team_id;
+        $stakes = Team::find($opponentId)?->is_derby ? 2 : 1;
+
         $this->applyMatchCondition->handle(
             array_values(array_map('intval', $session->lineup ?? [])),
             $session->home_goals,
             $session->away_goals,
             array_values(array_map(fn (array $scorer): int => (int) $scorer['player_id'], $session->scorers ?? [])),
+            $stakes,
         );
 
         $session->delete();

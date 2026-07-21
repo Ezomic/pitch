@@ -16,10 +16,11 @@ class ApplyMatchCondition
     /**
      * @param  list<int>  $featuredPlayerIds  the XI that played (drained + result-nudged)
      * @param  list<int>  $scoringPlayerIds  players who scored (an extra form lift)
+     * @param  int  $stakes  multiplies the result's form swing (a derby raises it)
      */
-    public function handle(array $featuredPlayerIds, int $goalsFor, int $goalsAgainst, array $scoringPlayerIds = []): void
+    public function handle(array $featuredPlayerIds, int $goalsFor, int $goalsAgainst, array $scoringPlayerIds = [], int $stakes = 1): void
     {
-        $resultNudge = $goalsFor <=> $goalsAgainst;
+        $resultNudge = ($goalsFor <=> $goalsAgainst) * $stakes;
 
         $affected = array_values(array_unique([...$featuredPlayerIds, ...$scoringPlayerIds]));
 

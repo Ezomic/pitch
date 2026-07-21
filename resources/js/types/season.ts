@@ -19,6 +19,7 @@ export interface FixtureView {
     awayGoals: number | null;
     played: boolean;
     isUser: boolean;
+    isDerby: boolean;
     reportUrl: string | null;
 }
 

@@ -223,6 +223,8 @@ class SeasonController extends Controller
                     'awayGoals' => $fixture->away_goals,
                     'played' => $fixture->played,
                     'isUser' => $fixture->involvesUser(),
+                    'isDerby' => $fixture->involvesUser()
+                        && (bool) $teams->get($fixture->home_team_id ?? $fixture->away_team_id)->is_derby,
                     'reportUrl' => $fixture->involvesUser() && $fixture->played
                         ? route('season.report', $fixture)
                         : null,
