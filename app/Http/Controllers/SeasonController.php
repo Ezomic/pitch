@@ -30,6 +30,7 @@ class SeasonController extends Controller
 
         $nextUnplayed = $season->fixtures->firstWhere('played', false);
         $current = $nextUnplayed?->matchday;
+        $due = $this->dueUserFixture($season);
 
         return Inertia::render('Season', [
             'standings' => $standings->handle($season),
@@ -38,6 +39,11 @@ class SeasonController extends Controller
             'currentDate' => $season->current_date->toDateString(),
             'nextFixtureDate' => $nextUnplayed?->scheduled_on?->toDateString(),
             'nextFixture' => $this->nextFixture($season, $teams, $current),
+            'liveFixture' => $due === null ? null : [
+                'opponentName' => $this->sideName($due->userIsHome() ? $due->away_team_id : $due->home_team_id, $teams),
+                'home' => $due->userIsHome(),
+                'url' => route('match.live.show', $due),
+            ],
             'complete' => $current === null,
         ]);
     }
@@ -46,9 +52,23 @@ class SeasonController extends Controller
     {
         $season = $ensureSeason->handle($this->user($request));
 
-        $advanceWeek->handle($season);
+        // The user must play their own fixture live before the season rolls on.
+        if ($this->dueUserFixture($season) === null) {
+            $advanceWeek->handle($season);
+        }
 
         return to_route('season.show');
+    }
+
+    private function dueUserFixture(Season $season): ?Fixture
+    {
+        return $season->fixtures()
+            ->where('youth', false)
+            ->where('played', false)
+            ->where(fn ($query) => $query->whereNull('home_team_id')->orWhereNull('away_team_id'))
+            ->whereDate('scheduled_on', '<=', $season->current_date)
+            ->orderBy('matchday')
+            ->first();
     }
 
     public function reset(Request $request, EnsureSeason $ensureSeason): RedirectResponse

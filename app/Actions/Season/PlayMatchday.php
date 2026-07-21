@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace App\Actions\Season;
 
-use App\Actions\Squad\EnsureSquad;
+use App\Models\Fixture;
 use App\Models\Season;
 use App\Models\Team;
 use App\Sim\Squad\FixtureResolver;
-use App\Sim\Squad\TeamSetup;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
@@ -16,38 +16,38 @@ class PlayMatchday
 {
     public function __construct(
         private readonly FixtureResolver $resolver = new FixtureResolver,
-        private readonly EnsureSquad $ensureSquad = new EnsureSquad,
     ) {}
 
     /**
-     * Resolve every fixture on the next unplayed matchday. The user's fixture is
-     * played with their current squad; the rest are auto-simulated.
+     * Auto-resolve the rival fixtures on the next unplayed matchday. The user's
+     * own fixture is left pending so it can be played live from the match viewer.
      */
     public function handle(Season $season): void
     {
-        $matchday = $season->fixtures()->where('youth', false)->where('played', false)->min('matchday');
+        $matchday = $this->rivalFixtures($season)->where('played', false)->min('matchday');
 
         if ($matchday === null) {
             return;
         }
 
-        $fixtures = $season->fixtures()
-            ->where('youth', false)
+        $fixtures = $this->rivalFixtures($season)
             ->where('matchday', $matchday)
             ->where('played', false)
             ->get();
 
         /** @var Collection<int, Team> $teams */
         $teams = Team::all()->keyBy('id');
-        $userSetup = $this->ensureSquad->handle($season->user)->setup();
 
-        DB::transaction(function () use ($fixtures, $teams, $userSetup): void {
+        DB::transaction(function () use ($fixtures, $teams): void {
             foreach ($fixtures as $fixture) {
-                $result = $this->resolver->resolve(
-                    $this->sideSetup($fixture->home_team_id, $teams, $userSetup),
-                    $this->sideSetup($fixture->away_team_id, $teams, $userSetup),
-                    $fixture->seed,
-                );
+                $home = $teams->get($fixture->home_team_id);
+                $away = $teams->get($fixture->away_team_id);
+
+                if (! $home instanceof Team || ! $away instanceof Team) {
+                    throw new \RuntimeException("Missing team in fixture {$fixture->id}.");
+                }
+
+                $result = $this->resolver->resolve($home->setup(), $away->setup(), $fixture->seed);
 
                 $fixture->update([
                     'home_goals' => $result['home'],
@@ -59,20 +59,15 @@ class PlayMatchday
     }
 
     /**
-     * @param  Collection<int, Team>  $teams
+     * Senior fixtures between two rival teams (neither side is the user).
+     *
+     * @return HasMany<Fixture, Season>
      */
-    private function sideSetup(?int $teamId, Collection $teams, TeamSetup $userSetup): TeamSetup
+    private function rivalFixtures(Season $season): HasMany
     {
-        if ($teamId === null) {
-            return $userSetup;
-        }
-
-        $team = $teams->get($teamId);
-
-        if (! $team instanceof Team) {
-            throw new \RuntimeException("Missing team {$teamId} in fixture.");
-        }
-
-        return $team->setup();
+        return $season->fixtures()
+            ->where('youth', false)
+            ->whereNotNull('home_team_id')
+            ->whereNotNull('away_team_id');
     }
 }

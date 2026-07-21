@@ -30,7 +30,7 @@ final class MatchEngine
      *
      * @param  array<int, Player>  $players  keyed by player id
      */
-    public function simulate(array $players, int $seed, ?Defense $defense = null, ?Formation $formation = null, float $attackBias = 1.0): MatchResult
+    public function simulate(array $players, int $seed, ?Defense $defense = null, ?Formation $formation = null, float $attackBias = 1.0, int $fromMinute = 0, int $toMinute = self::MATCH_MINUTES): MatchResult
     {
         $defense ??= Defense::none();
         $formation ??= Formation::balanced();
@@ -39,8 +39,11 @@ final class MatchEngine
         $rng = new Rng($seed);
         $events = [];
 
-        for ($possession = 0; $possession < self::POSSESSIONS_PER_MATCH; $possession++) {
-            $minute = intdiv($possession * self::MATCH_MINUTES, self::POSSESSIONS_PER_MATCH);
+        $window = max(1, $toMinute - $fromMinute);
+        $possessions = max(1, (int) round(self::POSSESSIONS_PER_MATCH * $window / self::MATCH_MINUTES));
+
+        for ($possession = 0; $possession < $possessions; $possession++) {
+            $minute = $fromMinute + intdiv($possession * $window, $possessions);
             $state = new MatchState($kickoffZone, $kickoffSlot, $minute);
 
             for ($tick = 0; $tick < self::MAX_TICKS_PER_POSSESSION; $tick++) {

@@ -12,3 +12,10 @@ export interface MatchReport {
     progressivePasses: number;
     moments: MatchMoment[];
 }
+
+export interface LiveMoment {
+    minute: number;
+    side: 'home' | 'away';
+    kind: string;
+    text: string;
+}
