@@ -17,11 +17,14 @@ use Illuminate\Support\Carbon;
  * @property int $home_goals
  * @property int $away_goals
  * @property array<int, array<string, mixed>> $moments
+ * @property array<int, int>|null $lineup
+ * @property array<int, int>|null $bench
+ * @property int $subs_remaining
  * @property string $status
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['user_id', 'fixture_id', 'seed', 'home_goals', 'away_goals', 'moments', 'status'])]
+#[Fillable(['user_id', 'fixture_id', 'seed', 'home_goals', 'away_goals', 'moments', 'lineup', 'bench', 'subs_remaining', 'status'])]
 class MatchSession extends Model
 {
     /**
@@ -39,8 +42,11 @@ class MatchSession extends Model
     {
         return [
             'moments' => 'array',
+            'lineup' => 'array',
+            'bench' => 'array',
             'home_goals' => 'integer',
             'away_goals' => 'integer',
+            'subs_remaining' => 'integer',
             'seed' => 'integer',
         ];
     }

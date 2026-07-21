@@ -36,8 +36,10 @@ class StartLiveMatch
 
         $squad = $this->ensureSquad->handle($user);
 
+        $lineup = [];
         $names = [];
         foreach ($squad->assignments()->with('player')->get() as $assignment) {
+            $lineup[$assignment->slot] = $assignment->player_id;
             $names[$assignment->slot] = $assignment->player->name;
         }
 
@@ -45,7 +47,7 @@ class StartLiveMatch
         $opponent = Team::findOrFail($opponentId);
 
         $result = $this->simulate->handle(
-            $squad->setup(), $names, $opponent->setup(), $opponent->name, $fixture->seed,
+            $squad->setupFrom($lineup), $names, $opponent->setup(), $opponent->name, $fixture->seed,
         );
 
         return MatchSession::create([
@@ -55,6 +57,9 @@ class StartLiveMatch
             'home_goals' => $result['scored'],
             'away_goals' => $result['conceded'],
             'moments' => $result['moments'],
+            'lineup' => $lineup,
+            'bench' => [],
+            'subs_remaining' => 3,
             'status' => 'in_progress',
         ]);
     }
