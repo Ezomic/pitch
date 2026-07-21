@@ -7,6 +7,7 @@ namespace App\Http\Controllers;
 use App\Actions\Squad\AssignSquadSlot;
 use App\Actions\Squad\EnsureSquad;
 use App\Actions\Squad\EvaluateSquad;
+use App\Actions\Squad\MarginalValue;
 use App\Http\Requests\AssignSquadSlotRequest;
 use App\Models\Player;
 use App\Models\Squad;
@@ -49,6 +50,15 @@ class SquadController extends Controller
                 fn (Mentality $mentality) => ['id' => $mentality->value, 'name' => $mentality->label()],
                 Mentality::cases(),
             ),
+        ]);
+    }
+
+    public function whatIf(Request $request, EnsureSquad $ensureSquad, MarginalValue $marginalValue): Response
+    {
+        $squad = $ensureSquad->handle($this->user($request));
+
+        return Inertia::render('SquadWhatIf', [
+            'marginal' => $marginalValue->handle($squad),
         ]);
     }
 

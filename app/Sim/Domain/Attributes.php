@@ -39,6 +39,23 @@ final readonly class Attributes
         );
     }
 
+    /** The named attribute nudged by a delta, clamped to the 1..100 scale. */
+    public function plus(string $attribute, int $delta): self
+    {
+        $values = [
+            'vision' => $this->vision,
+            'passing' => $this->passing,
+            'dribbling' => $this->dribbling,
+            'finishing' => $this->finishing,
+            'tackling' => $this->tackling,
+            'pace' => $this->pace,
+        ];
+
+        $values[$attribute] = max(1, min(100, $values[$attribute] + $delta));
+
+        return new self(...array_values($values));
+    }
+
     /** The rounded mean of the six attributes: a player's overall ability. */
     public function overall(): int
     {

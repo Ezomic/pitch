@@ -49,3 +49,20 @@ export interface SquadProfile {
     chancesConcededPer90: number;
     goalsConcededPer90: number;
 }
+
+export interface MarginalCell {
+    goals: number;
+    conceded: number;
+}
+
+export interface MarginalRow {
+    slot: number;
+    name: string;
+    attributes: Record<string, MarginalCell>;
+}
+
+export interface Marginal {
+    delta: number;
+    baseline: { goals: number; conceded: number };
+    rows: MarginalRow[];
+}

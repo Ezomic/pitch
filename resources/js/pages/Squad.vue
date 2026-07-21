@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { Head, router } from '@inertiajs/vue3';
+import { Head, Link, router } from '@inertiajs/vue3';
+import { TrendingUp } from '@lucide/vue';
 import { computed, ref, watch } from 'vue';
 import BudgetBar from '@/components/squad/BudgetBar.vue';
 import PitchFormation from '@/components/squad/PitchFormation.vue';
@@ -12,7 +13,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { assign, edit, tactics } from '@/routes/squad';
+import { assign, edit, tactics, whatIf } from '@/routes/squad';
 import type {
     PoolPlayer,
     Squad,
@@ -103,6 +104,15 @@ function pick(playerId: number): void {
     <Head title="Squad" />
 
     <div class="flex h-full flex-1 flex-col gap-4 p-4">
+        <div class="flex items-center justify-end">
+            <Link
+                :href="whatIf().url"
+                class="flex items-center gap-1.5 rounded-md border border-sidebar-border/70 px-2.5 py-1.5 text-sm text-muted-foreground transition hover:bg-accent/40 dark:border-sidebar-border"
+            >
+                <TrendingUp class="h-4 w-4" />
+                What-if analysis
+            </Link>
+        </div>
         <TeamProfile :profile="props.profile" :previous="previousProfile" />
 
         <div class="grid flex-1 gap-4 lg:grid-cols-[1.4fr_1fr]">
