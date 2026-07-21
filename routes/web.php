@@ -26,6 +26,7 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('squad', [SquadController::class, 'edit'])->name('squad.edit');
     Route::get('squad/what-if', [SquadController::class, 'whatIf'])->name('squad.what-if');
+    Route::get('squad/compare', [SquadController::class, 'compare'])->name('squad.compare');
     Route::patch('squad/slot', [SquadController::class, 'assign'])->name('squad.assign');
     Route::patch('squad/tactics', [SquadController::class, 'tactics'])->name('squad.tactics');
 

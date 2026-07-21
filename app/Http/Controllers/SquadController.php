@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Actions\Squad\AssignSquadSlot;
+use App\Actions\Squad\CompareSetups;
 use App\Actions\Squad\EnsureSquad;
 use App\Actions\Squad\EvaluateSquad;
 use App\Actions\Squad\MarginalValue;
@@ -59,6 +60,47 @@ class SquadController extends Controller
 
         return Inertia::render('SquadWhatIf', [
             'marginal' => $marginalValue->handle($squad),
+        ]);
+    }
+
+    public function compare(Request $request, EnsureSquad $ensureSquad, CompareSetups $compareSetups): Response
+    {
+        $squad = $ensureSquad->handle($this->user($request));
+
+        $formations = array_keys(Formation::all());
+        $mentalities = array_column(Mentality::cases(), 'value');
+
+        $data = $request->validate([
+            'formationA' => ['nullable', Rule::in($formations)],
+            'mentalityA' => ['nullable', Rule::in($mentalities)],
+            'formationB' => ['nullable', Rule::in($formations)],
+            'mentalityB' => ['nullable', Rule::in($mentalities)],
+        ]);
+
+        $setup = [
+            'formationA' => $data['formationA'] ?? $squad->formation,
+            'mentalityA' => $data['mentalityA'] ?? $squad->mentality,
+            'formationB' => $data['formationB'] ?? '442',
+            'mentalityB' => $data['mentalityB'] ?? 'attacking',
+        ];
+
+        return Inertia::render('SquadCompare', [
+            'setup' => $setup,
+            'profiles' => $compareSetups->handle(
+                $squad,
+                $setup['formationA'],
+                $setup['mentalityA'],
+                $setup['formationB'],
+                $setup['mentalityB'],
+            ),
+            'formations' => array_values(array_map(
+                fn (Formation $formation) => ['id' => $formation->id, 'name' => $formation->name],
+                Formation::all(),
+            )),
+            'mentalities' => array_map(
+                fn (Mentality $mentality) => ['id' => $mentality->value, 'name' => $mentality->label()],
+                Mentality::cases(),
+            ),
         ]);
     }
 
