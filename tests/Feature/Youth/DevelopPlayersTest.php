@@ -27,6 +27,24 @@ function prospect(array $overrides = []): Player
     ]);
 }
 
+it('trains the focused attribute instead of the weakest when a focus is set', function () {
+    $youth = prospect(['potential' => 20, 'training_focus' => 'finishing', 'vision' => 4, 'finishing' => 6]);
+
+    app(DevelopPlayers::class)->handle([$youth]);
+
+    $youth->refresh();
+    expect($youth->finishing)->toBe(7) // the focus grew
+        ->and($youth->vision)->toBe(4); // the weakest was left alone
+});
+
+it('falls back to the weakest attribute when the focus is maxed out', function () {
+    $youth = prospect(['potential' => 20, 'training_focus' => 'finishing', 'finishing' => 20, 'vision' => 4]);
+
+    app(DevelopPlayers::class)->handle([$youth]);
+
+    expect($youth->refresh()->vision)->toBe(5);
+});
+
 it('grows a prospect weakest-first toward its potential', function () {
     $youth = prospect();
 

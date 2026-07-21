@@ -6,6 +6,8 @@ export interface Prospect {
     overall: number;
     potential: number;
     promotable: boolean;
+    trainingFocus: string | null;
+    attributes: Record<string, number>;
 }
 
 export interface YouthFixture {
