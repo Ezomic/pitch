@@ -3,7 +3,7 @@ import { Head, router } from '@inertiajs/vue3';
 import ConditionIndicator from '@/components/ConditionIndicator.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { index, promote } from '@/routes/youth';
+import { focus, index, promote } from '@/routes/youth';
 import type { StandingRow } from '@/types/season';
 import type { Prospect, YouthFixture } from '@/types/youth';
 
@@ -19,8 +19,25 @@ defineOptions({
     },
 });
 
+const attributes: { key: string; label: string }[] = [
+    { key: 'vision', label: 'VIS' },
+    { key: 'passing', label: 'PAS' },
+    { key: 'dribbling', label: 'DRB' },
+    { key: 'finishing', label: 'FIN' },
+    { key: 'tackling', label: 'TAC' },
+    { key: 'pace', label: 'PAC' },
+];
+
 function promoteProspect(id: number): void {
     router.post(promote(id).url, {}, { preserveScroll: true });
+}
+
+function setFocus(prospect: Prospect, key: string): void {
+    router.patch(
+        focus(prospect.id).url,
+        { focus: prospect.trainingFocus === key ? null : key },
+        { preserveScroll: true, preserveState: true },
+    );
 }
 </script>
 
@@ -55,13 +72,13 @@ function promoteProspect(id: number): void {
                     finding youth.
                 </p>
 
-                <div v-else class="flex flex-col gap-2">
+                <div v-else class="flex flex-col gap-3">
                     <div
                         v-for="prospect in props.prospects"
                         :key="prospect.id"
                         class="rounded-lg border border-sidebar-border/70 p-3 dark:border-sidebar-border"
                     >
-                        <div class="flex items-center justify-between gap-3">
+                        <div class="flex items-start justify-between gap-3">
                             <div class="min-w-0">
                                 <div class="flex items-center gap-2">
                                     <span
@@ -98,6 +115,54 @@ function promoteProspect(id: number): void {
                             <Badge v-else variant="outline" class="shrink-0">
                                 Developing
                             </Badge>
+                        </div>
+
+                        <p class="mt-2 mb-1 text-[11px] text-muted-foreground">
+                            Tap an attribute to make it this prospect's training
+                            focus.
+                        </p>
+                        <div class="grid grid-cols-2 gap-x-3 gap-y-1">
+                            <button
+                                v-for="attr in attributes"
+                                :key="attr.key"
+                                type="button"
+                                class="flex items-center gap-1.5 rounded px-1 py-0.5 text-left transition"
+                                :class="
+                                    prospect.trainingFocus === attr.key
+                                        ? 'bg-accent'
+                                        : 'hover:bg-accent/40'
+                                "
+                                @click="setFocus(prospect, attr.key)"
+                            >
+                                <span
+                                    class="w-7 text-[10px] font-medium tracking-wide"
+                                    :class="
+                                        prospect.trainingFocus === attr.key
+                                            ? 'text-accent-foreground'
+                                            : 'text-muted-foreground'
+                                    "
+                                    >{{ attr.label }}</span
+                                >
+                                <span
+                                    class="h-1.5 flex-1 overflow-hidden rounded-full bg-muted"
+                                >
+                                    <span
+                                        class="block h-full rounded-full"
+                                        :class="
+                                            prospect.trainingFocus === attr.key
+                                                ? 'bg-emerald-500'
+                                                : 'bg-foreground/70'
+                                        "
+                                        :style="{
+                                            width: `${Math.min(100, prospect.attributes[attr.key])}%`,
+                                        }"
+                                    />
+                                </span>
+                                <span
+                                    class="w-4 text-right text-[10px] text-muted-foreground tabular-nums"
+                                    >{{ prospect.attributes[attr.key] }}</span
+                                >
+                            </button>
                         </div>
                         <div
                             class="mt-2 border-t border-sidebar-border/40 pt-2"

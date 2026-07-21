@@ -13,6 +13,7 @@ use App\Models\Team;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -41,6 +42,15 @@ class YouthController extends Controller
                 'overall' => $player->overall(),
                 'potential' => $player->potential,
                 'promotable' => $player->isPromotable(),
+                'trainingFocus' => $player->training_focus,
+                'attributes' => [
+                    'vision' => $player->vision,
+                    'passing' => $player->passing,
+                    'dribbling' => $player->dribbling,
+                    'finishing' => $player->finishing,
+                    'tackling' => $player->tackling,
+                    'pace' => $player->pace,
+                ],
                 'fitness' => $player->fitness,
                 'form' => $player->form,
             ])->all(),
@@ -61,6 +71,19 @@ class YouthController extends Controller
         abort_unless($player->user_id === $this->user($request)->id, 404);
 
         $promoteYouth->handle($player);
+
+        return to_route('youth.index');
+    }
+
+    public function focus(Request $request, Player $player): RedirectResponse
+    {
+        abort_unless($player->user_id === $this->user($request)->id && $player->is_youth, 404);
+
+        $data = $request->validate([
+            'focus' => ['nullable', Rule::in(Player::ATTRIBUTES)],
+        ]);
+
+        $player->update(['training_focus' => $data['focus'] ?? null]);
 
         return to_route('youth.index');
     }

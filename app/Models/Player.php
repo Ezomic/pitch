@@ -22,6 +22,7 @@ use Illuminate\Support\Carbon;
  * @property int $age
  * @property int $potential
  * @property bool $is_youth
+ * @property string|null $training_focus
  * @property int $vision
  * @property int $passing
  * @property int $dribbling
@@ -33,11 +34,14 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['user_id', 'name', 'position', 'age', 'potential', 'is_youth', 'vision', 'passing', 'dribbling', 'finishing', 'tackling', 'pace', 'fitness', 'form'])]
+#[Fillable(['user_id', 'name', 'position', 'age', 'potential', 'is_youth', 'training_focus', 'vision', 'passing', 'dribbling', 'finishing', 'tackling', 'pace', 'fitness', 'form'])]
 class Player extends Model
 {
     /** @use HasFactory<PlayerFactory> */
     use HasFactory;
+
+    /** The six trainable attributes; a prospect can focus its development on one. */
+    public const array ATTRIBUTES = ['vision', 'passing', 'dribbling', 'finishing', 'tackling', 'pace'];
 
     /**
      * @return BelongsTo<User, $this>
