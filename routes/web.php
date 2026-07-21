@@ -30,6 +30,8 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('match', [MatchController::class, 'show'])->name('match.show');
     Route::get('match/live/{fixture}', [LiveMatchController::class, 'show'])->name('match.live.show');
+    Route::post('match/live/{fixture}/bench', [LiveMatchController::class, 'bench'])->name('match.live.bench');
+    Route::post('match/live/{fixture}/sub', [LiveMatchController::class, 'sub'])->name('match.live.sub');
     Route::post('match/live/{fixture}/finish', [LiveMatchController::class, 'finish'])->name('match.live.finish');
 
     Route::get('season', [SeasonController::class, 'show'])->name('season.show');

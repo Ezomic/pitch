@@ -88,6 +88,72 @@ it('records the played-out score onto the fixture at full time', function () {
         ->and(MatchSession::where('fixture_id', $fixture->id)->exists())->toBeFalse();
 });
 
+it('names a bench and substitutes from it, re-simulating the rest of the match', function () {
+    $user = User::factory()->create();
+    $fixture = readyFixture($user);
+    $this->actingAs($user)->get(route('match.live.show', $fixture));
+    $session = MatchSession::where('fixture_id', $fixture->id)->firstOrFail();
+
+    $xi = array_values($session->lineup);
+    $benchPlayer = Player::query()->selectableFor($user->id)->whereNotIn('id', $xi)->firstOrFail();
+
+    $this->actingAs($user)
+        ->post(route('match.live.bench', $fixture), ['players' => [$benchPlayer->id]])
+        ->assertRedirect(route('match.live.show', $fixture));
+    expect($session->refresh()->bench)->toContain($benchPlayer->id);
+
+    $slot = (int) array_key_first($session->lineup);
+    $before = $session->moments;
+
+    $this->actingAs($user)
+        ->post(route('match.live.sub', $fixture), ['minute' => 40, 'slot' => $slot, 'in' => $benchPlayer->id])
+        ->assertRedirect(route('match.live.show', $fixture));
+
+    $session->refresh();
+    expect($session->subs_remaining)->toBe(2)
+        ->and($session->lineup[$slot])->toBe($benchPlayer->id)
+        ->and($session->bench)->not->toContain($benchPlayer->id)
+        // Moments before the sub minute are locked; the whole feed is a fresh tail after it.
+        ->and($session->moments)->not->toBe($before);
+});
+
+it('rejects a bench player who is already in the XI', function () {
+    $user = User::factory()->create();
+    $fixture = readyFixture($user);
+    $this->actingAs($user)->get(route('match.live.show', $fixture));
+    $session = MatchSession::where('fixture_id', $fixture->id)->firstOrFail();
+    $onPitch = (int) array_values($session->lineup)[0];
+
+    $this->actingAs($user)
+        ->from(route('match.live.show', $fixture))
+        ->post(route('match.live.bench', $fixture), ['players' => [$onPitch]])
+        ->assertSessionHasErrors('bench');
+});
+
+it('caps substitutions at three', function () {
+    $user = User::factory()->create();
+    $fixture = readyFixture($user);
+    $this->actingAs($user)->get(route('match.live.show', $fixture));
+    $session = MatchSession::where('fixture_id', $fixture->id)->firstOrFail();
+
+    $xi = array_values($session->lineup);
+    $bench = Player::query()->selectableFor($user->id)->whereNotIn('id', $xi)->take(4)->pluck('id')->all();
+    $this->actingAs($user)->post(route('match.live.bench', $fixture), ['players' => $bench]);
+
+    $slots = array_keys($session->refresh()->lineup);
+    foreach (array_slice($bench, 0, 3) as $i => $in) {
+        $this->actingAs($user)
+            ->post(route('match.live.sub', $fixture), ['minute' => 30, 'slot' => $slots[$i], 'in' => $in])
+            ->assertRedirect();
+    }
+
+    $this->actingAs($user)
+        ->from(route('match.live.show', $fixture))
+        ->post(route('match.live.sub', $fixture), ['minute' => 30, 'slot' => $slots[3], 'in' => $bench[3]])
+        ->assertSessionHasErrors('sub');
+    expect($session->refresh()->subs_remaining)->toBe(0);
+});
+
 it('will not open a live match for a played or rival-only fixture', function () {
     $user = User::factory()->create();
     $season = app(EnsureSeason::class)->handle($user);

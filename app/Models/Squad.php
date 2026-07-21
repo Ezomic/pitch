@@ -85,4 +85,33 @@ class Squad extends Model
             Mentality::fromId($this->mentality),
         );
     }
+
+    /**
+     * Build a setup from an explicit slot => playerId lineup (used for live-match
+     * substitutions), keeping the squad's own formation and mentality.
+     *
+     * @param  array<int, int>  $lineup  slot id => player id
+     */
+    public function setupFrom(array $lineup): TeamSetup
+    {
+        $players = Player::query()->whereIn('id', array_values($lineup))->get()->keyBy('id');
+
+        $bySlot = [];
+        foreach ($lineup as $slot => $playerId) {
+            $player = $players->get($playerId);
+            $bySlot[(int) $slot] = $player instanceof Player
+                ? $player->attributes()
+                : new Attributes(10, 10, 10, 10, 10, 10);
+        }
+
+        foreach (Roster::slots() as $slot) {
+            $bySlot[$slot] ??= new Attributes(10, 10, 10, 10, 10, 10);
+        }
+
+        return new TeamSetup(
+            $bySlot,
+            Formation::fromId($this->formation),
+            Mentality::fromId($this->mentality),
+        );
+    }
 }
