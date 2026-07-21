@@ -56,18 +56,23 @@ class Squad extends Model
         return $this->hasMany(SquadPlayer::class)->orderBy('slot');
     }
 
+    /** A player fielded out of their natural position plays at this fraction. */
+    private const float OFF_POSITION_FACTOR = 0.9;
+
     /**
      * The squad's attributes keyed by formation slot, with empty slots filled by
-     * an average placeholder so the engine always has a full eleven.
+     * an average placeholder so the engine always has a full eleven. A player
+     * fielded away from their natural position takes an off-position penalty.
      *
      * @return array<int, Attributes>
      */
     public function attributesBySlot(): array
     {
+        $formation = Formation::fromId($this->formation);
         $bySlot = [];
 
         foreach ($this->assignments()->with('player')->get() as $assignment) {
-            $bySlot[$assignment->slot] = $assignment->player->matchAttributes();
+            $bySlot[$assignment->slot] = $this->slotAttributes($assignment->player, $assignment->slot, $formation);
         }
 
         foreach (Roster::slots() as $slot) {
@@ -75,6 +80,18 @@ class Squad extends Model
         }
 
         return $bySlot;
+    }
+
+    private function slotAttributes(Player $player, int $slot, Formation $formation): Attributes
+    {
+        $attributes = $player->matchAttributes();
+        $slotPosition = $formation->layout[$slot][1] ?? null;
+
+        if ($slotPosition !== null && $slotPosition !== $player->position) {
+            $attributes = $attributes->scaled(self::OFF_POSITION_FACTOR);
+        }
+
+        return $attributes;
     }
 
     public function setup(): TeamSetup
@@ -95,12 +112,13 @@ class Squad extends Model
     public function setupFrom(array $lineup): TeamSetup
     {
         $players = Player::query()->whereIn('id', array_values($lineup))->get()->keyBy('id');
+        $formation = Formation::fromId($this->formation);
 
         $bySlot = [];
         foreach ($lineup as $slot => $playerId) {
             $player = $players->get($playerId);
             $bySlot[(int) $slot] = $player instanceof Player
-                ? $player->matchAttributes()
+                ? $this->slotAttributes($player, (int) $slot, $formation)
                 : new Attributes(50, 50, 50, 50, 50, 50);
         }
 
@@ -110,7 +128,7 @@ class Squad extends Model
 
         return new TeamSetup(
             $bySlot,
-            Formation::fromId($this->formation),
+            $formation,
             Mentality::fromId($this->mentality),
         );
     }
