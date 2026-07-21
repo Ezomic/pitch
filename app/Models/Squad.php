@@ -67,7 +67,7 @@ class Squad extends Model
         $bySlot = [];
 
         foreach ($this->assignments()->with('player')->get() as $assignment) {
-            $bySlot[$assignment->slot] = $assignment->player->attributes();
+            $bySlot[$assignment->slot] = $assignment->player->matchAttributes();
         }
 
         foreach (Roster::slots() as $slot) {
@@ -100,7 +100,7 @@ class Squad extends Model
         foreach ($lineup as $slot => $playerId) {
             $player = $players->get($playerId);
             $bySlot[(int) $slot] = $player instanceof Player
-                ? $player->attributes()
+                ? $player->matchAttributes()
                 : new Attributes(10, 10, 10, 10, 10, 10);
         }
 

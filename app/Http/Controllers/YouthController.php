@@ -41,6 +41,8 @@ class YouthController extends Controller
                 'overall' => $player->overall(),
                 'potential' => $player->potential,
                 'promotable' => $player->isPromotable(),
+                'fitness' => $player->fitness,
+                'form' => $player->form,
             ])->all(),
             'leagueTable' => $standings->handle($season, youth: true),
             'fixtures' => $season->fixtures()->where('youth', true)->orderBy('matchday')->get()

@@ -20,6 +20,25 @@ final readonly class Attributes
         return new self($vision, $this->passing, $this->dribbling, $this->finishing, $this->tackling, $this->pace);
     }
 
+    /**
+     * Every attribute multiplied by a condition factor and clamped to the 1..20
+     * scale, so fitness and form move a player's effective match rating without
+     * ever pushing an attribute out of range.
+     */
+    public function scaled(float $factor): self
+    {
+        $scale = static fn (int $attr): int => max(1, min(20, (int) round($attr * $factor)));
+
+        return new self(
+            $scale($this->vision),
+            $scale($this->passing),
+            $scale($this->dribbling),
+            $scale($this->finishing),
+            $scale($this->tackling),
+            $scale($this->pace),
+        );
+    }
+
     /** The rounded mean of the six attributes: a player's overall ability. */
     public function overall(): int
     {

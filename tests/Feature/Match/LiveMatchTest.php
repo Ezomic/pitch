@@ -60,6 +60,8 @@ it('renders the live match and opens a session', function () {
             ->component('LiveMatch')
             ->has('opponentName')
             ->has('moments')
+            ->has('lineup.0.fitness')
+            ->has('lineup.0.form')
             ->has('finishUrl'),
         );
 
@@ -72,6 +74,7 @@ it('records the played-out score onto the fixture at full time', function () {
 
     $this->actingAs($user)->get(route('match.live.show', $fixture));
     $session = MatchSession::where('fixture_id', $fixture->id)->firstOrFail();
+    $xi = array_map('intval', array_values($session->lineup));
 
     $this->actingAs($user)
         ->post(route('match.live.finish', $fixture))
@@ -85,7 +88,9 @@ it('records the played-out score onto the fixture at full time', function () {
     expect($fixture->played)->toBeTrue()
         ->and($fixture->home_goals)->toBe($expectedHome)
         ->and($fixture->away_goals)->toBe($expectedAway)
-        ->and(MatchSession::where('fixture_id', $fixture->id)->exists())->toBeFalse();
+        ->and(MatchSession::where('fixture_id', $fixture->id)->exists())->toBeFalse()
+        // The XI leaves the pitch tired: full-time drains their fitness.
+        ->and(Player::find($xi[0])->fitness)->toBe(100 - Player::MATCH_DRAIN);
 });
 
 it('names a bench and substitutes from it, re-simulating the rest of the match', function () {

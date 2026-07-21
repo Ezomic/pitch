@@ -10,3 +10,24 @@ it('reports overall as the rounded mean of the six attributes', function () {
         ->and((new Attributes(1, 1, 1, 1, 1, 1))->overall())->toBe(1)
         ->and((new Attributes(20, 20, 20, 20, 20, 20))->overall())->toBe(20);
 });
+
+it('leaves the attributes untouched when scaled by one', function () {
+    $attrs = new Attributes(10, 11, 12, 13, 14, 15);
+
+    expect($attrs->scaled(1.0))->toEqual($attrs);
+});
+
+it('scales every attribute by the factor', function () {
+    $scaled = (new Attributes(10, 10, 10, 10, 10, 10))->scaled(0.7);
+
+    expect($scaled->vision)->toBe(7)
+        ->and($scaled->pace)->toBe(7);
+});
+
+it('clamps a scaled attribute to the 1..20 range', function () {
+    $up = (new Attributes(19, 19, 19, 19, 19, 19))->scaled(1.15);
+    $down = (new Attributes(1, 1, 1, 1, 1, 1))->scaled(0.5);
+
+    expect($up->vision)->toBe(20) // 19 * 1.15 = 21.85 -> clamped to 20
+        ->and($down->vision)->toBe(1); // 1 * 0.5 = 0.5 -> clamped to 1
+});

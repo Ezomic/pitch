@@ -59,6 +59,7 @@ class StartLiveMatch
             'moments' => $result['moments'],
             'lineup' => $lineup,
             'bench' => [],
+            'scorers' => ResolveScorers::forLineup($result['scorers'], $lineup),
             'subs_remaining' => 3,
             'status' => 'in_progress',
         ]);

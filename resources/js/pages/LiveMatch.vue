@@ -11,6 +11,8 @@ interface LineupSlot {
     slot: number;
     name: string;
     position: string;
+    fitness: number;
+    form: number;
 }
 interface PoolOption {
     id: number;
@@ -165,6 +167,18 @@ function confirmResult(): void {
     router.post(props.finishUrl);
 }
 
+function fitnessTone(fitness: number): string {
+    if (fitness >= 66) {
+        return 'text-emerald-600 dark:text-emerald-400';
+    }
+
+    if (fitness >= 33) {
+        return 'text-amber-600 dark:text-amber-400';
+    }
+
+    return 'text-red-600 dark:text-red-400';
+}
+
 onBeforeUnmount(stop);
 </script>
 
@@ -312,9 +326,18 @@ onBeforeUnmount(stop);
                         @click="makeSub(spot.slot)"
                     >
                         <span class="truncate">{{ spot.name }}</span>
-                        <span class="text-xs text-muted-foreground">{{
-                            spot.position
-                        }}</span>
+                        <span
+                            class="flex shrink-0 items-center gap-1.5 text-xs"
+                        >
+                            <span
+                                class="tabular-nums"
+                                :class="fitnessTone(spot.fitness)"
+                                >{{ spot.fitness }}%</span
+                            >
+                            <span class="text-muted-foreground">{{
+                                spot.position
+                            }}</span>
+                        </span>
                     </Button>
                 </div>
             </template>

@@ -6,6 +6,8 @@ export interface Prospect {
     overall: number;
     potential: number;
     promotable: boolean;
+    fitness: number;
+    form: number;
 }
 
 export interface YouthFixture {

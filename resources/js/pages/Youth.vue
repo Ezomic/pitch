@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Head, router } from '@inertiajs/vue3';
+import ConditionIndicator from '@/components/ConditionIndicator.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { index, promote } from '@/routes/youth';
@@ -58,41 +59,54 @@ function promoteProspect(id: number): void {
                     <div
                         v-for="prospect in props.prospects"
                         :key="prospect.id"
-                        class="flex items-center justify-between gap-3 rounded-lg border border-sidebar-border/70 p-3 dark:border-sidebar-border"
+                        class="rounded-lg border border-sidebar-border/70 p-3 dark:border-sidebar-border"
                     >
-                        <div class="min-w-0">
-                            <div class="flex items-center gap-2">
-                                <span class="truncate text-sm font-medium">{{
-                                    prospect.name
-                                }}</span>
-                                <Badge variant="secondary">{{
-                                    prospect.position
-                                }}</Badge>
-                                <span class="text-xs text-muted-foreground"
-                                    >{{ prospect.age }}y</span
-                                >
+                        <div class="flex items-center justify-between gap-3">
+                            <div class="min-w-0">
+                                <div class="flex items-center gap-2">
+                                    <span
+                                        class="truncate text-sm font-medium"
+                                        >{{ prospect.name }}</span
+                                    >
+                                    <Badge variant="secondary">{{
+                                        prospect.position
+                                    }}</Badge>
+                                    <span class="text-xs text-muted-foreground"
+                                        >{{ prospect.age }}y</span
+                                    >
+                                </div>
+                                <p class="mt-0.5 text-xs text-muted-foreground">
+                                    Ability
+                                    <span
+                                        class="text-foreground tabular-nums"
+                                        >{{ prospect.overall }}</span
+                                    >
+                                    &middot; potential
+                                    <span
+                                        class="text-foreground tabular-nums"
+                                        >{{ prospect.potential }}</span
+                                    >
+                                </p>
                             </div>
-                            <p class="mt-0.5 text-xs text-muted-foreground">
-                                Ability
-                                <span class="text-foreground tabular-nums">{{
-                                    prospect.overall
-                                }}</span>
-                                &middot; potential
-                                <span class="text-foreground tabular-nums">{{
-                                    prospect.potential
-                                }}</span>
-                            </p>
+                            <Button
+                                v-if="prospect.promotable"
+                                size="sm"
+                                @click="promoteProspect(prospect.id)"
+                            >
+                                Promote
+                            </Button>
+                            <Badge v-else variant="outline" class="shrink-0">
+                                Developing
+                            </Badge>
                         </div>
-                        <Button
-                            v-if="prospect.promotable"
-                            size="sm"
-                            @click="promoteProspect(prospect.id)"
+                        <div
+                            class="mt-2 border-t border-sidebar-border/40 pt-2"
                         >
-                            Promote
-                        </Button>
-                        <Badge v-else variant="outline" class="shrink-0">
-                            Developing
-                        </Badge>
+                            <ConditionIndicator
+                                :fitness="prospect.fitness"
+                                :form="prospect.form"
+                            />
+                        </div>
                     </div>
                 </div>
             </div>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import ConditionIndicator from '@/components/ConditionIndicator.vue';
 import { Badge } from '@/components/ui/badge';
 import type { PoolPlayer } from '@/types/squad';
 
@@ -80,6 +81,13 @@ const stats: { key: keyof PoolPlayer; label: string; key_metric: boolean }[] = [
                     >{{ props.player[stat.key] }}</span
                 >
             </div>
+        </div>
+
+        <div class="mt-2 border-t border-sidebar-border/40 pt-2">
+            <ConditionIndicator
+                :fitness="props.player.fitness"
+                :form="props.player.form"
+            />
         </div>
     </button>
 </template>
