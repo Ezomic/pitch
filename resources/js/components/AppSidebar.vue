@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
 import {
+    ArrowRightLeft,
     BookOpen,
     Clapperboard,
     FolderGit2,
@@ -28,6 +29,7 @@ import { show as matchShow } from '@/routes/match';
 import { index as scoutsIndex } from '@/routes/scouts';
 import { show as seasonShow } from '@/routes/season';
 import { edit as squadEdit } from '@/routes/squad';
+import { index as transfersIndex } from '@/routes/transfers';
 import { index as youthIndex } from '@/routes/youth';
 import type { NavItem } from '@/types';
 
@@ -46,6 +48,11 @@ const mainNavItems: NavItem[] = [
         title: 'Season',
         href: seasonShow(),
         icon: Trophy,
+    },
+    {
+        title: 'Transfers',
+        href: transfersIndex(),
+        icon: ArrowRightLeft,
     },
     {
         title: 'Scouting',

@@ -17,6 +17,7 @@ use Illuminate\Support\Carbon;
 /**
  * @property int $id
  * @property int|null $user_id
+ * @property bool $is_free_agent
  * @property string $name
  * @property Position $position
  * @property int $age
@@ -38,7 +39,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['user_id', 'name', 'position', 'age', 'potential', 'is_youth', 'training_focus', 'vision', 'passing', 'dribbling', 'finishing', 'tackling', 'pace', 'fitness', 'form', 'trait', 'injured_weeks', 'yellow_cards', 'suspended_weeks'])]
+#[Fillable(['user_id', 'is_free_agent', 'name', 'position', 'age', 'potential', 'is_youth', 'training_focus', 'vision', 'passing', 'dribbling', 'finishing', 'tackling', 'pace', 'fitness', 'form', 'trait', 'injured_weeks', 'yellow_cards', 'suspended_weeks'])]
 class Player extends Model
 {
     /** @use HasFactory<PlayerFactory> */
@@ -110,6 +111,7 @@ class Player extends Model
     public function scopeSelectableFor(Builder $query, int $userId): void
     {
         $query->where('is_youth', false)
+            ->where('is_free_agent', false)
             ->where('injured_weeks', 0)
             ->where('suspended_weeks', 0)
             ->where(fn (Builder $scoped) => $scoped->whereNull('user_id')->orWhere('user_id', $userId));
@@ -178,6 +180,7 @@ class Player extends Model
             'age' => 'integer',
             'potential' => 'integer',
             'is_youth' => 'boolean',
+            'is_free_agent' => 'boolean',
             'fitness' => 'integer',
             'form' => 'integer',
             'injured_weeks' => 'integer',

@@ -6,6 +6,7 @@ use App\Http\Controllers\MatchController;
 use App\Http\Controllers\ScoutController;
 use App\Http\Controllers\SeasonController;
 use App\Http\Controllers\SquadController;
+use App\Http\Controllers\TransferController;
 use App\Http\Controllers\YouthController;
 use Illuminate\Support\Facades\Route;
 
@@ -30,6 +31,10 @@ Route::middleware(['auth'])->group(function () {
     Route::patch('squad/slot', [SquadController::class, 'assign'])->name('squad.assign');
     Route::patch('squad/tactics', [SquadController::class, 'tactics'])->name('squad.tactics');
     Route::patch('squad/role', [SquadController::class, 'role'])->name('squad.role');
+
+    Route::get('transfers', [TransferController::class, 'index'])->name('transfers.index');
+    Route::post('transfers/{player}/sign', [TransferController::class, 'sign'])->name('transfers.sign');
+    Route::post('transfers/{player}/sell', [TransferController::class, 'sell'])->name('transfers.sell');
 
     Route::get('match', [MatchController::class, 'show'])->name('match.show');
     Route::get('match/live/{fixture}', [LiveMatchController::class, 'show'])->name('match.live.show');
