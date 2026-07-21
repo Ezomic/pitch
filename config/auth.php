@@ -128,4 +128,18 @@ return [
 
     'dev_login_code' => env('PITCH_DEV_LOGIN_CODE'),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Local Dev Account
+    |--------------------------------------------------------------------------
+    |
+    | The email of the account the database seeder recreates in non-production
+    | environments, so a `migrate:fresh --seed` always leaves a ready account to
+    | sign into with the dev login code. Point this at your own address in a
+    | local .env if you prefer signing in as yourself.
+    |
+    */
+
+    'dev_login_email' => env('PITCH_DEV_LOGIN_EMAIL', 'test@example.com'),
+
 ];
