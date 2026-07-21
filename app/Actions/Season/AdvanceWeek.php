@@ -21,6 +21,7 @@ class AdvanceWeek
         private readonly DevelopPlayers $developPlayers = new DevelopPlayers,
         private readonly PlayYouthFixtures $playYouthFixtures = new PlayYouthFixtures,
         private readonly RecoverCondition $recoverCondition = new RecoverCondition,
+        private readonly MentorYouth $mentorYouth = new MentorYouth,
     ) {}
 
     public function handle(Season $season): void
@@ -37,6 +38,7 @@ class AdvanceWeek
             Player::query()->where('user_id', $season->user_id)->where('is_youth', true)->get()
         );
 
+        $this->mentorYouth->handle($season);
         $this->playYouthFixtures->handle($season);
     }
 }
