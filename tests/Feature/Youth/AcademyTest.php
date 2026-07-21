@@ -23,9 +23,9 @@ it('never fields a youth when building the default squad', function () {
 });
 
 it('marks a prospect promotable when old or good enough', function () {
-    $old = Player::factory()->youth()->create(['age' => 18, 'vision' => 4, 'passing' => 4, 'dribbling' => 4, 'finishing' => 4, 'tackling' => 4, 'pace' => 4]);
-    $good = Player::factory()->youth()->create(['age' => 14, 'vision' => 14, 'passing' => 14, 'dribbling' => 14, 'finishing' => 14, 'tackling' => 14, 'pace' => 14]);
-    $raw = Player::factory()->youth()->create(['age' => 14, 'vision' => 5, 'passing' => 5, 'dribbling' => 5, 'finishing' => 5, 'tackling' => 5, 'pace' => 5]);
+    $old = Player::factory()->youth()->create(['age' => 18, 'vision' => 20, 'passing' => 20, 'dribbling' => 20, 'finishing' => 20, 'tackling' => 20, 'pace' => 20]);
+    $good = Player::factory()->youth()->create(['age' => 14, 'vision' => 70, 'passing' => 70, 'dribbling' => 70, 'finishing' => 70, 'tackling' => 70, 'pace' => 70]);
+    $raw = Player::factory()->youth()->create(['age' => 14, 'vision' => 25, 'passing' => 25, 'dribbling' => 25, 'finishing' => 25, 'tackling' => 25, 'pace' => 25]);
 
     expect($old->isPromotable())->toBeTrue()
         ->and($good->isPromotable())->toBeTrue()

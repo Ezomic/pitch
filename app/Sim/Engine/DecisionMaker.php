@@ -10,11 +10,11 @@ final class DecisionMaker
 {
     /**
      * How many of the available options a player can evaluate, from their vision.
-     * Vision 6 sees 2 options, vision 16 sees 5.
+     * Vision 30 sees 2 options, vision 80 sees 5.
      */
     public function visibleCount(int $vision, int $total): int
     {
-        $count = intdiv($vision, 3);
+        $count = intdiv($vision, 15);
 
         return max(1, min($count, $total));
     }

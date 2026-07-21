@@ -13,7 +13,7 @@ function setupOf(Formation $formation, Mentality $mentality): TeamSetup
 {
     $bySlot = [];
     foreach (Roster::slots() as $slot) {
-        $bySlot[$slot] = new Attributes(12, 12, 12, 12, 12, 12);
+        $bySlot[$slot] = new Attributes(60, 60, 60, 60, 60, 60);
     }
 
     return new TeamSetup($bySlot, $formation, $mentality);

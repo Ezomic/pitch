@@ -24,10 +24,10 @@ it('scales every attribute by the factor', function () {
         ->and($scaled->pace)->toBe(7);
 });
 
-it('clamps a scaled attribute to the 1..20 range', function () {
-    $up = (new Attributes(19, 19, 19, 19, 19, 19))->scaled(1.15);
+it('clamps a scaled attribute to the 1..100 range', function () {
+    $up = (new Attributes(95, 95, 95, 95, 95, 95))->scaled(1.15);
     $down = (new Attributes(1, 1, 1, 1, 1, 1))->scaled(0.5);
 
-    expect($up->vision)->toBe(20) // 19 * 1.15 = 21.85 -> clamped to 20
+    expect($up->vision)->toBe(100) // 95 * 1.15 = 109.25 -> clamped to 100
         ->and($down->vision)->toBe(1); // 1 * 0.5 = 0.5 -> clamped to 1
 });

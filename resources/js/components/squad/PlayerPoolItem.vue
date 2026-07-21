@@ -72,7 +72,7 @@ const stats: { key: keyof PoolPlayer; label: string; key_metric: boolean }[] = [
                     <span
                         class="block h-full rounded-full bg-foreground/70"
                         :style="{
-                            width: `${(Number(props.player[stat.key]) / 20) * 100}%`,
+                            width: `${Math.min(100, Number(props.player[stat.key]))}%`,
                         }"
                     />
                 </span>

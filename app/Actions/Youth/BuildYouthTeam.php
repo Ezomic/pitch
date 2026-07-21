@@ -19,7 +19,7 @@ use Illuminate\Support\Collection;
  */
 class BuildYouthTeam
 {
-    private const int TRIALIST = 6;
+    private const int TRIALIST = 30;
 
     public function forUser(User $user): TeamSetup
     {

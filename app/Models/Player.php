@@ -48,7 +48,7 @@ class Player extends Model
     }
 
     /** Ability at or above this, or turning eighteen, makes a prospect first-team ready. */
-    public const int PROMOTION_OVERALL = 14;
+    public const int PROMOTION_OVERALL = 70;
 
     /** Condition the season clock moves: a match tires, a week of rest recovers. */
     public const int MATCH_DRAIN = 18;
@@ -131,7 +131,7 @@ class Player extends Model
 
         $score = 0.0;
         foreach ($attrs as $attr) {
-            $score += ($attr / 20) ** 2;
+            $score += ($attr / 100) ** 2;
         }
 
         return max(1, (int) round($score * 10));

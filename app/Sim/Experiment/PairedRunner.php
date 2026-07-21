@@ -61,11 +61,11 @@ final class PairedRunner
     {
         return new Attributes(
             vision: $vision,
-            passing: 12,
-            dribbling: 12,
-            finishing: 12,
-            tackling: 12,
-            pace: 12,
+            passing: 60,
+            dribbling: 60,
+            finishing: 60,
+            tackling: 60,
+            pace: 60,
         );
     }
 }

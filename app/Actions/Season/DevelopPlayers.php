@@ -8,12 +8,14 @@ use App\Models\Player;
 
 /**
  * One week of youth development. Each developing prospect nudges its weakest
- * attribute up by a point, pulling its overall toward its potential; once a
- * player reaches its ceiling (or turns out to be a senior) it stops improving.
- * Higher-potential prospects keep growing after lower ones have plateaued.
+ * attribute up, pulling its overall toward its potential; once a player reaches
+ * its ceiling (or turns out to be a senior) it stops improving. Higher-potential
+ * prospects keep growing after lower ones have plateaued.
  */
 class DevelopPlayers
 {
+    private const int STEP = 5;
+
     private const array ATTRIBUTES = ['vision', 'passing', 'dribbling', 'finishing', 'tackling', 'pace'];
 
     /**
@@ -38,7 +40,7 @@ class DevelopPlayers
         foreach (self::ATTRIBUTES as $attribute) {
             $value = $player->{$attribute};
 
-            if ($value < 20 && ($lowest === null || $value < $lowest)) {
+            if ($value < $player->potential && ($lowest === null || $value < $lowest)) {
                 $lowest = $value;
                 $weakest = $attribute;
             }
@@ -48,6 +50,6 @@ class DevelopPlayers
             return;
         }
 
-        $player->forceFill([$weakest => $player->{$weakest} + 1])->save();
+        $player->forceFill([$weakest => min($player->potential, $player->{$weakest} + self::STEP)])->save();
     }
 }
