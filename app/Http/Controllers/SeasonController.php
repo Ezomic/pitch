@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Actions\Season\AdvanceWeek;
 use App\Actions\Season\EnsureSeason;
+use App\Actions\Season\ScoutOpponent;
 use App\Actions\Season\Standings;
 use App\Actions\Squad\EnsureSquad;
 use App\Actions\Squad\SimulateMatch;
@@ -43,6 +44,7 @@ class SeasonController extends Controller
                 'opponentName' => $this->sideName($due->userIsHome() ? $due->away_team_id : $due->home_team_id, $teams),
                 'home' => $due->userIsHome(),
                 'url' => route('match.live.show', $due),
+                'scoutUrl' => route('season.scout', $due),
             ],
             'complete' => $current === null,
         ]);
@@ -58,6 +60,30 @@ class SeasonController extends Controller
         }
 
         return to_route('season.show');
+    }
+
+    public function scout(
+        Request $request,
+        Fixture $fixture,
+        EnsureSeason $ensureSeason,
+        EnsureSquad $ensureSquad,
+        ScoutOpponent $scoutOpponent,
+    ): Response {
+        $user = $this->user($request);
+        $season = $ensureSeason->handle($user);
+
+        abort_unless($fixture->season_id === $season->id && $fixture->involvesUser() && ! $fixture->played, 404);
+
+        $opponent = Team::findOrFail($fixture->userIsHome() ? $fixture->away_team_id : $fixture->home_team_id);
+        $scout = $scoutOpponent->handle($ensureSquad->handle($user), $opponent);
+
+        return Inertia::render('Scout', [
+            'opponentName' => $opponent->name,
+            'style' => $opponent->style,
+            'home' => $fixture->userIsHome(),
+            'opponent' => $scout['opponent'],
+            'matchup' => $scout['matchup'],
+        ]);
     }
 
     private function dueUserFixture(Season $season): ?Fixture

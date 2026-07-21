@@ -11,7 +11,12 @@ const props = defineProps<{
     currentDate: string;
     nextFixtureDate: string | null;
     nextFixture: NextFixture | null;
-    liveFixture: { opponentName: string; home: boolean; url: string } | null;
+    liveFixture: {
+        opponentName: string;
+        home: boolean;
+        url: string;
+        scoutUrl: string;
+    } | null;
     complete: boolean;
 }>();
 
@@ -28,6 +33,12 @@ function advanceWeek(): void {
 function playLive(): void {
     if (props.liveFixture) {
         router.get(props.liveFixture.url);
+    }
+}
+
+function scoutOpponent(): void {
+    if (props.liveFixture) {
+        router.get(props.liveFixture.scoutUrl);
     }
 }
 
@@ -110,9 +121,12 @@ const columns: { key: keyof StandingRow; label: string }[] = [
                     </p>
                 </div>
 
-                <Button v-if="props.liveFixture" @click="playLive">
-                    Play your match
-                </Button>
+                <template v-if="props.liveFixture">
+                    <Button variant="outline" @click="scoutOpponent">
+                        Scout opponent
+                    </Button>
+                    <Button @click="playLive"> Play your match </Button>
+                </template>
                 <Button v-else-if="!props.complete" @click="advanceWeek">
                     Advance week
                 </Button>

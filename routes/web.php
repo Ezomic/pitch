@@ -39,6 +39,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('season/advance', [SeasonController::class, 'advance'])->name('season.advance');
     Route::post('season/reset', [SeasonController::class, 'reset'])->name('season.reset');
     Route::get('season/fixtures/{fixture}/report', [SeasonController::class, 'report'])->name('season.report');
+    Route::get('season/fixtures/{fixture}/scout', [SeasonController::class, 'scout'])->name('season.scout');
 
     Route::get('scouts', [ScoutController::class, 'index'])->name('scouts.index');
     Route::post('scouts/{scout}/hire', [ScoutController::class, 'hire'])->name('scouts.hire');
