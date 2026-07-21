@@ -29,10 +29,12 @@ use Illuminate\Support\Carbon;
  * @property int $finishing
  * @property int $tackling
  * @property int $pace
+ * @property int $fitness
+ * @property int $form
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['user_id', 'name', 'position', 'age', 'potential', 'is_youth', 'training_focus', 'vision', 'passing', 'dribbling', 'finishing', 'tackling', 'pace'])]
+#[Fillable(['user_id', 'name', 'position', 'age', 'potential', 'is_youth', 'training_focus', 'vision', 'passing', 'dribbling', 'finishing', 'tackling', 'pace', 'fitness', 'form'])]
 class Player extends Model
 {
     /** @use HasFactory<PlayerFactory> */
@@ -51,6 +53,18 @@ class Player extends Model
 
     /** Ability at or above this, or turning eighteen, makes a prospect first-team ready. */
     public const int PROMOTION_OVERALL = 14;
+
+    /** Condition the season clock moves: a match tires, a week of rest recovers. */
+    public const int MATCH_DRAIN = 18;
+
+    public const int WEEKLY_RECOVERY = 12;
+
+    public const int FITNESS_MAX = 100;
+
+    /** Form is a small signed swing that mean-reverts toward zero. */
+    public const int FORM_MIN = -5;
+
+    public const int FORM_MAX = 5;
 
     public function overall(): int
     {
@@ -94,6 +108,24 @@ class Player extends Model
     }
 
     /**
+     * The attributes a player actually takes into a match: their raw ability
+     * scaled by condition. Fitness runs 0.70 (spent) to 1.00 (fresh); form adds
+     * up to ±15%. Full fitness and neutral form leave the attributes untouched.
+     */
+    public function matchAttributes(): Attributes
+    {
+        return $this->attributes()->scaled($this->conditionFactor());
+    }
+
+    public function conditionFactor(): float
+    {
+        $fitnessFactor = 0.70 + 0.30 * ($this->fitness / self::FITNESS_MAX);
+        $formFactor = 1.0 + 0.03 * $this->form;
+
+        return $fitnessFactor * $formFactor;
+    }
+
+    /**
      * A convex price derived from the six attributes, so elite players cost
      * disproportionately more than average ones.
      */
@@ -119,6 +151,8 @@ class Player extends Model
             'age' => 'integer',
             'potential' => 'integer',
             'is_youth' => 'boolean',
+            'fitness' => 'integer',
+            'form' => 'integer',
         ];
     }
 }

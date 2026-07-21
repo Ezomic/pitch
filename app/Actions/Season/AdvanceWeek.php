@@ -20,6 +20,7 @@ class AdvanceWeek
         private readonly DeliverProspects $deliverProspects = new DeliverProspects,
         private readonly DevelopPlayers $developPlayers = new DevelopPlayers,
         private readonly PlayYouthFixtures $playYouthFixtures = new PlayYouthFixtures,
+        private readonly RecoverCondition $recoverCondition = new RecoverCondition,
     ) {}
 
     public function handle(Season $season): void
@@ -28,6 +29,7 @@ class AdvanceWeek
             'current_date' => CarbonImmutable::parse($season->current_date)->addWeek(),
         ]);
 
+        $this->recoverCondition->handle($season);
         $this->playMatchday->handle($season);
         $this->deliverProspects->handle($season);
 

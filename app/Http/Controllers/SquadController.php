@@ -150,6 +150,8 @@ class SquadController extends Controller
             'tackling' => $player->tackling,
             'pace' => $player->pace,
             'value' => $player->value(),
+            'fitness' => $player->fitness,
+            'form' => $player->form,
         ];
     }
 

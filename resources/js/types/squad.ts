@@ -10,6 +10,8 @@ export interface Player {
     tackling: number;
     pace: number;
     value: number;
+    fitness: number;
+    form: number;
 }
 
 export interface PoolPlayer extends Player {

@@ -63,11 +63,18 @@ class SubstituteLive
 
         $moments = array_merge($locked, $tail['moments']);
 
+        $lockedScorers = array_values(array_filter(
+            $session->scorers ?? [],
+            fn (array $scorer) => $scorer['minute'] < $minute,
+        ));
+        $scorers = array_merge($lockedScorers, ResolveScorers::forLineup($tail['scorers'], $lineup));
+
         $session->update([
             'lineup' => $lineup,
             'bench' => $bench,
             'subs_remaining' => $session->subs_remaining - 1,
             'moments' => $moments,
+            'scorers' => $scorers,
             'home_goals' => $this->countGoals($moments, 'home'),
             'away_goals' => $this->countGoals($moments, 'away'),
         ]);

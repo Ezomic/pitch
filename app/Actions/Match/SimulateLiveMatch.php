@@ -24,7 +24,7 @@ class SimulateLiveMatch
 
     /**
      * @param  array<int, string>  $names  slot id => player name
-     * @return array{moments: list<array<string, mixed>>, scored: int, conceded: int}
+     * @return array{moments: list<array<string, mixed>>, scored: int, conceded: int, scorers: list<array{minute: int, slot: int}>}
      */
     public function handle(
         TeamSetup $user,
@@ -46,9 +46,16 @@ class SimulateLiveMatch
         );
 
         $moments = [];
+        $scorers = [];
 
         foreach ($this->narrator->feed($attack, $names) as $moment) {
             $moments[] = ['minute' => $moment->minute, 'side' => 'home', 'kind' => $moment->kind, 'text' => $moment->text];
+        }
+
+        foreach ($attack->events as $event) {
+            if ($event->type === EventType::Shot && $event->success) {
+                $scorers[] = ['minute' => $event->minute, 'slot' => $event->actorId];
+            }
         }
 
         foreach ($defence->events as $event) {
@@ -59,6 +66,6 @@ class SimulateLiveMatch
 
         usort($moments, fn (array $a, array $b): int => $a['minute'] <=> $b['minute']);
 
-        return ['moments' => $moments, 'scored' => $attack->goals, 'conceded' => $defence->goals];
+        return ['moments' => $moments, 'scored' => $attack->goals, 'conceded' => $defence->goals, 'scorers' => $scorers];
     }
 }

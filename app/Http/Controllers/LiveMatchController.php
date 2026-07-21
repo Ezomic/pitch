@@ -37,6 +37,8 @@ class LiveMatchController extends Controller
                 'slot' => (int) $slot,
                 'name' => $player->name,
                 'position' => $player->position->value,
+                'fitness' => $player->fitness,
+                'form' => $player->form,
             ];
         }
 

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Head, router } from '@inertiajs/vue3';
+import ConditionIndicator from '@/components/ConditionIndicator.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { focus, index, promote } from '@/routes/youth';
@@ -162,6 +163,14 @@ function setFocus(prospect: Prospect, key: string): void {
                                     >{{ prospect.attributes[attr.key] }}</span
                                 >
                             </button>
+                        </div>
+                        <div
+                            class="mt-2 border-t border-sidebar-border/40 pt-2"
+                        >
+                            <ConditionIndicator
+                                :fitness="prospect.fitness"
+                                :form="prospect.form"
+                            />
                         </div>
                     </div>
                 </div>

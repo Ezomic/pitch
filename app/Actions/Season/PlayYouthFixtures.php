@@ -24,6 +24,7 @@ class PlayYouthFixtures
         private readonly FixtureResolver $resolver = new FixtureResolver,
         private readonly BuildYouthTeam $buildYouthTeam = new BuildYouthTeam,
         private readonly DevelopPlayers $developPlayers = new DevelopPlayers,
+        private readonly ApplyMatchCondition $applyMatchCondition = new ApplyMatchCondition,
     ) {}
 
     public function handle(Season $season): void
@@ -43,8 +44,10 @@ class PlayYouthFixtures
         /** @var Collection<int, Team> $teams */
         $teams = Team::query()->where('is_youth', true)->get()->keyBy('id');
         $userSetup = $this->buildYouthTeam->forUser($season->user);
+        $featured = $this->buildYouthTeam->featured($season->user);
+        $featuredIds = array_values(array_map('intval', $featured->pluck('id')->all()));
 
-        DB::transaction(function () use ($fixtures, $teams, $userSetup): void {
+        DB::transaction(function () use ($fixtures, $teams, $userSetup, $featuredIds): void {
             foreach ($fixtures as $fixture) {
                 $result = $this->resolver->resolve(
                     $this->sideSetup($fixture->home_team_id, $teams, $userSetup),
@@ -57,10 +60,16 @@ class PlayYouthFixtures
                     'away_goals' => $result['away'],
                     'played' => true,
                 ]);
+
+                if ($fixture->home_team_id === null) {
+                    $this->applyMatchCondition->handle($featuredIds, $result['home'], $result['away']);
+                } elseif ($fixture->away_team_id === null) {
+                    $this->applyMatchCondition->handle($featuredIds, $result['away'], $result['home']);
+                }
             }
         });
 
-        $this->developPlayers->handle($this->buildYouthTeam->featured($season->user));
+        $this->developPlayers->handle($featured);
     }
 
     /**

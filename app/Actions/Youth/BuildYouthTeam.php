@@ -30,7 +30,7 @@ class BuildYouthTeam
         foreach ($formation->slots() as $index => $slot) {
             $player = $prospects->get($index);
             $bySlot[$slot] = $player instanceof Player
-                ? $player->attributes()
+                ? $player->matchAttributes()
                 : new Attributes(self::TRIALIST, self::TRIALIST, self::TRIALIST, self::TRIALIST, self::TRIALIST, self::TRIALIST);
         }
 

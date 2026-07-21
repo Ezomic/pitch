@@ -8,6 +8,8 @@ export interface Prospect {
     promotable: boolean;
     trainingFocus: string | null;
     attributes: Record<string, number>;
+    fitness: number;
+    form: number;
 }
 
 export interface YouthFixture {
