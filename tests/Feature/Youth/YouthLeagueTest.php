@@ -61,7 +61,7 @@ it('fields the strongest prospects first and caps the youth XI at eleven', funct
     $user = User::factory()->create();
     Player::factory()->youth($user->id)->count(12)->create();
     $gem = Player::factory()->youth($user->id)->create([
-        'vision' => 18, 'passing' => 18, 'dribbling' => 18, 'finishing' => 18, 'tackling' => 18, 'pace' => 18,
+        'vision' => 90, 'passing' => 90, 'dribbling' => 90, 'finishing' => 90, 'tackling' => 90, 'pace' => 90,
     ]);
 
     $featured = app(BuildYouthTeam::class)->featured($user);
@@ -80,13 +80,13 @@ it('gives featured prospects an extra week of development from match minutes', f
     $user = User::factory()->create();
     $season = app(EnsureSeason::class)->handle($user);
     $prospect = Player::factory()->youth($user->id)->create([
-        'potential' => 20, 'vision' => 6, 'passing' => 6, 'dribbling' => 6, 'finishing' => 6, 'tackling' => 6, 'pace' => 6,
+        'potential' => 100, 'vision' => 30, 'passing' => 30, 'dribbling' => 30, 'finishing' => 30, 'tackling' => 30, 'pace' => 30,
     ]);
     $before = attributeSum($prospect);
 
     app(AdvanceWeek::class)->handle($season); // weekly develop + a youth match this week
 
-    expect(attributeSum($prospect->refresh()) - $before)->toBe(2);
+    expect(attributeSum($prospect->refresh()) - $before)->toBe(10);
 });
 
 it('shows the youth league on the academy page', function () {

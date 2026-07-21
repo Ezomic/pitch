@@ -14,8 +14,8 @@ final class RunVisionSpike extends Command
     protected $signature = 'pitch:vision-spike
         {--matches=3000 : Number of paired matches per arm}
         {--seed=1 : Base seed for the shared sequence}
-        {--low=6 : Vision value for the low arm}
-        {--high=16 : Vision value for the high arm}
+        {--low=30 : Vision value for the low arm}
+        {--high=80 : Vision value for the high arm}
         {--sample=20 : Matches per arm to persist with full event logs}
         {--no-persist : Skip writing the run to the database}';
 

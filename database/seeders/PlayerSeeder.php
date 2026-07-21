@@ -20,12 +20,12 @@ class PlayerSeeder extends Seeder
 
         foreach ($this->roster() as [$name, $position]) {
             $attributes = [
-                'vision' => mt_rand(4, 18),
-                'passing' => mt_rand(6, 18),
-                'dribbling' => mt_rand(6, 18),
-                'finishing' => mt_rand(4, 18),
-                'tackling' => mt_rand(6, 18),
-                'pace' => mt_rand(6, 18),
+                'vision' => mt_rand(20, 90),
+                'passing' => mt_rand(30, 90),
+                'dribbling' => mt_rand(30, 90),
+                'finishing' => mt_rand(20, 90),
+                'tackling' => mt_rand(30, 90),
+                'pace' => mt_rand(30, 90),
             ];
 
             $overall = (int) round(array_sum($attributes) / count($attributes));
@@ -35,7 +35,7 @@ class PlayerSeeder extends Seeder
                 'name' => $name,
                 'position' => $position,
                 'age' => mt_rand(18, 33),
-                'potential' => min(20, $overall + mt_rand(0, 3)),
+                'potential' => min(100, $overall + mt_rand(0, 15)),
                 'is_youth' => false,
             ]);
         }

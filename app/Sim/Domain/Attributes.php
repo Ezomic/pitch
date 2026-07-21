@@ -21,13 +21,13 @@ final readonly class Attributes
     }
 
     /**
-     * Every attribute multiplied by a condition factor and clamped to the 1..20
+     * Every attribute multiplied by a condition factor and clamped to the 1..100
      * scale, so fitness and form move a player's effective match rating without
      * ever pushing an attribute out of range.
      */
     public function scaled(float $factor): self
     {
-        $scale = static fn (int $attr): int => max(1, min(20, (int) round($attr * $factor)));
+        $scale = static fn (int $attr): int => max(1, min(100, (int) round($attr * $factor)));
 
         return new self(
             $scale($this->vision),

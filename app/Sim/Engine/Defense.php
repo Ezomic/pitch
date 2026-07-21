@@ -87,7 +87,7 @@ final readonly class Defense
 
         $line = $this->lineForZone($ballZone);
 
-        return ($this->tackling[$line] / 20) * $this->coverage[$line] * self::TACKLE_WEIGHT * $this->defenceBias;
+        return ($this->tackling[$line] / 100) * $this->coverage[$line] * self::TACKLE_WEIGHT * $this->defenceBias;
     }
 
     public function paceContest(int $attackerPace, Zone $ballZone): float
@@ -98,7 +98,7 @@ final readonly class Defense
 
         $line = $this->lineForZone($ballZone);
 
-        return (($attackerPace - $this->pace[$line]) / 20) * self::PACE_WEIGHT * $this->coverage[$line];
+        return (($attackerPace - $this->pace[$line]) / 100) * self::PACE_WEIGHT * $this->coverage[$line];
     }
 
     public function shotSuppression(Zone $ballZone): float
@@ -109,7 +109,7 @@ final readonly class Defense
 
         $line = $this->lineForZone($ballZone);
 
-        return ($this->tackling[$line] / 20) * $this->coverage[$line] * self::SHOT_WEIGHT * $this->defenceBias;
+        return ($this->tackling[$line] / 100) * $this->coverage[$line] * self::SHOT_WEIGHT * $this->defenceBias;
     }
 
     private function lineForZone(Zone $ballZone): string

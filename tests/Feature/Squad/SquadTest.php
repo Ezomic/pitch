@@ -144,8 +144,8 @@ it('rejects an unknown formation or mentality', function () {
 it('rejects a swap that would exceed the budget and leaves the squad unchanged', function () {
     $elite = Player::factory()->create([
         'position' => Position::Forward,
-        'vision' => 20, 'passing' => 20, 'dribbling' => 20,
-        'finishing' => 20, 'tackling' => 20, 'pace' => 20,
+        'vision' => 100, 'passing' => 100, 'dribbling' => 100,
+        'finishing' => 100, 'tackling' => 100, 'pace' => 100,
     ]);
 
     $user = User::factory()->create();

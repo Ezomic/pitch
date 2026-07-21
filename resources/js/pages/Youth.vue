@@ -154,7 +154,7 @@ function setFocus(prospect: Prospect, key: string): void {
                                                 : 'bg-foreground/70'
                                         "
                                         :style="{
-                                            width: `${(prospect.attributes[attr.key] / 20) * 100}%`,
+                                            width: `${Math.min(100, prospect.attributes[attr.key])}%`,
                                         }"
                                     />
                                 </span>

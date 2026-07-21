@@ -15,7 +15,7 @@ function squadOf(int $vision): TeamSetup
 {
     $bySlot = [];
     foreach (Roster::slots() as $slot) {
-        $bySlot[$slot] = new Attributes($vision, 12, 12, 12, 12, 12);
+        $bySlot[$slot] = new Attributes($vision, 60, 60, 60, 60, 60);
     }
 
     return new TeamSetup($bySlot, Formation::balanced(), Mentality::Balanced);
@@ -24,8 +24,8 @@ function squadOf(int $vision): TeamSetup
 it('evaluates a squad deterministically', function () {
     $evaluator = new SquadEvaluator;
 
-    $a = $evaluator->evaluate(squadOf(10), TeamSetup::baseline(), 60);
-    $b = $evaluator->evaluate(squadOf(10), TeamSetup::baseline(), 60);
+    $a = $evaluator->evaluate(squadOf(50), TeamSetup::baseline(), 60);
+    $b = $evaluator->evaluate(squadOf(50), TeamSetup::baseline(), 60);
 
     expect($a->meanDecisionGap)->toBe($b->meanDecisionGap)
         ->and($a->chancesPer90)->toBe($b->chancesPer90)
@@ -35,8 +35,8 @@ it('evaluates a squad deterministically', function () {
 it('makes a high-vision squad measurably sharper than a low-vision one', function () {
     $evaluator = new SquadEvaluator;
 
-    $low = $evaluator->evaluate(squadOf(6), TeamSetup::baseline(), 150);
-    $high = $evaluator->evaluate(squadOf(16), TeamSetup::baseline(), 150);
+    $low = $evaluator->evaluate(squadOf(30), TeamSetup::baseline(), 150);
+    $high = $evaluator->evaluate(squadOf(80), TeamSetup::baseline(), 150);
 
     expect($high->meanDecisionGap)->toBeLessThan($low->meanDecisionGap)
         ->and($high->progressivePassShare)->toBeGreaterThan($low->progressivePassShare)
@@ -44,7 +44,7 @@ it('makes a high-vision squad measurably sharper than a low-vision one', functio
 });
 
 it('lays the default 4-3-3 roster out back to front', function () {
-    $players = Roster::build(new Attributes(10, 12, 12, 12, 12, 12));
+    $players = Roster::build(new Attributes(50, 60, 60, 60, 60, 60));
 
     expect($players)->toHaveCount(10)
         ->and(array_keys($players))->toBe(range(1, 10));

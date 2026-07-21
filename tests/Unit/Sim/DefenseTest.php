@@ -13,14 +13,14 @@ use App\Sim\Squad\TeamSetup;
 
 function attackers(): array
 {
-    return Roster::build(new Attributes(11, 12, 12, 12, 12, 12));
+    return Roster::build(new Attributes(55, 60, 60, 60, 60, 60));
 }
 
 function defenseOf(int $tackling, int $pace): Defense
 {
     $bySlot = [];
     foreach (Roster::slots() as $slot) {
-        $bySlot[$slot] = new Attributes(11, 11, 11, 11, $tackling, $pace);
+        $bySlot[$slot] = new Attributes(55, 55, 55, 55, $tackling, $pace);
     }
 
     return Defense::fromAttributes($bySlot);
@@ -30,7 +30,7 @@ function squadWith(int $tackling, int $pace): TeamSetup
 {
     $bySlot = [];
     foreach (Roster::slots() as $slot) {
-        $bySlot[$slot] = new Attributes(11, 12, 12, 12, $tackling, $pace);
+        $bySlot[$slot] = new Attributes(55, 60, 60, 60, $tackling, $pace);
     }
 
     return new TeamSetup($bySlot, Formation::balanced(), Mentality::Balanced);
@@ -56,8 +56,8 @@ it('concedes fewer chances against a stronger tackling defence', function () {
     $weak = 0;
     $strong = 0;
     for ($seed = 1; $seed <= 120; $seed++) {
-        $weak += $engine->simulate($players, $seed, defenseOf(4, 8))->shots;
-        $strong += $engine->simulate($players, $seed, defenseOf(18, 8))->shots;
+        $weak += $engine->simulate($players, $seed, defenseOf(20, 40))->shots;
+        $strong += $engine->simulate($players, $seed, defenseOf(90, 40))->shots;
     }
 
     expect($strong)->toBeLessThan($weak);
@@ -70,8 +70,8 @@ it('concedes fewer chances against a quicker defence', function () {
     $slow = 0;
     $quick = 0;
     for ($seed = 1; $seed <= 120; $seed++) {
-        $slow += $engine->simulate($players, $seed, defenseOf(11, 4))->shots;
-        $quick += $engine->simulate($players, $seed, defenseOf(11, 18))->shots;
+        $slow += $engine->simulate($players, $seed, defenseOf(55, 20))->shots;
+        $quick += $engine->simulate($players, $seed, defenseOf(55, 90))->shots;
     }
 
     expect($quick)->toBeLessThan($slow);
@@ -80,8 +80,8 @@ it('concedes fewer chances against a quicker defence', function () {
 it('makes a high tackling and pace squad concede less than a poor one', function () {
     $evaluator = new SquadEvaluator;
 
-    $solid = $evaluator->evaluate(squadWith(18, 17), TeamSetup::baseline(), 120);
-    $porous = $evaluator->evaluate(squadWith(4, 6), TeamSetup::baseline(), 120);
+    $solid = $evaluator->evaluate(squadWith(90, 85), TeamSetup::baseline(), 120);
+    $porous = $evaluator->evaluate(squadWith(20, 30), TeamSetup::baseline(), 120);
 
     expect($solid->chancesConcededPer90)->toBeLessThan($porous->chancesConcededPer90)
         ->and($solid->goalsConcededPer90)->toBeLessThanOrEqual($porous->goalsConcededPer90);

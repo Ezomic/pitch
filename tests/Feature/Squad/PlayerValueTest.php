@@ -23,9 +23,9 @@ function playerRated(int $rating): Player
 }
 
 it('prices elite players convexly higher than average and poor ones', function () {
-    $elite = playerRated(20)->value();
-    $average = playerRated(10)->value();
-    $poor = playerRated(5)->value();
+    $elite = playerRated(100)->value();
+    $average = playerRated(50)->value();
+    $poor = playerRated(25)->value();
 
     expect($elite)->toBeGreaterThan($average)
         ->and($average)->toBeGreaterThan($poor)
@@ -33,17 +33,17 @@ it('prices elite players convexly higher than average and poor ones', function (
 });
 
 it('is deterministic and rises when any attribute rises', function () {
-    $base = playerRated(10);
+    $base = playerRated(50);
     $sharper = Player::factory()->make([
-        'vision' => 16,
-        'passing' => 10,
-        'dribbling' => 10,
-        'finishing' => 10,
-        'tackling' => 10,
-        'pace' => 10,
+        'vision' => 80,
+        'passing' => 50,
+        'dribbling' => 50,
+        'finishing' => 50,
+        'tackling' => 50,
+        'pace' => 50,
     ]);
 
-    expect($base->value())->toBe(playerRated(10)->value())
+    expect($base->value())->toBe(playerRated(50)->value())
         ->and($sharper->value())->toBeGreaterThan($base->value());
 });
 

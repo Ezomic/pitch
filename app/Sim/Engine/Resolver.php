@@ -11,7 +11,7 @@ use App\Sim\Domain\Zone;
 
 final class Resolver
 {
-    private const float SKILL_SCALE = 20.0;
+    private const float SKILL_SCALE = 100.0;
 
     private const float PRESSURE_WEIGHT = 0.30;
 

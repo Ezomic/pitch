@@ -16,33 +16,33 @@ function prospect(array $overrides = []): Player
     return Player::factory()->create([
         'is_youth' => true,
         'age' => 15,
-        'potential' => 12,
-        'vision' => 5,
-        'passing' => 6,
-        'dribbling' => 6,
-        'finishing' => 6,
-        'tackling' => 6,
-        'pace' => 6,
+        'potential' => 60,
+        'vision' => 25,
+        'passing' => 30,
+        'dribbling' => 30,
+        'finishing' => 30,
+        'tackling' => 30,
+        'pace' => 30,
         ...$overrides,
     ]);
 }
 
 it('trains the focused attribute instead of the weakest when a focus is set', function () {
-    $youth = prospect(['potential' => 20, 'training_focus' => 'finishing', 'vision' => 4, 'finishing' => 6]);
+    $youth = prospect(['potential' => 100, 'training_focus' => 'finishing', 'vision' => 20, 'finishing' => 30]);
 
     app(DevelopPlayers::class)->handle([$youth]);
 
     $youth->refresh();
-    expect($youth->finishing)->toBe(7) // the focus grew
-        ->and($youth->vision)->toBe(4); // the weakest was left alone
+    expect($youth->finishing)->toBe(35) // the focus grew
+        ->and($youth->vision)->toBe(20); // the weakest was left alone
 });
 
 it('falls back to the weakest attribute when the focus is maxed out', function () {
-    $youth = prospect(['potential' => 20, 'training_focus' => 'finishing', 'finishing' => 20, 'vision' => 4]);
+    $youth = prospect(['potential' => 100, 'training_focus' => 'finishing', 'finishing' => 100, 'vision' => 20]);
 
     app(DevelopPlayers::class)->handle([$youth]);
 
-    expect($youth->refresh()->vision)->toBe(5);
+    expect($youth->refresh()->vision)->toBe(25);
 });
 
 it('grows a prospect weakest-first toward its potential', function () {
@@ -50,22 +50,22 @@ it('grows a prospect weakest-first toward its potential', function () {
 
     app(DevelopPlayers::class)->handle([$youth]);
 
-    expect($youth->refresh()->vision)->toBe(6); // the lowest attribute gained a point
+    expect($youth->refresh()->vision)->toBe(30); // the lowest attribute gained a step
 });
 
 it('stops a prospect at its potential and never overshoots', function () {
-    $youth = prospect(['potential' => 12]);
+    $youth = prospect(['potential' => 60]);
 
     foreach (range(1, 200) as $ignored) {
         app(DevelopPlayers::class)->handle([$youth]);
     }
 
-    expect($youth->refresh()->attributes()->overall())->toBe(12);
+    expect($youth->refresh()->attributes()->overall())->toBe(60);
 });
 
 it('lets a higher-potential prospect end up stronger than a lower one', function () {
-    $modest = prospect(['potential' => 13]);
-    $gem = prospect(['potential' => 19]);
+    $modest = prospect(['potential' => 65]);
+    $gem = prospect(['potential' => 95]);
 
     foreach (range(1, 300) as $ignored) {
         app(DevelopPlayers::class)->handle([$modest, $gem]);
@@ -78,13 +78,13 @@ it('lets a higher-potential prospect end up stronger than a lower one', function
 it('does not develop seniors', function () {
     $senior = Player::factory()->create([
         'is_youth' => false,
-        'potential' => 20,
-        'vision' => 5,
+        'potential' => 100,
+        'vision' => 25,
     ]);
 
     app(DevelopPlayers::class)->handle([$senior]);
 
-    expect($senior->refresh()->vision)->toBe(5);
+    expect($senior->refresh()->vision)->toBe(25);
 });
 
 it('develops the user\'s youth when the week advances', function () {
@@ -96,5 +96,5 @@ it('develops the user\'s youth when the week advances', function () {
     app(AdvanceWeek::class)->handle($season);
 
     expect($youth->refresh()->attributes()->overall())->toBeGreaterThanOrEqual($before)
-        ->and($youth->vision)->toBe(6);
+        ->and($youth->vision)->toBe(30);
 });

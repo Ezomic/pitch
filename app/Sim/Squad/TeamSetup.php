@@ -33,7 +33,7 @@ final readonly class TeamSetup
     {
         $bySlot = [];
         foreach (Formation::balanced()->slots() as $slot) {
-            $bySlot[$slot] = new Attributes(11, 11, 11, 11, 11, 11);
+            $bySlot[$slot] = new Attributes(55, 55, 55, 55, 55, 55);
         }
 
         return new self($bySlot, Formation::balanced(), Mentality::Balanced);
