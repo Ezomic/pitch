@@ -13,6 +13,7 @@ export interface Player {
     fitness: number;
     form: number;
     trait: string | null;
+    injuredWeeks: number;
 }
 
 export interface PoolPlayer extends Player {

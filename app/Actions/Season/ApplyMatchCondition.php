@@ -5,14 +5,19 @@ declare(strict_types=1);
 namespace App\Actions\Season;
 
 use App\Models\Player;
+use App\Models\SquadPlayer;
 
 /**
  * Settle the condition consequences of a played match. Everyone who featured
  * loses fitness; their form swings with the result (win up, loss down) and each
- * scorer gets an extra lift. Form is clamped to its range and never runs away.
+ * scorer gets an extra lift. Form is clamped to its range and never runs away. A
+ * player run into the ground can break down and drop out of the XI to recover.
  */
 class ApplyMatchCondition
 {
+    /** Below this fitness a played player risks an injury; empty means certain. */
+    private const int INJURY_FITNESS = 30;
+
     /**
      * @param  list<int>  $featuredPlayerIds  the XI that played (drained + result-nudged)
      * @param  list<int>  $scoringPlayerIds  players who scored (an extra form lift)
@@ -33,13 +38,30 @@ class ApplyMatchCondition
 
         foreach (Player::query()->whereIn('id', $affected)->get() as $player) {
             $formDelta = $resultNudge + ($scorerCounts[$player->id] ?? 0);
+            $update = ['form' => max(Player::FORM_MIN, min(Player::FORM_MAX, $player->form + $formDelta))];
 
-            $form = max(Player::FORM_MIN, min(Player::FORM_MAX, $player->form + $formDelta));
-            $fitness = isset($featured[$player->id])
-                ? max(0, $player->fitness - Player::MATCH_DRAIN)
-                : $player->fitness;
+            if (isset($featured[$player->id])) {
+                $fitness = max(0, $player->fitness - Player::MATCH_DRAIN);
+                $update['fitness'] = $fitness;
 
-            $player->forceFill(['form' => $form, 'fitness' => $fitness])->save();
+                if ($this->breaksDown($fitness)) {
+                    $update['injured_weeks'] = random_int(1, 3);
+                    SquadPlayer::query()->where('player_id', $player->id)->delete();
+                }
+            }
+
+            $player->forceFill($update)->save();
         }
+    }
+
+    /** An exhausted player (no fitness left) is certain to break down; a merely
+     * tired one has a chance rising as fitness falls toward the threshold. */
+    private function breaksDown(int $fitness): bool
+    {
+        if ($fitness <= 0) {
+            return true;
+        }
+
+        return $fitness < self::INJURY_FITNESS && random_int(1, 100) <= self::INJURY_FITNESS - $fitness;
     }
 }

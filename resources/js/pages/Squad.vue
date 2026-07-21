@@ -76,7 +76,11 @@ function affordable(player: PoolPlayer): boolean {
 }
 
 function canPick(player: PoolPlayer): boolean {
-    return selectedSlot.value !== null && affordable(player);
+    return (
+        selectedSlot.value !== null &&
+        player.injuredWeeks === 0 &&
+        affordable(player)
+    );
 }
 
 function unaffordable(player: PoolPlayer): boolean {

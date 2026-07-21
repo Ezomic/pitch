@@ -49,7 +49,14 @@ const stats: { key: keyof PoolPlayer; label: string; key_metric: boolean }[] = [
                     >£{{ props.player.value }}m</span
                 >
                 <Badge variant="secondary">{{ props.player.position }}</Badge>
-                <Badge v-if="props.player.slot !== null" variant="outline">
+                <Badge
+                    v-if="props.player.injuredWeeks > 0"
+                    variant="outline"
+                    class="border-red-500/40 text-red-600 dark:text-red-400"
+                >
+                    Injured {{ props.player.injuredWeeks }}w
+                </Badge>
+                <Badge v-else-if="props.player.slot !== null" variant="outline">
                     Slot {{ props.player.slot }}
                 </Badge>
                 <Badge

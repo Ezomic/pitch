@@ -174,8 +174,16 @@ class SquadController extends Controller
             ->orderBy('name')
             ->get();
 
+        // The user's own injured players are shown too, greyed out until they heal.
+        $injured = Player::query()
+            ->where('user_id', $squad->user_id)
+            ->where('is_youth', false)
+            ->where('injured_weeks', '>', 0)
+            ->orderBy('name')
+            ->get();
+
         $pool = [];
-        foreach ($players as $player) {
+        foreach ($players->concat($injured) as $player) {
             $pool[] = [
                 ...$this->player($player),
                 'slot' => $assignedSlot->get($player->id)?->slot,
@@ -205,6 +213,7 @@ class SquadController extends Controller
             'fitness' => $player->fitness,
             'form' => $player->form,
             'trait' => $player->trait,
+            'injuredWeeks' => $player->injured_weeks,
         ];
     }
 
