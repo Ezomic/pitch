@@ -1,10 +1,17 @@
 <script setup lang="ts">
 import { Head, Link, router } from '@inertiajs/vue3';
 import { Button } from '@/components/ui/button';
-import { advance, reset, show } from '@/routes/season';
-import type { Matchday, NextFixture, StandingRow } from '@/types/season';
+import { advance, rollover, show } from '@/routes/season';
+import type {
+    Matchday,
+    NextFixture,
+    SeasonHistory,
+    StandingRow,
+} from '@/types/season';
 
 const props = defineProps<{
+    seasonNumber: number;
+    history: SeasonHistory[];
     standings: StandingRow[];
     matchdays: Matchday[];
     currentMatchday: number | null;
@@ -52,7 +59,7 @@ function formatDate(iso: string): string {
 }
 
 function newSeason(): void {
-    router.post(reset().url, {}, { preserveScroll: true });
+    router.post(rollover().url, {}, { preserveScroll: true });
 }
 
 function ordinal(n: number): string {
@@ -112,8 +119,7 @@ const columns: { key: keyof StandingRow; label: string }[] = [
                 </div>
                 <div v-else>
                     <p class="text-sm text-muted-foreground">
-                        {{ formatDate(props.currentDate) }} &middot; Season
-                        complete
+                        Season {{ props.seasonNumber }} complete
                     </p>
                     <p class="text-lg font-medium">
                         You finished {{ userPosition() }} of
@@ -131,7 +137,7 @@ const columns: { key: keyof StandingRow; label: string }[] = [
                     Advance week
                 </Button>
                 <Button v-else variant="outline" @click="newSeason">
-                    Start new season
+                    Start season {{ props.seasonNumber + 1 }}
                 </Button>
             </div>
         </div>
@@ -140,9 +146,14 @@ const columns: { key: keyof StandingRow; label: string }[] = [
             <div
                 class="rounded-xl border border-sidebar-border/70 p-4 dark:border-sidebar-border"
             >
-                <h2 class="mb-3 text-sm font-medium text-muted-foreground">
-                    Standings
-                </h2>
+                <div class="mb-3 flex items-center justify-between gap-2">
+                    <h2 class="text-sm font-medium text-muted-foreground">
+                        Standings
+                    </h2>
+                    <span class="text-xs text-muted-foreground"
+                        >Season {{ props.seasonNumber }}</span
+                    >
+                </div>
                 <table class="w-full text-sm">
                     <thead>
                         <tr class="text-muted-foreground">
@@ -225,6 +236,28 @@ const columns: { key: keyof StandingRow; label: string }[] = [
                             </Link>
                         </span>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <div
+            v-if="props.history.length > 0"
+            class="rounded-xl border border-sidebar-border/70 p-4 dark:border-sidebar-border"
+        >
+            <h2 class="mb-3 text-sm font-medium text-muted-foreground">
+                Past seasons
+            </h2>
+            <div class="flex flex-col gap-1">
+                <div
+                    v-for="entry in props.history"
+                    :key="entry.number"
+                    class="flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-sm"
+                >
+                    <span>Season {{ entry.number }}</span>
+                    <span class="text-muted-foreground">
+                        finished {{ entry.position }} of {{ entry.teams }} on
+                        {{ entry.points }} pts
+                    </span>
                 </div>
             </div>
         </div>

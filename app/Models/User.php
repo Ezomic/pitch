@@ -45,11 +45,22 @@ class User extends Authenticatable implements PasskeyUser
     }
 
     /**
+     * The one active campaign. Completed seasons are kept for history but only a
+     * single season is ever in progress at a time.
+     *
      * @return HasOne<Season, $this>
      */
     public function season(): HasOne
     {
-        return $this->hasOne(Season::class);
+        return $this->hasOne(Season::class)->whereNull('completed_at');
+    }
+
+    /**
+     * @return HasMany<Season, $this>
+     */
+    public function seasons(): HasMany
+    {
+        return $this->hasMany(Season::class);
     }
 
     /**

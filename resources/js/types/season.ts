@@ -31,3 +31,10 @@ export interface NextFixture {
     opponentName: string;
     home: boolean;
 }
+
+export interface SeasonHistory {
+    number: number;
+    position: number;
+    points: number;
+    teams: number;
+}

@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Actions\Season\AdvanceWeek;
 use App\Actions\Season\EnsureSeason;
+use App\Actions\Season\RolloverSeason;
 use App\Actions\Season\ScoutOpponent;
 use App\Actions\Season\Standings;
 use App\Actions\Squad\EnsureSquad;
@@ -34,6 +35,8 @@ class SeasonController extends Controller
         $due = $this->dueUserFixture($season);
 
         return Inertia::render('Season', [
+            'seasonNumber' => $season->number,
+            'history' => $this->history($this->user($request), $standings),
             'standings' => $standings->handle($season),
             'matchdays' => $this->matchdays($season, $teams),
             'currentMatchday' => $current,
@@ -102,6 +105,48 @@ class SeasonController extends Controller
         $ensureSeason->handle($this->user($request))->delete();
 
         return to_route('season.show');
+    }
+
+    public function rollover(Request $request, EnsureSeason $ensureSeason, RolloverSeason $rolloverSeason): RedirectResponse
+    {
+        $season = $ensureSeason->handle($this->user($request));
+
+        // Only roll over once the campaign is done: no unplayed senior fixtures left.
+        if ($season->fixtures()->where('youth', false)->where('played', false)->doesntExist()) {
+            $rolloverSeason->handle($season);
+        }
+
+        return to_route('season.show');
+    }
+
+    /**
+     * @return list<array{number: int, position: int, points: int, teams: int}>
+     */
+    private function history(User $user, Standings $standings): array
+    {
+        $history = [];
+
+        foreach ($user->seasons()->whereNotNull('completed_at')->orderByDesc('number')->get() as $season) {
+            $table = $standings->handle($season);
+            $position = 0;
+            foreach ($table as $index => $row) {
+                if ($row['isUser'] === true) {
+                    $position = $index + 1;
+                    break;
+                }
+            }
+
+            $userRow = collect($table)->firstWhere('isUser', true);
+
+            $history[] = [
+                'number' => $season->number,
+                'position' => $position,
+                'points' => is_array($userRow) ? (int) $userRow['points'] : 0,
+                'teams' => count($table),
+            ];
+        }
+
+        return $history;
     }
 
     public function report(

@@ -5,17 +5,19 @@ declare(strict_types=1);
 namespace App\Actions\Season;
 
 use App\Models\Season;
-use App\Models\Team;
 use App\Models\User;
-use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 
 class EnsureSeason
 {
+    public function __construct(
+        private readonly ScheduleSeason $scheduleSeason = new ScheduleSeason,
+    ) {}
+
     /**
-     * Return the user's season, creating one with a full double round-robin
-     * fixture list on first use. The user (represented by a null team id) plays
-     * every seeded rival home and away.
+     * Return the user's active season, creating one with a full double
+     * round-robin fixture list on first use. The user (represented by a null team
+     * id) plays every seeded rival home and away.
      */
     public function handle(User $user): Season
     {
@@ -28,99 +30,14 @@ class EnsureSeason
         return DB::transaction(function () use ($user): Season {
             $season = Season::create([
                 'user_id' => $user->id,
+                'number' => 1,
                 'starts_on' => Season::STARTS_ON,
                 'current_date' => Season::STARTS_ON,
             ]);
 
-            $teamIds = [];
-            foreach (Team::query()->where('is_youth', false)->orderBy('id')->get() as $team) {
-                $teamIds[] = $team->id;
-            }
-
-            $this->generateSchedule($season, $teamIds);
-
-            $youthTeamIds = [];
-            foreach (Team::query()->where('is_youth', true)->orderBy('id')->get() as $team) {
-                $youthTeamIds[] = $team->id;
-            }
-
-            $this->generateYouthSchedule($season, $youthTeamIds);
+            $this->scheduleSeason->handle($season);
 
             return $season;
         });
-    }
-
-    /**
-     * @param  list<int>  $teamIds
-     */
-    private function generateSchedule(Season $season, array $teamIds): void
-    {
-        $participants = array_merge([null], $teamIds);
-        $count = count($participants);
-        $rounds = $count - 1;
-        $half = intdiv($count, 2);
-
-        $fixed = $participants[0];
-        $rotating = array_slice($participants, 1);
-
-        $firstHalf = [];
-        for ($round = 0; $round < $rounds; $round++) {
-            $ordered = array_merge([$fixed], $rotating);
-            $day = [];
-
-            for ($i = 0; $i < $half; $i++) {
-                $a = $ordered[$i];
-                $b = $ordered[$count - 1 - $i];
-                $day[] = $round % 2 === 0 ? [$a, $b] : [$b, $a];
-            }
-
-            $firstHalf[] = $day;
-            array_unshift($rotating, array_pop($rotating));
-        }
-
-        $index = 0;
-        foreach ($firstHalf as $matchday => $day) {
-            foreach ($day as [$home, $away]) {
-                $this->createFixture($season, $matchday + 1, $home, $away, $index++);
-            }
-        }
-
-        foreach ($firstHalf as $matchday => $day) {
-            foreach ($day as [$home, $away]) {
-                $this->createFixture($season, $rounds + $matchday + 1, $away, $home, $index++);
-            }
-        }
-    }
-
-    private function createFixture(Season $season, int $matchday, ?int $home, ?int $away, int $index): void
-    {
-        $season->fixtures()->create([
-            'matchday' => $matchday,
-            'scheduled_on' => CarbonImmutable::parse($season->starts_on)->addWeeks($matchday),
-            'home_team_id' => $home,
-            'away_team_id' => $away,
-            'seed' => $season->id * 1000 + $index + 1,
-            'played' => false,
-        ]);
-    }
-
-    /**
-     * The academy plays each youth side once, week by week alongside the seniors.
-     *
-     * @param  list<int>  $youthTeamIds
-     */
-    private function generateYouthSchedule(Season $season, array $youthTeamIds): void
-    {
-        foreach ($youthTeamIds as $matchday => $teamId) {
-            $season->fixtures()->create([
-                'matchday' => $matchday + 1,
-                'youth' => true,
-                'scheduled_on' => CarbonImmutable::parse($season->starts_on)->addWeeks($matchday + 1),
-                'home_team_id' => null,
-                'away_team_id' => $teamId,
-                'seed' => $season->id * 1000 + 900 + $matchday,
-                'played' => false,
-            ]);
-        }
     }
 }

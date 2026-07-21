@@ -39,6 +39,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('season', [SeasonController::class, 'show'])->name('season.show');
     Route::post('season/advance', [SeasonController::class, 'advance'])->name('season.advance');
     Route::post('season/reset', [SeasonController::class, 'reset'])->name('season.reset');
+    Route::post('season/rollover', [SeasonController::class, 'rollover'])->name('season.rollover');
     Route::get('season/fixtures/{fixture}/report', [SeasonController::class, 'report'])->name('season.report');
     Route::get('season/fixtures/{fixture}/scout', [SeasonController::class, 'scout'])->name('season.scout');
 
