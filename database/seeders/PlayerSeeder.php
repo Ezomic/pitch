@@ -30,6 +30,9 @@ class PlayerSeeder extends Seeder
 
             $overall = (int) round(array_sum($attributes) / count($attributes));
 
+            $traits = array_keys(Player::TRAITS);
+            $trait = mt_rand(1, 10) <= 4 ? $traits[mt_rand(0, count($traits) - 1)] : null;
+
             Player::create([
                 ...$attributes,
                 'name' => $name,
@@ -37,6 +40,7 @@ class PlayerSeeder extends Seeder
                 'age' => mt_rand(18, 33),
                 'potential' => min(100, $overall + mt_rand(0, 15)),
                 'is_youth' => false,
+                'trait' => $trait,
             ]);
         }
 

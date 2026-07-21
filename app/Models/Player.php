@@ -31,10 +31,11 @@ use Illuminate\Support\Carbon;
  * @property int $pace
  * @property int $fitness
  * @property int $form
+ * @property string|null $trait
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['user_id', 'name', 'position', 'age', 'potential', 'is_youth', 'training_focus', 'vision', 'passing', 'dribbling', 'finishing', 'tackling', 'pace', 'fitness', 'form'])]
+#[Fillable(['user_id', 'name', 'position', 'age', 'potential', 'is_youth', 'training_focus', 'vision', 'passing', 'dribbling', 'finishing', 'tackling', 'pace', 'fitness', 'form', 'trait'])]
 class Player extends Model
 {
     /** @use HasFactory<PlayerFactory> */
@@ -42,6 +43,20 @@ class Player extends Model
 
     /** The six trainable attributes; a prospect can focus its development on one. */
     public const array ATTRIBUTES = ['vision', 'passing', 'dribbling', 'finishing', 'tackling', 'pace'];
+
+    /**
+     * Signature traits, each a standing bonus to the attributes it names, applied
+     * on top of raw ability whenever the player takes the field.
+     *
+     * @var array<string, array<string, int>>
+     */
+    public const array TRAITS = [
+        'clinical' => ['finishing' => 10],
+        'playmaker' => ['vision' => 8, 'passing' => 6],
+        'pacey' => ['pace' => 12],
+        'enforcer' => ['tackling' => 10],
+        'dribbler' => ['dribbling' => 10],
+    ];
 
     /**
      * @return BelongsTo<User, $this>
@@ -108,13 +123,20 @@ class Player extends Model
     }
 
     /**
-     * The attributes a player actually takes into a match: their raw ability
-     * scaled by condition. Fitness runs 0.70 (spent) to 1.00 (fresh); form adds
-     * up to ±15%. Full fitness and neutral form leave the attributes untouched.
+     * The attributes a player actually takes into a match: raw ability plus any
+     * trait bonus, scaled by condition. Fitness runs 0.70 (spent) to 1.00
+     * (fresh); form adds up to ±15%. Full fitness, neutral form and no trait
+     * leave the attributes untouched.
      */
     public function matchAttributes(): Attributes
     {
-        return $this->attributes()->scaled($this->conditionFactor());
+        $attributes = $this->attributes();
+
+        foreach (self::TRAITS[$this->trait] ?? [] as $attribute => $bonus) {
+            $attributes = $attributes->plus($attribute, $bonus);
+        }
+
+        return $attributes->scaled($this->conditionFactor());
     }
 
     public function conditionFactor(): float

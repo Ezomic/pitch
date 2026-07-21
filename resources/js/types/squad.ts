@@ -12,6 +12,7 @@ export interface Player {
     value: number;
     fitness: number;
     form: number;
+    trait: string | null;
 }
 
 export interface PoolPlayer extends Player {

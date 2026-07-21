@@ -31,9 +31,16 @@ const stats: { key: keyof PoolPlayer; label: string; key_metric: boolean }[] = [
         @click="emit('pick', props.player.id)"
     >
         <div class="mb-2 flex items-center justify-between gap-2">
-            <span class="truncate text-sm font-medium">{{
-                props.player.name
-            }}</span>
+            <span class="flex min-w-0 items-center gap-1.5">
+                <span class="truncate text-sm font-medium">{{
+                    props.player.name
+                }}</span>
+                <span
+                    v-if="props.player.trait"
+                    class="shrink-0 rounded bg-accent px-1.5 py-0.5 text-[10px] font-medium text-accent-foreground capitalize"
+                    >{{ props.player.trait }}</span
+                >
+            </span>
             <div class="flex shrink-0 items-center gap-1">
                 <span class="text-xs text-muted-foreground tabular-nums"
                     >{{ props.player.age }}y</span
