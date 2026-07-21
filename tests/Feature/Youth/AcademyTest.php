@@ -45,7 +45,9 @@ it('renders the academy with the user\'s prospects', function () {
             ->has('prospects', 2)
             ->has('prospects.0.overall')
             ->has('prospects.0.potential')
-            ->has('prospects.0.promotable'),
+            ->has('prospects.0.promotable')
+            ->has('prospects.0.attributes.finishing')
+            ->has('prospects.0.trainingFocus'),
         );
 });
 
@@ -75,6 +77,36 @@ it('refuses to promote a prospect that is not ready', function () {
         ->assertSessionHasErrors('player');
 
     expect($prospect->refresh()->is_youth)->toBeTrue();
+});
+
+it('sets and clears a training focus', function () {
+    $user = User::factory()->create();
+    $youth = Player::factory()->youth($user->id)->create();
+
+    $this->actingAs($user)
+        ->patch(route('youth.focus', $youth), ['focus' => 'finishing'])
+        ->assertRedirect(route('youth.index'));
+    expect($youth->refresh()->training_focus)->toBe('finishing');
+
+    $this->actingAs($user)->patch(route('youth.focus', $youth), ['focus' => null]);
+    expect($youth->refresh()->training_focus)->toBeNull();
+});
+
+it('rejects an unknown training focus', function () {
+    $user = User::factory()->create();
+    $youth = Player::factory()->youth($user->id)->create();
+
+    $this->actingAs($user)
+        ->from(route('youth.index'))
+        ->patch(route('youth.focus', $youth), ['focus' => 'nonsense'])
+        ->assertSessionHasErrors('focus');
+});
+
+it('will not set a training focus on another club\'s prospect', function () {
+    $user = User::factory()->create();
+    $youth = Player::factory()->youth(User::factory()->create()->id)->create();
+
+    $this->actingAs($user)->patch(route('youth.focus', $youth), ['focus' => 'pace'])->assertNotFound();
 });
 
 it('will not promote another club\'s prospect', function () {

@@ -7,15 +7,13 @@ namespace App\Actions\Season;
 use App\Models\Player;
 
 /**
- * One week of youth development. Each developing prospect nudges its weakest
- * attribute up by a point, pulling its overall toward its potential; once a
- * player reaches its ceiling (or turns out to be a senior) it stops improving.
- * Higher-potential prospects keep growing after lower ones have plateaued.
+ * One week of youth development. Each developing prospect nudges an attribute up
+ * by a point, pulling its overall toward its potential; once a player reaches its
+ * ceiling (or turns out to be a senior) it stops improving. A prospect with a
+ * training focus develops that attribute; otherwise it works on its weakest.
  */
 class DevelopPlayers
 {
-    private const array ATTRIBUTES = ['vision', 'passing', 'dribbling', 'finishing', 'tackling', 'pace'];
-
     /**
      * @param  iterable<Player>  $players
      */
@@ -32,10 +30,32 @@ class DevelopPlayers
 
     private function grow(Player $player): void
     {
+        $attribute = $this->attributeToTrain($player);
+
+        if ($attribute === null) {
+            return;
+        }
+
+        $player->forceFill([$attribute => $player->{$attribute} + 1])->save();
+    }
+
+    private function attributeToTrain(Player $player): ?string
+    {
+        $focus = $player->training_focus;
+
+        if ($focus !== null && in_array($focus, Player::ATTRIBUTES, true) && $player->{$focus} < 20) {
+            return $focus;
+        }
+
+        return $this->weakest($player);
+    }
+
+    private function weakest(Player $player): ?string
+    {
         $weakest = null;
         $lowest = null;
 
-        foreach (self::ATTRIBUTES as $attribute) {
+        foreach (Player::ATTRIBUTES as $attribute) {
             $value = $player->{$attribute};
 
             if ($value < 20 && ($lowest === null || $value < $lowest)) {
@@ -44,10 +64,6 @@ class DevelopPlayers
             }
         }
 
-        if ($weakest === null) {
-            return;
-        }
-
-        $player->forceFill([$weakest => $player->{$weakest} + 1])->save();
+        return $weakest;
     }
 }

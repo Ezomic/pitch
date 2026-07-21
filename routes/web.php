@@ -46,6 +46,7 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('youth', [YouthController::class, 'index'])->name('youth.index');
     Route::post('youth/{player}/promote', [YouthController::class, 'promote'])->name('youth.promote');
+    Route::patch('youth/{player}/focus', [YouthController::class, 'focus'])->name('youth.focus');
 });
 
 require __DIR__.'/settings.php';
