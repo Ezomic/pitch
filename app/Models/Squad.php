@@ -72,7 +72,7 @@ class Squad extends Model
         $bySlot = [];
 
         foreach ($this->assignments()->with('player')->get() as $assignment) {
-            $bySlot[$assignment->slot] = $this->slotAttributes($assignment->player, $assignment->slot, $formation);
+            $bySlot[$assignment->slot] = $this->slotAttributes($assignment->player, $assignment->slot, $formation, $assignment->role);
         }
 
         foreach (Roster::slots() as $slot) {
@@ -82,9 +82,14 @@ class Squad extends Model
         return $bySlot;
     }
 
-    private function slotAttributes(Player $player, int $slot, Formation $formation): Attributes
+    private function slotAttributes(Player $player, int $slot, Formation $formation, ?string $role = null): Attributes
     {
         $attributes = $player->matchAttributes();
+
+        foreach (SquadPlayer::ROLES[$role] ?? [] as $attribute => $delta) {
+            $attributes = $attributes->plus($attribute, $delta);
+        }
+
         $slotPosition = $formation->layout[$slot][1] ?? null;
 
         if ($slotPosition !== null && $slotPosition !== $player->position) {
@@ -113,12 +118,13 @@ class Squad extends Model
     {
         $players = Player::query()->whereIn('id', array_values($lineup))->get()->keyBy('id');
         $formation = Formation::fromId($this->formation);
+        $roles = $this->assignments()->pluck('role', 'slot');
 
         $bySlot = [];
         foreach ($lineup as $slot => $playerId) {
             $player = $players->get($playerId);
             $bySlot[(int) $slot] = $player instanceof Player
-                ? $this->slotAttributes($player, (int) $slot, $formation)
+                ? $this->slotAttributes($player, (int) $slot, $formation, $roles->get((int) $slot))
                 : new Attributes(50, 50, 50, 50, 50, 50);
         }
 

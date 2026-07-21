@@ -13,7 +13,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { assign, compare, edit, tactics, whatIf } from '@/routes/squad';
+import { assign, compare, edit, role, tactics, whatIf } from '@/routes/squad';
 import type {
     PoolPlayer,
     Squad,
@@ -27,6 +27,7 @@ const props = defineProps<{
     profile: SquadProfile;
     formations: TacticOption[];
     mentalities: TacticOption[];
+    roles: TacticOption[];
 }>();
 
 function changeTactics(formation: string, mentality: string): void {
@@ -36,6 +37,16 @@ function changeTactics(formation: string, mentality: string): void {
         { preserveScroll: true, preserveState: true },
     );
 }
+
+function setRole(slot: number, value: string): void {
+    router.patch(
+        role().url,
+        { slot, role: value === '' ? null : value },
+        { preserveScroll: true, preserveState: true },
+    );
+}
+
+const filledSlots = () => props.squad.slots.filter((s) => s.player !== null);
 
 defineOptions({
     layout: {
@@ -209,6 +220,46 @@ function pick(playerId: number): void {
                         swap in, or choose another position.
                     </template>
                 </p>
+
+                <div
+                    v-if="filledSlots().length > 0"
+                    class="rounded-xl border border-sidebar-border/70 p-3 dark:border-sidebar-border"
+                >
+                    <h2 class="mb-2 text-sm font-medium text-muted-foreground">
+                        Roles
+                    </h2>
+                    <div class="grid gap-x-4 gap-y-1.5 sm:grid-cols-2">
+                        <label
+                            v-for="s in filledSlots()"
+                            :key="s.slot"
+                            class="flex items-center justify-between gap-2 text-sm"
+                        >
+                            <span class="min-w-0 truncate">{{
+                                s.player?.name
+                            }}</span>
+                            <select
+                                class="shrink-0 rounded-md border border-sidebar-border/70 bg-transparent px-1.5 py-1 text-xs dark:border-sidebar-border"
+                                :value="s.role ?? ''"
+                                @change="
+                                    setRole(
+                                        s.slot,
+                                        ($event.target as HTMLSelectElement)
+                                            .value,
+                                    )
+                                "
+                            >
+                                <option value="">No role</option>
+                                <option
+                                    v-for="r in props.roles"
+                                    :key="r.id"
+                                    :value="r.id"
+                                >
+                                    {{ r.name }}
+                                </option>
+                            </select>
+                        </label>
+                    </div>
+                </div>
             </div>
 
             <div

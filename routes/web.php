@@ -29,6 +29,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('squad/compare', [SquadController::class, 'compare'])->name('squad.compare');
     Route::patch('squad/slot', [SquadController::class, 'assign'])->name('squad.assign');
     Route::patch('squad/tactics', [SquadController::class, 'tactics'])->name('squad.tactics');
+    Route::patch('squad/role', [SquadController::class, 'role'])->name('squad.role');
 
     Route::get('match', [MatchController::class, 'show'])->name('match.show');
     Route::get('match/live/{fixture}', [LiveMatchController::class, 'show'])->name('match.live.show');

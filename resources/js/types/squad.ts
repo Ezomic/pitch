@@ -26,6 +26,7 @@ export interface SquadSlot {
     zone: { x: number; y: number };
     position: string;
     player: Player | null;
+    role: string | null;
 }
 
 export interface Squad {

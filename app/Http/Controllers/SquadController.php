@@ -12,6 +12,7 @@ use App\Actions\Squad\MarginalValue;
 use App\Http\Requests\AssignSquadSlotRequest;
 use App\Models\Player;
 use App\Models\Squad;
+use App\Models\SquadPlayer;
 use App\Models\User;
 use App\Sim\Engine\Formation;
 use App\Sim\Engine\Mentality;
@@ -50,6 +51,10 @@ class SquadController extends Controller
             'mentalities' => array_map(
                 fn (Mentality $mentality) => ['id' => $mentality->value, 'name' => $mentality->label()],
                 Mentality::cases(),
+            ),
+            'roles' => array_map(
+                fn (string $role) => ['id' => $role, 'name' => ucwords(str_replace('_', ' ', $role))],
+                array_keys(SquadPlayer::ROLES),
             ),
         ]);
     }
@@ -128,6 +133,21 @@ class SquadController extends Controller
         return to_route('squad.edit');
     }
 
+    public function role(Request $request, EnsureSquad $ensureSquad): RedirectResponse
+    {
+        $data = $request->validate([
+            'slot' => ['required', 'integer'],
+            'role' => ['nullable', Rule::in(array_keys(SquadPlayer::ROLES))],
+        ]);
+
+        $ensureSquad->handle($this->user($request))
+            ->assignments()
+            ->where('slot', $data['slot'])
+            ->update(['role' => $data['role'] ?? null]);
+
+        return to_route('squad.edit');
+    }
+
     private function user(Request $request): User
     {
         $user = $request->user();
@@ -148,13 +168,15 @@ class SquadController extends Controller
 
         $slots = [];
         foreach (Formation::fromId($squad->formation)->layout as $slot => [$zone, $position]) {
-            $player = $bySlot->get($slot)?->player;
+            $assignment = $bySlot->get($slot);
+            $player = $assignment?->player;
 
             $slots[] = [
                 'slot' => $slot,
                 'zone' => ['x' => $zone->x, 'y' => $zone->y],
                 'position' => $position->value,
                 'player' => $player !== null ? $this->player($player) : null,
+                'role' => $assignment?->role,
             ];
         }
 
