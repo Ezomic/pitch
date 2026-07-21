@@ -34,10 +34,13 @@ class SeasonController extends Controller
         $current = $nextUnplayed?->matchday;
         $due = $this->dueUserFixture($season);
 
+        $table = $standings->handle($season);
+
         return Inertia::render('Season', [
             'seasonNumber' => $season->number,
             'history' => $this->history($this->user($request), $standings),
-            'standings' => $standings->handle($season),
+            'objective' => $this->objective($table, $current === null),
+            'standings' => $table,
             'matchdays' => $this->matchdays($season, $teams),
             'currentMatchday' => $current,
             'currentDate' => $season->current_date->toDateString(),
@@ -117,6 +120,35 @@ class SeasonController extends Controller
         }
 
         return to_route('season.show');
+    }
+
+    /**
+     * The board's expectation for the campaign: a top-half finish. Returns the
+     * target position, the user's current standing, and (once the season is done)
+     * whether it was met.
+     *
+     * @param  list<array<string, mixed>>  $table
+     * @return array{target: int, position: int, teams: int, met: bool|null}
+     */
+    private function objective(array $table, bool $complete): array
+    {
+        $teams = count($table);
+        $target = max(1, intdiv($teams, 2));
+
+        $position = $teams;
+        foreach ($table as $index => $row) {
+            if ($row['isUser'] === true) {
+                $position = $index + 1;
+                break;
+            }
+        }
+
+        return [
+            'target' => $target,
+            'position' => $position,
+            'teams' => $teams,
+            'met' => $complete ? $position <= $target : null,
+        ];
     }
 
     /**

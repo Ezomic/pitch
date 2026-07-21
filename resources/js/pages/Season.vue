@@ -6,12 +6,14 @@ import type {
     Matchday,
     NextFixture,
     SeasonHistory,
+    SeasonObjective,
     StandingRow,
 } from '@/types/season';
 
 const props = defineProps<{
     seasonNumber: number;
     history: SeasonHistory[];
+    objective: SeasonObjective;
     standings: StandingRow[];
     matchdays: Matchday[];
     currentMatchday: number | null;
@@ -140,6 +142,34 @@ const columns: { key: keyof StandingRow; label: string }[] = [
                     Start season {{ props.seasonNumber + 1 }}
                 </Button>
             </div>
+        </div>
+
+        <div
+            class="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-sidebar-border/70 p-4 dark:border-sidebar-border"
+        >
+            <p class="text-sm">
+                <span class="text-muted-foreground">Board objective:</span>
+                finish top {{ props.objective.target }} of
+                {{ props.objective.teams }}
+            </p>
+            <span
+                v-if="props.objective.met === null"
+                class="text-sm text-muted-foreground"
+            >
+                Currently {{ props.objective.position }}
+            </span>
+            <span
+                v-else-if="props.objective.met"
+                class="rounded-md bg-emerald-500/15 px-2 py-0.5 text-sm font-medium text-emerald-600 dark:text-emerald-400"
+            >
+                Met &middot; finished {{ props.objective.position }}
+            </span>
+            <span
+                v-else
+                class="rounded-md bg-red-500/15 px-2 py-0.5 text-sm font-medium text-red-600 dark:text-red-400"
+            >
+                Missed &middot; finished {{ props.objective.position }}
+            </span>
         </div>
 
         <div class="grid flex-1 gap-4 lg:grid-cols-[1.3fr_1fr]">

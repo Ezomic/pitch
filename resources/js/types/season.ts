@@ -38,3 +38,10 @@ export interface SeasonHistory {
     points: number;
     teams: number;
 }
+
+export interface SeasonObjective {
+    target: number;
+    position: number;
+    teams: number;
+    met: boolean | null;
+}
