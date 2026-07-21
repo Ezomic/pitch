@@ -56,7 +56,7 @@ it('schedules the season on a weekly calendar', function () {
         ->and($second->scheduled_on->toDateString())->toBe($first->scheduled_on->copy()->addWeek()->toDateString());
 });
 
-it('advances the calendar a week and plays the matchday now due', function () {
+it('advances the calendar a week, plays the rivals and leaves the user fixture live', function () {
     $user = User::factory()->create();
     $season = app(EnsureSeason::class)->handle($user);
     $start = $season->current_date->copy();
@@ -64,9 +64,14 @@ it('advances the calendar a week and plays the matchday now due', function () {
     app(AdvanceWeek::class)->handle($season);
     $season->refresh();
 
+    $matchday1 = $season->fixtures()->where('matchday', 1);
+    $userFixture = (clone $matchday1)->where(fn ($q) => $q->whereNull('home_team_id')->orWhereNull('away_team_id'))->first();
+
     expect($season->current_date->toDateString())->toBe($start->addWeek()->toDateString())
-        ->and($season->fixtures()->where('matchday', 1)->where('played', false)->count())->toBe(0)
-        ->and($season->fixtures()->where('matchday', 2)->where('played', true)->count())->toBe(0);
+        // Every rival-vs-rival fixture on matchday 1 is resolved...
+        ->and((clone $matchday1)->whereNotNull('home_team_id')->whereNotNull('away_team_id')->where('played', false)->count())->toBe(0)
+        // ...but the user's own fixture is left pending for the live match.
+        ->and($userFixture->played)->toBeFalse();
 });
 
 it('renders the season page with standings and fixtures', function () {
@@ -86,18 +91,18 @@ it('renders the season page with standings and fixtures', function () {
         );
 });
 
-it('plays a matchday and advances the table', function () {
+it('advancing resolves the rival fixtures and advances the table', function () {
     $user = User::factory()->create();
     $this->actingAs($user)->get(route('season.show'));
 
     $this->actingAs($user)->post(route('season.advance'))->assertRedirect(route('season.show'));
 
     $season = $user->season()->first();
-    expect($season->fixtures()->where('played', true)->count())->toBe(4)
-        ->and($season->fixtures()->where('matchday', 1)->where('played', false)->count())->toBe(0);
+    // Matchday 1 has 4 fixtures; three are rival-vs-rival, the user's is left for live play.
+    expect($season->fixtures()->where('played', true)->count())->toBe(3);
 
     $table = app(Standings::class)->handle($season);
-    expect(array_sum(array_column($table, 'played')))->toBe(8);
+    expect(array_sum(array_column($table, 'played')))->toBe(6);
 });
 
 it('orders the standings by points then goal difference', function () {
@@ -126,12 +131,15 @@ it('shows a report for a played user fixture', function () {
     $this->actingAs($user)->get(route('season.show'));
     $this->actingAs($user)->post(route('season.advance'));
 
+    // The user's fixture is played live; the report is available afterwards.
     $season = $user->season()->first();
-    $userFixture = $season->fixtures()->where('played', true)->get()
+    $userFixture = $season->fixtures()->where('played', false)->get()
         ->first(fn ($f) => $f->involvesUser());
+    $this->actingAs($user)->get(route('match.live.show', $userFixture));
+    $this->actingAs($user)->post(route('match.live.finish', $userFixture));
 
     $this->actingAs($user)
-        ->get(route('season.report', $userFixture))
+        ->get(route('season.report', $userFixture->refresh()))
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page->component('Match')->has('report'));
 });

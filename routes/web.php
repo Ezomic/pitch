@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Auth\LoginCodeController;
+use App\Http\Controllers\LiveMatchController;
 use App\Http\Controllers\MatchController;
 use App\Http\Controllers\ScoutController;
 use App\Http\Controllers\SeasonController;
@@ -28,6 +29,8 @@ Route::middleware(['auth'])->group(function () {
     Route::patch('squad/tactics', [SquadController::class, 'tactics'])->name('squad.tactics');
 
     Route::get('match', [MatchController::class, 'show'])->name('match.show');
+    Route::get('match/live/{fixture}', [LiveMatchController::class, 'show'])->name('match.live.show');
+    Route::post('match/live/{fixture}/finish', [LiveMatchController::class, 'finish'])->name('match.live.finish');
 
     Route::get('season', [SeasonController::class, 'show'])->name('season.show');
     Route::post('season/advance', [SeasonController::class, 'advance'])->name('season.advance');

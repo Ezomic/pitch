@@ -18,6 +18,24 @@ final class MatchNarrator
      */
     public function narrate(MatchResult $attack, int $opponentGoals, array $names): MatchReport
     {
+        return new MatchReport(
+            homeGoals: $attack->goals,
+            awayGoals: $opponentGoals,
+            shots: $attack->shots,
+            passesCompleted: $attack->passesCompleted,
+            progressivePasses: $attack->progressivePasses,
+            moments: $this->feed($attack, $names),
+        );
+    }
+
+    /**
+     * The curated highlights of one attacking side, in minute order.
+     *
+     * @param  array<int, string>  $names  slot id => player name
+     * @return list<MatchMoment>
+     */
+    public function feed(MatchResult $attack, array $names): array
+    {
         $moments = [];
 
         foreach ($attack->events as $event) {
@@ -28,14 +46,7 @@ final class MatchNarrator
             }
         }
 
-        return new MatchReport(
-            homeGoals: $attack->goals,
-            awayGoals: $opponentGoals,
-            shots: $attack->shots,
-            passesCompleted: $attack->passesCompleted,
-            progressivePasses: $attack->progressivePasses,
-            moments: $moments,
-        );
+        return $moments;
     }
 
     /**

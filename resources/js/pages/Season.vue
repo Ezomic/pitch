@@ -11,6 +11,7 @@ const props = defineProps<{
     currentDate: string;
     nextFixtureDate: string | null;
     nextFixture: NextFixture | null;
+    liveFixture: { opponentName: string; home: boolean; url: string } | null;
     complete: boolean;
 }>();
 
@@ -22,6 +23,12 @@ defineOptions({
 
 function advanceWeek(): void {
     router.post(advance().url, {}, { preserveScroll: true });
+}
+
+function playLive(): void {
+    if (props.liveFixture) {
+        router.get(props.liveFixture.url);
+    }
 }
 
 function formatDate(iso: string): string {
@@ -67,7 +74,17 @@ const columns: { key: keyof StandingRow; label: string }[] = [
             class="rounded-xl border border-sidebar-border/70 p-4 dark:border-sidebar-border"
         >
             <div class="flex flex-wrap items-center justify-between gap-3">
-                <div v-if="!props.complete && props.nextFixture">
+                <div v-if="props.liveFixture">
+                    <p class="text-sm text-muted-foreground">
+                        {{ formatDate(props.currentDate) }} &middot; Kick-off
+                    </p>
+                    <p class="text-lg font-medium">
+                        Your squad
+                        {{ props.liveFixture.home ? 'vs' : 'away to' }}
+                        {{ props.liveFixture.opponentName }}
+                    </p>
+                </div>
+                <div v-else-if="!props.complete && props.nextFixture">
                     <p class="text-sm text-muted-foreground">
                         {{ formatDate(props.currentDate) }} &middot; Matchday
                         {{ props.currentMatchday
@@ -93,7 +110,10 @@ const columns: { key: keyof StandingRow; label: string }[] = [
                     </p>
                 </div>
 
-                <Button v-if="!props.complete" @click="advanceWeek">
+                <Button v-if="props.liveFixture" @click="playLive">
+                    Play your match
+                </Button>
+                <Button v-else-if="!props.complete" @click="advanceWeek">
                     Advance week
                 </Button>
                 <Button v-else variant="outline" @click="newSeason">
