@@ -14,6 +14,7 @@ export interface Player {
     form: number;
     trait: string | null;
     injuredWeeks: number;
+    suspendedWeeks: number;
 }
 
 export interface PoolPlayer extends Player {

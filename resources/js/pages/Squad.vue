@@ -79,6 +79,7 @@ function canPick(player: PoolPlayer): boolean {
     return (
         selectedSlot.value !== null &&
         player.injuredWeeks === 0 &&
+        player.suspendedWeeks === 0 &&
         affordable(player)
     );
 }

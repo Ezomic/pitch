@@ -18,6 +18,12 @@ class ApplyMatchCondition
     /** Below this fitness a played player risks an injury; empty means certain. */
     private const int INJURY_FITNESS = 30;
 
+    /** A committed tackler (this hard or harder) picks up a booking each match. */
+    private const int BOOKING_TACKLING = 80;
+
+    /** Yellow cards that trigger a one-week suspension, then reset. */
+    private const int YELLOW_LIMIT = 3;
+
     /**
      * @param  list<int>  $featuredPlayerIds  the XI that played (drained + result-nudged)
      * @param  list<int>  $scoringPlayerIds  players who scored (an extra form lift)
@@ -47,6 +53,18 @@ class ApplyMatchCondition
                 if ($this->breaksDown($fitness)) {
                     $update['injured_weeks'] = random_int(1, 3);
                     SquadPlayer::query()->where('player_id', $player->id)->delete();
+                }
+
+                if ($player->tackling >= self::BOOKING_TACKLING) {
+                    $yellows = $player->yellow_cards + 1;
+
+                    if ($yellows >= self::YELLOW_LIMIT) {
+                        $update['yellow_cards'] = 0;
+                        $update['suspended_weeks'] = 1;
+                        SquadPlayer::query()->where('player_id', $player->id)->delete();
+                    } else {
+                        $update['yellow_cards'] = $yellows;
+                    }
                 }
             }
 

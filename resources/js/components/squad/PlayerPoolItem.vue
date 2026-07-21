@@ -56,6 +56,13 @@ const stats: { key: keyof PoolPlayer; label: string; key_metric: boolean }[] = [
                 >
                     Injured {{ props.player.injuredWeeks }}w
                 </Badge>
+                <Badge
+                    v-else-if="props.player.suspendedWeeks > 0"
+                    variant="outline"
+                    class="border-amber-500/40 text-amber-600 dark:text-amber-400"
+                >
+                    Suspended {{ props.player.suspendedWeeks }}w
+                </Badge>
                 <Badge v-else-if="props.player.slot !== null" variant="outline">
                     Slot {{ props.player.slot }}
                 </Badge>

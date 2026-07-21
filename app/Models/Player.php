@@ -33,10 +33,12 @@ use Illuminate\Support\Carbon;
  * @property int $form
  * @property string|null $trait
  * @property int $injured_weeks
+ * @property int $yellow_cards
+ * @property int $suspended_weeks
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['user_id', 'name', 'position', 'age', 'potential', 'is_youth', 'training_focus', 'vision', 'passing', 'dribbling', 'finishing', 'tackling', 'pace', 'fitness', 'form', 'trait', 'injured_weeks'])]
+#[Fillable(['user_id', 'name', 'position', 'age', 'potential', 'is_youth', 'training_focus', 'vision', 'passing', 'dribbling', 'finishing', 'tackling', 'pace', 'fitness', 'form', 'trait', 'injured_weeks', 'yellow_cards', 'suspended_weeks'])]
 class Player extends Model
 {
     /** @use HasFactory<PlayerFactory> */
@@ -109,6 +111,7 @@ class Player extends Model
     {
         $query->where('is_youth', false)
             ->where('injured_weeks', 0)
+            ->where('suspended_weeks', 0)
             ->where(fn (Builder $scoped) => $scoped->whereNull('user_id')->orWhere('user_id', $userId));
     }
 
@@ -178,6 +181,8 @@ class Player extends Model
             'fitness' => 'integer',
             'form' => 'integer',
             'injured_weeks' => 'integer',
+            'yellow_cards' => 'integer',
+            'suspended_weeks' => 'integer',
         ];
     }
 }
