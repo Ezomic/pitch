@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\Season;
 
 use App\Models\Season;
+use App\Models\Squad;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
 
@@ -28,9 +29,12 @@ class EnsureSeason
         }
 
         return DB::transaction(function () use ($user): Season {
+            $squad = $user->squad()->first();
+
             $season = Season::create([
                 'user_id' => $user->id,
                 'number' => 1,
+                'division' => $squad !== null ? $squad->division : Squad::DEFAULT_DIVISION,
                 'starts_on' => Season::STARTS_ON,
                 'current_date' => Season::STARTS_ON,
             ]);

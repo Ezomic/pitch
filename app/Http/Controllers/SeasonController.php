@@ -13,6 +13,7 @@ use App\Actions\Squad\EnsureSquad;
 use App\Actions\Squad\SimulateMatch;
 use App\Models\Fixture;
 use App\Models\Season;
+use App\Models\Squad;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
@@ -38,6 +39,9 @@ class SeasonController extends Controller
 
         return Inertia::render('Season', [
             'seasonNumber' => $season->number,
+            'division' => $season->division,
+            'promotes' => $season->division > Squad::TOP_DIVISION,
+            'relegates' => $season->division < Squad::BOTTOM_DIVISION,
             'history' => $this->history($this->user($request), $standings),
             'objective' => $this->objective($table, $current === null),
             'standings' => $table,

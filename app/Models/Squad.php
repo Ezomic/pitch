@@ -22,12 +22,13 @@ use Illuminate\Support\Carbon;
  * @property int $budget
  * @property int $bank
  * @property int $weekly_income
+ * @property int $division
  * @property string $formation
  * @property string $mentality
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['user_id', 'name', 'budget', 'bank', 'weekly_income', 'formation', 'mentality'])]
+#[Fillable(['user_id', 'name', 'budget', 'bank', 'weekly_income', 'division', 'formation', 'mentality'])]
 class Squad extends Model
 {
     public const int DEFAULT_BUDGET = 220;
@@ -37,12 +38,21 @@ class Squad extends Model
     /** Cash the club takes in each week, drawn against the wage bill. */
     public const int DEFAULT_WEEKLY_INCOME = 20;
 
+    /** The toughest tier a club can reach; a promotion from here is not possible. */
+    public const int TOP_DIVISION = 1;
+
+    /** The lowest tier, where clubs start and where relegation bottoms out. */
+    public const int BOTTOM_DIVISION = 2;
+
+    public const int DEFAULT_DIVISION = self::BOTTOM_DIVISION;
+
     /**
      * @var array<string, mixed>
      */
     protected $attributes = [
         'formation' => '433',
         'mentality' => 'balanced',
+        'division' => self::DEFAULT_DIVISION,
     ];
 
     /**

@@ -20,7 +20,13 @@ class Standings
     {
         $rows = ['user' => $this->emptyRow($youth ? 'Your academy' : 'Your squad', true)];
 
-        foreach (Team::query()->where('is_youth', $youth)->orderBy('id')->get() as $team) {
+        $teams = Team::query()->where('is_youth', $youth)->orderBy('id');
+
+        if (! $youth) {
+            $teams->where('division', $season->division);
+        }
+
+        foreach ($teams->get() as $team) {
             $rows[$team->id] = $this->emptyRow($team->name, false);
         }
 

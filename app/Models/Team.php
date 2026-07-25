@@ -20,6 +20,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property string $style
  * @property bool $is_youth
  * @property bool $is_derby
+ * @property int $division
  * @property string $formation
  * @property string $mentality
  * @property int $vision
@@ -29,7 +30,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property int $tackling
  * @property int $pace
  */
-#[Fillable(['name', 'style', 'is_youth', 'is_derby', 'formation', 'mentality', 'vision', 'passing', 'dribbling', 'finishing', 'tackling', 'pace'])]
+#[Fillable(['name', 'style', 'is_youth', 'is_derby', 'division', 'formation', 'mentality', 'vision', 'passing', 'dribbling', 'finishing', 'tackling', 'pace'])]
 class Team extends Model
 {
     /** @use HasFactory<TeamFactory> */
@@ -43,6 +44,7 @@ class Team extends Model
         return [
             'is_youth' => 'boolean',
             'is_derby' => 'boolean',
+            'division' => 'integer',
         ];
     }
 
