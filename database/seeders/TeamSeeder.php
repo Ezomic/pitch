@@ -47,13 +47,13 @@ class TeamSeeder extends Seeder
     {
         return [
             // name, style, division, formation, mentality, vision, passing, dribbling, finishing, tackling, pace
-            ['name' => 'Old Harbour', 'style' => 'Balanced', 'is_derby' => true, 'division' => 1, 'formation' => '442', 'mentality' => 'balanced', 'vision' => 75, 'passing' => 75, 'dribbling' => 70, 'finishing' => 70, 'tackling' => 75, 'pace' => 70],
-            ['name' => 'Tiki Rovers', 'style' => 'Possession', 'division' => 1, 'formation' => '433', 'mentality' => 'attacking', 'vision' => 85, 'passing' => 80, 'dribbling' => 65, 'finishing' => 55, 'tackling' => 50, 'pace' => 50],
-            ['name' => 'Blaze United', 'style' => 'Attacking', 'division' => 1, 'formation' => '343', 'mentality' => 'attacking', 'vision' => 60, 'passing' => 60, 'dribbling' => 75, 'finishing' => 80, 'tackling' => 40, 'pace' => 70],
-            ['name' => 'Ferrous Wall', 'style' => 'Defensive', 'division' => 1, 'formation' => '532', 'mentality' => 'defensive', 'vision' => 50, 'passing' => 55, 'dribbling' => 45, 'finishing' => 45, 'tackling' => 85, 'pace' => 75],
-            ['name' => 'Central Standard', 'style' => 'Balanced', 'division' => 2, 'formation' => '4231', 'mentality' => 'balanced', 'vision' => 60, 'passing' => 60, 'dribbling' => 60, 'finishing' => 60, 'tackling' => 60, 'pace' => 60],
-            ['name' => 'Marsh End Athletic', 'style' => 'Attacking', 'division' => 2, 'formation' => '352', 'mentality' => 'balanced', 'vision' => 45, 'passing' => 45, 'dribbling' => 55, 'finishing' => 65, 'tackling' => 45, 'pace' => 60],
-            ['name' => 'Loamshire Town', 'style' => 'Balanced', 'division' => 2, 'formation' => '532', 'mentality' => 'defensive', 'vision' => 40, 'passing' => 40, 'dribbling' => 40, 'finishing' => 40, 'tackling' => 40, 'pace' => 40],
+            ['name' => 'Old Harbour', 'style' => 'Balanced', 'is_derby' => true, 'division' => 1, 'formation' => '442', 'mentality' => 'balanced', 'vision' => 75, 'passing' => 75, 'dribbling' => 70, 'finishing' => 70, 'tackling' => 75, 'pace' => 70, 'keeping' => 78],
+            ['name' => 'Tiki Rovers', 'style' => 'Possession', 'division' => 1, 'formation' => '433', 'mentality' => 'attacking', 'vision' => 85, 'passing' => 80, 'dribbling' => 65, 'finishing' => 55, 'tackling' => 50, 'pace' => 50, 'keeping' => 70],
+            ['name' => 'Blaze United', 'style' => 'Attacking', 'division' => 1, 'formation' => '343', 'mentality' => 'attacking', 'vision' => 60, 'passing' => 60, 'dribbling' => 75, 'finishing' => 80, 'tackling' => 40, 'pace' => 70, 'keeping' => 65],
+            ['name' => 'Ferrous Wall', 'style' => 'Defensive', 'division' => 1, 'formation' => '532', 'mentality' => 'defensive', 'vision' => 50, 'passing' => 55, 'dribbling' => 45, 'finishing' => 45, 'tackling' => 85, 'pace' => 75, 'keeping' => 80],
+            ['name' => 'Central Standard', 'style' => 'Balanced', 'division' => 2, 'formation' => '4231', 'mentality' => 'balanced', 'vision' => 60, 'passing' => 60, 'dribbling' => 60, 'finishing' => 60, 'tackling' => 60, 'pace' => 60, 'keeping' => 58],
+            ['name' => 'Marsh End Athletic', 'style' => 'Attacking', 'division' => 2, 'formation' => '352', 'mentality' => 'balanced', 'vision' => 45, 'passing' => 45, 'dribbling' => 55, 'finishing' => 65, 'tackling' => 45, 'pace' => 60, 'keeping' => 50],
+            ['name' => 'Loamshire Town', 'style' => 'Balanced', 'division' => 2, 'formation' => '532', 'mentality' => 'defensive', 'vision' => 40, 'passing' => 40, 'dribbling' => 40, 'finishing' => 40, 'tackling' => 40, 'pace' => 40, 'keeping' => 45],
         ];
     }
 }

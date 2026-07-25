@@ -30,6 +30,7 @@ use Illuminate\Support\Carbon;
  * @property int $finishing
  * @property int $tackling
  * @property int $pace
+ * @property int $handling
  * @property int $fitness
  * @property int $form
  * @property string|null $trait
@@ -40,7 +41,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['user_id', 'is_free_agent', 'name', 'position', 'age', 'potential', 'is_youth', 'training_focus', 'vision', 'passing', 'dribbling', 'finishing', 'tackling', 'pace', 'fitness', 'form', 'trait', 'injured_weeks', 'yellow_cards', 'suspended_weeks', 'contract_years'])]
+#[Fillable(['user_id', 'is_free_agent', 'name', 'position', 'age', 'potential', 'is_youth', 'training_focus', 'vision', 'passing', 'dribbling', 'finishing', 'tackling', 'pace', 'handling', 'fitness', 'form', 'trait', 'injured_weeks', 'yellow_cards', 'suspended_weeks', 'contract_years'])]
 class Player extends Model
 {
     /** @use HasFactory<PlayerFactory> */
@@ -150,6 +151,15 @@ class Player extends Model
         return $attributes->scaled($this->conditionFactor());
     }
 
+    /**
+     * A keeper's effective shot-stopping this match: raw handling scaled by
+     * condition, so a tired or out-of-form keeper lets more through.
+     */
+    public function keeperRating(): int
+    {
+        return max(1, min(100, (int) round($this->handling * $this->conditionFactor())));
+    }
+
     public function conditionFactor(): float
     {
         $fitnessFactor = 0.70 + 0.30 * ($this->fitness / self::FITNESS_MAX);
@@ -195,6 +205,7 @@ class Player extends Model
             'potential' => 'integer',
             'is_youth' => 'boolean',
             'is_free_agent' => 'boolean',
+            'handling' => 'integer',
             'fitness' => 'integer',
             'form' => 'integer',
             'injured_weeks' => 'integer',

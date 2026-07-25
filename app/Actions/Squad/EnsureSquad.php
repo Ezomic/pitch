@@ -7,6 +7,7 @@ namespace App\Actions\Squad;
 use App\Models\Player;
 use App\Models\Squad;
 use App\Models\User;
+use App\Sim\Domain\Position;
 use App\Sim\Engine\Roster;
 use Illuminate\Support\Facades\DB;
 
@@ -48,6 +49,14 @@ class EnsureSquad
                     'player_id' => $player->id,
                     'slot' => $slot,
                 ]);
+            }
+
+            $keeper = Player::query()->selectableFor($user->id)
+                ->where('position', Position::Goalkeeper)
+                ->orderByDesc('handling')->first();
+
+            if ($keeper !== null) {
+                $squad->forceFill(['goalkeeper_id' => $keeper->id])->save();
             }
 
             return $squad;

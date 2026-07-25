@@ -29,8 +29,9 @@ use Illuminate\Database\Eloquent\Model;
  * @property int $finishing
  * @property int $tackling
  * @property int $pace
+ * @property int $keeping
  */
-#[Fillable(['name', 'style', 'is_youth', 'is_derby', 'division', 'formation', 'mentality', 'vision', 'passing', 'dribbling', 'finishing', 'tackling', 'pace'])]
+#[Fillable(['name', 'style', 'is_youth', 'is_derby', 'division', 'formation', 'mentality', 'vision', 'passing', 'dribbling', 'finishing', 'tackling', 'pace', 'keeping'])]
 class Team extends Model
 {
     /** @use HasFactory<TeamFactory> */
@@ -83,6 +84,7 @@ class Team extends Model
             $this->bySlot(),
             Formation::fromId($this->formation),
             Mentality::fromId($this->mentality),
+            $this->keeping,
         );
     }
 }

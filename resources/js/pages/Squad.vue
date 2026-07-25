@@ -13,8 +13,17 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { assign, compare, edit, role, tactics, whatIf } from '@/routes/squad';
+import {
+    assign,
+    compare,
+    edit,
+    keeper,
+    role,
+    tactics,
+    whatIf,
+} from '@/routes/squad';
 import type {
+    Keeper,
     PoolPlayer,
     Squad,
     SquadProfile,
@@ -24,11 +33,20 @@ import type {
 const props = defineProps<{
     squad: Squad;
     pool: PoolPlayer[];
+    keepers: Keeper[];
     profile: SquadProfile;
     formations: TacticOption[];
     mentalities: TacticOption[];
     roles: TacticOption[];
 }>();
+
+function changeKeeper(playerId: string): void {
+    router.patch(
+        keeper().url,
+        { player_id: Number(playerId) },
+        { preserveScroll: true, preserveState: true },
+    );
+}
 
 function changeTactics(formation: string, mentality: string): void {
     router.patch(
@@ -195,6 +213,32 @@ function pick(playerId: number): void {
                                     :value="m.id"
                                 >
                                     {{ m.name }}
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div class="flex-1">
+                        <label class="mb-1 block text-xs text-muted-foreground"
+                            >Goalkeeper</label
+                        >
+                        <Select
+                            :model-value="
+                                props.squad.goalkeeperId
+                                    ? String(props.squad.goalkeeperId)
+                                    : ''
+                            "
+                            @update:model-value="(v) => changeKeeper(String(v))"
+                        >
+                            <SelectTrigger class="w-full">
+                                <SelectValue placeholder="None" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem
+                                    v-for="k in props.keepers"
+                                    :key="k.id"
+                                    :value="String(k.id)"
+                                >
+                                    {{ k.name }} ({{ k.handling }})
                                 </SelectItem>
                             </SelectContent>
                         </Select>

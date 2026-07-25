@@ -23,14 +23,18 @@ use Illuminate\Support\Carbon;
  * @property int $bank
  * @property int $weekly_income
  * @property int $division
+ * @property int|null $goalkeeper_id
  * @property string $formation
  * @property string $mentality
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['user_id', 'name', 'budget', 'bank', 'weekly_income', 'division', 'formation', 'mentality'])]
+#[Fillable(['user_id', 'name', 'budget', 'bank', 'weekly_income', 'division', 'goalkeeper_id', 'formation', 'mentality'])]
 class Squad extends Model
 {
+    /** The keeper rating used when no goalkeeper is assigned: a stand-in reserve. */
+    public const int DEFAULT_KEEPING = 45;
+
     public const int DEFAULT_BUDGET = 220;
 
     public const int DEFAULT_BANK = 300;
@@ -61,6 +65,25 @@ class Squad extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * @return BelongsTo<Player, $this>
+     */
+    public function goalkeeper(): BelongsTo
+    {
+        return $this->belongsTo(Player::class, 'goalkeeper_id');
+    }
+
+    /**
+     * The keeper rating the engine defends with: the assigned goalkeeper's
+     * shot-stopping, or a weak reserve level when no keeper is chosen.
+     */
+    public function goalkeeping(): int
+    {
+        $keeper = $this->goalkeeper;
+
+        return $keeper instanceof Player ? $keeper->keeperRating() : self::DEFAULT_KEEPING;
     }
 
     /**
@@ -138,6 +161,7 @@ class Squad extends Model
             $this->attributesBySlot(),
             Formation::fromId($this->formation),
             Mentality::fromId($this->mentality),
+            $this->goalkeeping(),
         );
     }
 
@@ -169,6 +193,7 @@ class Squad extends Model
             $bySlot,
             $formation,
             Mentality::fromId($this->mentality),
+            $this->goalkeeping(),
         );
     }
 }
