@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Head, router } from '@inertiajs/vue3';
+import StatTile from '@/components/StatTile.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { index, renew, sell, sign } from '@/routes/transfers';
@@ -53,46 +54,24 @@ function renewPlayer(id: number): void {
 
     <div class="flex h-full flex-1 flex-col gap-4 p-4">
         <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div
-                class="rounded-xl border border-sidebar-border/70 p-4 dark:border-sidebar-border"
-            >
-                <p class="text-sm text-muted-foreground">Transfer bank</p>
-                <p
-                    class="text-2xl font-medium tabular-nums"
-                    :class="props.bank < 0 ? 'text-destructive' : ''"
-                >
-                    £{{ props.bank }}m
-                </p>
-            </div>
-            <div
-                class="rounded-xl border border-sidebar-border/70 p-4 dark:border-sidebar-border"
-            >
-                <p class="text-sm text-muted-foreground">Weekly income</p>
-                <p class="text-2xl font-medium tabular-nums">
-                    £{{ props.finances.income }}m
-                </p>
-            </div>
-            <div
-                class="rounded-xl border border-sidebar-border/70 p-4 dark:border-sidebar-border"
-            >
-                <p class="text-sm text-muted-foreground">Weekly wages</p>
-                <p class="text-2xl font-medium tabular-nums">
-                    £{{ props.finances.wageBill }}m
-                </p>
-            </div>
-            <div
-                class="rounded-xl border border-sidebar-border/70 p-4 dark:border-sidebar-border"
-            >
-                <p class="text-sm text-muted-foreground">Weekly net</p>
-                <p
-                    class="text-2xl font-medium tabular-nums"
-                    :class="props.finances.net < 0 ? 'text-destructive' : ''"
-                >
-                    {{ props.finances.net < 0 ? '-' : '+' }}£{{
-                        Math.abs(props.finances.net)
-                    }}m
-                </p>
-            </div>
+            <StatTile
+                label="Transfer bank"
+                :value="`£${props.bank}m`"
+                :tone="props.bank < 0 ? 'negative' : 'default'"
+            />
+            <StatTile
+                label="Weekly income"
+                :value="`£${props.finances.income}m`"
+            />
+            <StatTile
+                label="Weekly wages"
+                :value="`£${props.finances.wageBill}m`"
+            />
+            <StatTile
+                label="Weekly net"
+                :value="`${props.finances.net < 0 ? '-' : '+'}£${Math.abs(props.finances.net)}m`"
+                :tone="props.finances.net < 0 ? 'negative' : 'positive'"
+            />
         </div>
 
         <div class="grid flex-1 gap-4 lg:grid-cols-2">
