@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Actions\Squad\AssignKeeper;
 use App\Actions\Squad\AssignSquadSlot;
 use App\Actions\Squad\CompareSetups;
 use App\Actions\Squad\EnsureSquad;
@@ -14,6 +15,7 @@ use App\Models\Player;
 use App\Models\Squad;
 use App\Models\SquadPlayer;
 use App\Models\User;
+use App\Sim\Domain\Position;
 use App\Sim\Engine\Formation;
 use App\Sim\Engine\Mentality;
 use App\Sim\Squad\SquadProfile;
@@ -27,7 +29,7 @@ class SquadController extends Controller
 {
     public function edit(Request $request, EnsureSquad $ensureSquad, EvaluateSquad $evaluateSquad): Response
     {
-        $squad = $ensureSquad->handle($this->user($request))->load('assignments.player');
+        $squad = $ensureSquad->handle($this->user($request))->load('assignments.player', 'goalkeeper');
 
         $spent = (int) $squad->assignments->sum(fn ($assignment) => $assignment->player->value());
 
@@ -41,7 +43,9 @@ class SquadController extends Controller
                 'remaining' => $squad->budget - $spent,
                 'formation' => $squad->formation,
                 'mentality' => $squad->mentality,
+                'goalkeeperId' => $squad->goalkeeper_id,
             ],
+            'keepers' => $this->keepers($squad),
             'pool' => $this->pool($squad),
             'profile' => $this->profile($evaluateSquad->handle($squad)),
             'formations' => array_values(array_map(
@@ -148,6 +152,45 @@ class SquadController extends Controller
         return to_route('squad.edit');
     }
 
+    public function keeper(Request $request, EnsureSquad $ensureSquad, AssignKeeper $assignKeeper): RedirectResponse
+    {
+        $data = $request->validate([
+            'player_id' => ['required', 'integer'],
+        ]);
+
+        $squad = $ensureSquad->handle($this->user($request));
+        $assignKeeper->handle($squad, Player::findOrFail((int) $data['player_id']));
+
+        return to_route('squad.edit');
+    }
+
+    /**
+     * The goalkeepers the user can pick between, ranked by shot-stopping.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function keepers(Squad $squad): array
+    {
+        $keepers = [];
+        foreach (Player::query()
+            ->selectableFor($squad->user_id)
+            ->where('position', Position::Goalkeeper)
+            ->orderByDesc('handling')
+            ->get() as $keeper) {
+            $keepers[] = [
+                'id' => $keeper->id,
+                'name' => $keeper->name,
+                'age' => $keeper->age,
+                'handling' => $keeper->handling,
+                'value' => $keeper->value(),
+                'fitness' => $keeper->fitness,
+                'form' => $keeper->form,
+            ];
+        }
+
+        return $keepers;
+    }
+
     private function user(Request $request): User
     {
         $user = $request->user();
@@ -192,6 +235,7 @@ class SquadController extends Controller
 
         $players = Player::query()
             ->selectableFor($squad->user_id)
+            ->where('position', '!=', Position::Goalkeeper)
             ->orderBy('position')
             ->orderBy('name')
             ->get();

@@ -38,6 +38,17 @@ export interface Squad {
     remaining: number;
     formation: string;
     mentality: string;
+    goalkeeperId: number | null;
+}
+
+export interface Keeper {
+    id: number;
+    name: string;
+    age: number;
+    handling: number;
+    value: number;
+    fitness: number;
+    form: number;
 }
 
 export interface TacticOption {
