@@ -6,7 +6,9 @@ namespace App\Http\Controllers;
 
 use App\Actions\Season\EnsureSeason;
 use App\Actions\Season\Standings;
+use App\Actions\Youth\LoanOut;
 use App\Actions\Youth\PromoteYouth;
+use App\Actions\Youth\RecallLoan;
 use App\Models\Fixture;
 use App\Models\Player;
 use App\Models\Team;
@@ -41,7 +43,9 @@ class YouthController extends Controller
                 'age' => $player->age,
                 'overall' => $player->overall(),
                 'potential' => $player->potential,
-                'promotable' => $player->isPromotable(),
+                'promotable' => $player->isPromotable() && ! $player->on_loan,
+                'onLoan' => $player->on_loan,
+                'loanWeeks' => $player->loan_weeks_remaining,
                 'trainingFocus' => $player->training_focus,
                 'attributes' => [
                     'vision' => $player->vision,
@@ -68,9 +72,27 @@ class YouthController extends Controller
 
     public function promote(Request $request, Player $player, PromoteYouth $promoteYouth): RedirectResponse
     {
-        abort_unless($player->user_id === $this->user($request)->id, 404);
+        abort_unless($player->user_id === $this->user($request)->id && ! $player->on_loan, 404);
 
         $promoteYouth->handle($player);
+
+        return to_route('youth.index');
+    }
+
+    public function loan(Request $request, Player $player, LoanOut $loanOut): RedirectResponse
+    {
+        abort_unless($player->user_id === $this->user($request)->id && $player->is_youth, 404);
+
+        $loanOut->handle($player);
+
+        return to_route('youth.index');
+    }
+
+    public function recall(Request $request, Player $player, RecallLoan $recallLoan): RedirectResponse
+    {
+        abort_unless($player->user_id === $this->user($request)->id, 404);
+
+        $recallLoan->handle($player);
 
         return to_route('youth.index');
     }

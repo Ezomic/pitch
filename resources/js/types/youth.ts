@@ -6,6 +6,8 @@ export interface Prospect {
     overall: number;
     potential: number;
     promotable: boolean;
+    onLoan: boolean;
+    loanWeeks: number;
     trainingFocus: string | null;
     attributes: Record<string, number>;
     fitness: number;
