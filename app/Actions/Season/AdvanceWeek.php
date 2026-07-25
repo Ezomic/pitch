@@ -23,6 +23,7 @@ class AdvanceWeek
         private readonly RecoverCondition $recoverCondition = new RecoverCondition,
         private readonly MentorYouth $mentorYouth = new MentorYouth,
         private readonly PayWages $payWages = new PayWages,
+        private readonly PlayCupRound $playCupRound = new PlayCupRound,
     ) {}
 
     public function handle(Season $season): void
@@ -33,6 +34,7 @@ class AdvanceWeek
 
         $this->recoverCondition->handle($season);
         $this->playMatchday->handle($season);
+        $this->playCupRound->handle($season);
         $this->deliverProspects->handle($season);
 
         $squad = $season->user->squad()->first();

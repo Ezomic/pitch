@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Auth\LoginCodeController;
+use App\Http\Controllers\CupController;
 use App\Http\Controllers\LiveMatchController;
 use App\Http\Controllers\MatchController;
 use App\Http\Controllers\ScoutController;
@@ -46,6 +47,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('match/live/{fixture}/finish', [LiveMatchController::class, 'finish'])->name('match.live.finish');
 
     Route::get('season', [SeasonController::class, 'show'])->name('season.show');
+    Route::get('cup', [CupController::class, 'show'])->name('cup.show');
     Route::post('season/advance', [SeasonController::class, 'advance'])->name('season.advance');
     Route::post('season/reset', [SeasonController::class, 'reset'])->name('season.reset');
     Route::post('season/rollover', [SeasonController::class, 'rollover'])->name('season.rollover');

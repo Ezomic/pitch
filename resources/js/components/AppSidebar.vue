@@ -6,6 +6,7 @@ import {
     Clapperboard,
     FolderGit2,
     LayoutGrid,
+    Medal,
     Shirt,
     Sprout,
     Telescope,
@@ -27,6 +28,7 @@ import {
 import { dashboard } from '@/routes';
 import { show as matchShow } from '@/routes/match';
 import { index as scoutsIndex } from '@/routes/scouts';
+import { show as cupShow } from '@/routes/cup';
 import { show as seasonShow } from '@/routes/season';
 import { edit as squadEdit } from '@/routes/squad';
 import { index as transfersIndex } from '@/routes/transfers';
@@ -48,6 +50,11 @@ const mainNavItems: NavItem[] = [
         title: 'Season',
         href: seasonShow(),
         icon: Trophy,
+    },
+    {
+        title: 'Cup',
+        href: cupShow(),
+        icon: Medal,
     },
     {
         title: 'Transfers',

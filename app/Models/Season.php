@@ -56,4 +56,12 @@ class Season extends Model
     {
         return $this->hasMany(Fixture::class)->orderBy('matchday')->orderBy('id');
     }
+
+    /**
+     * @return HasMany<CupTie, $this>
+     */
+    public function cupTies(): HasMany
+    {
+        return $this->hasMany(CupTie::class)->orderBy('round')->orderBy('slot');
+    }
 }
