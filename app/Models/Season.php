@@ -14,13 +14,14 @@ use Illuminate\Support\Carbon;
  * @property int $id
  * @property int $user_id
  * @property int $number
+ * @property int $division
  * @property Carbon $starts_on
  * @property Carbon $current_date
  * @property Carbon|null $completed_at
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['user_id', 'number', 'starts_on', 'current_date', 'completed_at'])]
+#[Fillable(['user_id', 'number', 'division', 'starts_on', 'current_date', 'completed_at'])]
 class Season extends Model
 {
     /** The campaign always kicks off on this date; matchdays fall one week apart. */
@@ -41,6 +42,7 @@ class Season extends Model
     {
         return [
             'number' => 'integer',
+            'division' => 'integer',
             'starts_on' => 'date',
             'current_date' => 'date',
             'completed_at' => 'datetime',

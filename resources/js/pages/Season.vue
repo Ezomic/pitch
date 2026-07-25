@@ -12,6 +12,9 @@ import type {
 
 const props = defineProps<{
     seasonNumber: number;
+    division: number;
+    promotes: boolean;
+    relegates: boolean;
     history: SeasonHistory[];
     objective: SeasonObjective;
     standings: StandingRow[];
@@ -180,8 +183,8 @@ const columns: { key: keyof StandingRow; label: string }[] = [
                     <h2 class="text-sm font-medium text-muted-foreground">
                         Standings
                     </h2>
-                    <span class="text-xs text-muted-foreground"
-                        >Season {{ props.seasonNumber }}</span
+                    <span class="text-xs font-medium"
+                        >Division {{ props.division }}</span
                     >
                 </div>
                 <table class="w-full text-sm">
@@ -210,7 +213,22 @@ const columns: { key: keyof StandingRow; label: string }[] = [
                             "
                         >
                             <td class="py-1.5 pr-2 tabular-nums">
-                                {{ index + 1 }}
+                                <span class="inline-flex items-center gap-1.5">
+                                    <span
+                                        v-if="props.promotes && index === 0"
+                                        class="inline-block h-2 w-2 rounded-full bg-emerald-500"
+                                        title="Promotion place"
+                                    />
+                                    <span
+                                        v-else-if="
+                                            props.relegates &&
+                                            index === props.standings.length - 1
+                                        "
+                                        class="inline-block h-2 w-2 rounded-full bg-destructive"
+                                        title="Relegation place"
+                                    />
+                                    {{ index + 1 }}
+                                </span>
                             </td>
                             <td class="py-1.5">{{ row.name }}</td>
                             <td

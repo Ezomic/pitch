@@ -58,6 +58,9 @@ it('shows the season number and past-season history on the season page', functio
         ->assertOk()
         ->assertInertia(fn (Assert $page) => $page
             ->where('seasonNumber', 2)
+            ->has('division')
+            ->has('promotes')
+            ->has('relegates')
             ->has('history', 1)
             ->where('history.0.number', 1),
         );

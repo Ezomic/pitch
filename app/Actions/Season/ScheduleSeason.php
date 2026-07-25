@@ -17,7 +17,10 @@ class ScheduleSeason
 {
     public function handle(Season $season): void
     {
-        $teamIds = array_values(array_map('intval', Team::query()->where('is_youth', false)->orderBy('id')->pluck('id')->all()));
+        $teamIds = array_values(array_map('intval', Team::query()
+            ->where('is_youth', false)
+            ->where('division', $season->division)
+            ->orderBy('id')->pluck('id')->all()));
         $this->generateSchedule($season, $teamIds);
 
         $youthTeamIds = array_values(array_map('intval', Team::query()->where('is_youth', true)->orderBy('id')->pluck('id')->all()));
