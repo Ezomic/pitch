@@ -22,6 +22,7 @@ class AdvanceWeek
         private readonly PlayYouthFixtures $playYouthFixtures = new PlayYouthFixtures,
         private readonly RecoverCondition $recoverCondition = new RecoverCondition,
         private readonly MentorYouth $mentorYouth = new MentorYouth,
+        private readonly PayWages $payWages = new PayWages,
     ) {}
 
     public function handle(Season $season): void
@@ -33,6 +34,12 @@ class AdvanceWeek
         $this->recoverCondition->handle($season);
         $this->playMatchday->handle($season);
         $this->deliverProspects->handle($season);
+
+        $squad = $season->user->squad()->first();
+
+        if ($squad !== null) {
+            $this->payWages->handle($squad);
+        }
 
         $this->developPlayers->handle(
             Player::query()->where('user_id', $season->user_id)->where('is_youth', true)->get()

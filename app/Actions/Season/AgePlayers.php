@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace App\Actions\Season;
 
 use App\Models\Player;
+use App\Models\SquadPlayer;
 use App\Models\User;
 
 /**
  * A year passes between campaigns: every player the user owns ages by one, and
  * seniors past their peak start to regress, shedding a little from every
- * attribute so an ageing squad visibly needs refreshing.
+ * attribute so an ageing squad visibly needs refreshing. A senior's contract
+ * also winds down a year; when it runs out they walk to the free-agent pool.
  */
 class AgePlayers
 {
@@ -30,7 +32,30 @@ class AgePlayers
                 }
             }
 
+            if (! $player->is_youth) {
+                $update['contract_years'] = max(0, $player->contract_years - 1);
+
+                if ($update['contract_years'] === 0) {
+                    $this->release($player, $update);
+
+                    continue;
+                }
+            }
+
             $player->forceFill($update)->save();
         }
+    }
+
+    /**
+     * A senior whose contract has expired leaves for nothing: dropped from the
+     * squad and returned to the market.
+     *
+     * @param  array<string, mixed>  $update
+     */
+    private function release(Player $player, array $update): void
+    {
+        SquadPlayer::query()->where('player_id', $player->id)->delete();
+
+        $player->forceFill([...$update, 'user_id' => null, 'is_free_agent' => true])->save();
     }
 }
