@@ -85,6 +85,14 @@ class Player extends Model
 
     public const int LOAN_RETURN_POTENTIAL = 3;
 
+    /** A senior's weekly attribute gain from focused training, and its fitness cost. */
+    public const int SENIOR_TRAIN_STEP = 1;
+
+    public const int SENIOR_TRAIN_FITNESS_COST = 6;
+
+    /** A senior too tired to train productively skips the week's session. */
+    public const int SENIOR_TRAIN_MIN_FITNESS = 40;
+
     /** Condition the season clock moves: a match tires, a week of rest recovers. */
     public const int MATCH_DRAIN = 18;
 

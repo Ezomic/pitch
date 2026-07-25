@@ -8,6 +8,7 @@ use App\Http\Controllers\NewsController;
 use App\Http\Controllers\ScoutController;
 use App\Http\Controllers\SeasonController;
 use App\Http\Controllers\SquadController;
+use App\Http\Controllers\TrainingController;
 use App\Http\Controllers\TransferController;
 use App\Http\Controllers\YouthController;
 use Illuminate\Support\Facades\Route;
@@ -50,6 +51,8 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('season', [SeasonController::class, 'show'])->name('season.show');
     Route::get('cup', [CupController::class, 'show'])->name('cup.show');
+    Route::get('training', [TrainingController::class, 'index'])->name('training.index');
+    Route::patch('training/{player}/focus', [TrainingController::class, 'focus'])->name('training.focus');
     Route::get('news', [NewsController::class, 'index'])->name('news.index');
     Route::post('news/{news}/accept', [NewsController::class, 'accept'])->name('news.accept');
     Route::post('news/{news}/decline', [NewsController::class, 'decline'])->name('news.decline');
