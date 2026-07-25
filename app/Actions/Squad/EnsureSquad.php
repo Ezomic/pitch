@@ -55,9 +55,14 @@ class EnsureSquad
                 ->where('position', Position::Goalkeeper)
                 ->orderByDesc('handling')->first();
 
-            if ($keeper !== null) {
-                $squad->forceFill(['goalkeeper_id' => $keeper->id])->save();
-            }
+            $taker = Player::query()->selectableFor($user->id)
+                ->where('position', '!=', Position::Goalkeeper)
+                ->orderByRaw('(passing + finishing) desc')->first();
+
+            $squad->forceFill([
+                'goalkeeper_id' => $keeper?->id,
+                'set_piece_taker_id' => $taker?->id,
+            ])->save();
 
             return $squad;
         });

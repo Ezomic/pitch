@@ -39,6 +39,7 @@ export interface Squad {
     formation: string;
     mentality: string;
     goalkeeperId: number | null;
+    setPieceTakerId: number | null;
     isCustom: boolean;
 }
 
@@ -50,6 +51,12 @@ export interface Keeper {
     value: number;
     fitness: number;
     form: number;
+}
+
+export interface SetPieceTaker {
+    id: number;
+    name: string;
+    rating: number;
 }
 
 export interface TacticOption {

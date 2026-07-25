@@ -34,6 +34,7 @@ Route::middleware(['auth'])->group(function () {
     Route::patch('squad/tactics', [SquadController::class, 'tactics'])->name('squad.tactics');
     Route::patch('squad/role', [SquadController::class, 'role'])->name('squad.role');
     Route::patch('squad/keeper', [SquadController::class, 'keeper'])->name('squad.keeper');
+    Route::patch('squad/set-pieces', [SquadController::class, 'setPieces'])->name('squad.set-pieces');
     Route::patch('squad/formation', [SquadController::class, 'customize'])->name('squad.customize');
 
     Route::get('transfers', [TransferController::class, 'index'])->name('transfers.index');

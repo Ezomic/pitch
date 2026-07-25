@@ -124,6 +124,23 @@ final readonly class Defense
         return $backLine + ($this->goalkeeping / 100) * self::KEEPER_WEIGHT;
     }
 
+    /**
+     * How well the defence smothers a dead-ball delivery: the keeper claiming it
+     * and the back line clearing it. Zero for Defense::none(), so a bare defence
+     * offers no set-piece resistance.
+     */
+    public function setPieceResistance(): float
+    {
+        if (! $this->active) {
+            return 0.0;
+        }
+
+        $keeper = ($this->goalkeeping / 100) * 0.20;
+        $backLine = ($this->tackling[self::BACK] / 100) * $this->coverage[self::BACK] * 0.12;
+
+        return $keeper + $backLine;
+    }
+
     private function lineForZone(Zone $ballZone): string
     {
         return match (true) {

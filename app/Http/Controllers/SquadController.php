@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Actions\Squad\AssignKeeper;
+use App\Actions\Squad\AssignSetPieceTaker;
 use App\Actions\Squad\AssignSquadSlot;
 use App\Actions\Squad\CompareSetups;
 use App\Actions\Squad\EnsureSquad;
@@ -30,7 +31,7 @@ class SquadController extends Controller
 {
     public function edit(Request $request, EnsureSquad $ensureSquad, EvaluateSquad $evaluateSquad): Response
     {
-        $squad = $ensureSquad->handle($this->user($request))->load('assignments.player', 'goalkeeper');
+        $squad = $ensureSquad->handle($this->user($request))->load('assignments.player', 'goalkeeper', 'setPieceTaker');
 
         $spent = (int) $squad->assignments->sum(fn ($assignment) => $assignment->player->value());
 
@@ -45,9 +46,11 @@ class SquadController extends Controller
                 'formation' => $squad->formation,
                 'mentality' => $squad->mentality,
                 'goalkeeperId' => $squad->goalkeeper_id,
+                'setPieceTakerId' => $squad->set_piece_taker_id,
                 'isCustom' => $squad->formation === Formation::CUSTOM_ID,
             ],
             'keepers' => $this->keepers($squad),
+            'takers' => $this->takers($squad),
             'pool' => $this->pool($squad),
             'profile' => $this->profile($evaluateSquad->handle($squad)),
             'formations' => [
@@ -201,6 +204,18 @@ class SquadController extends Controller
         return to_route('squad.edit');
     }
 
+    public function setPieces(Request $request, EnsureSquad $ensureSquad, AssignSetPieceTaker $assignSetPieceTaker): RedirectResponse
+    {
+        $data = $request->validate([
+            'player_id' => ['required', 'integer'],
+        ]);
+
+        $squad = $ensureSquad->handle($this->user($request));
+        $assignSetPieceTaker->handle($squad, Player::findOrFail((int) $data['player_id']));
+
+        return to_route('squad.edit');
+    }
+
     /**
      * The goalkeepers the user can pick between, ranked by shot-stopping.
      *
@@ -226,6 +241,29 @@ class SquadController extends Controller
         }
 
         return $keepers;
+    }
+
+    /**
+     * The outfielders the user can nominate to take set pieces, best delivery first.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function takers(Squad $squad): array
+    {
+        $takers = [];
+        foreach (Player::query()
+            ->selectableFor($squad->user_id)
+            ->where('position', '!=', Position::Goalkeeper)
+            ->orderByRaw('(passing + finishing) desc')
+            ->get() as $taker) {
+            $takers[] = [
+                'id' => $taker->id,
+                'name' => $taker->name,
+                'rating' => $taker->setPieceRating(),
+            ];
+        }
+
+        return $takers;
     }
 
     private function user(Request $request): User
