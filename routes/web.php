@@ -65,6 +65,8 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('youth', [YouthController::class, 'index'])->name('youth.index');
     Route::post('youth/{player}/promote', [YouthController::class, 'promote'])->name('youth.promote');
+    Route::post('youth/{player}/loan', [YouthController::class, 'loan'])->name('youth.loan');
+    Route::post('youth/{player}/recall', [YouthController::class, 'recall'])->name('youth.recall');
     Route::patch('youth/{player}/focus', [YouthController::class, 'focus'])->name('youth.focus');
 });
 

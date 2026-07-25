@@ -38,10 +38,12 @@ use Illuminate\Support\Carbon;
  * @property int $yellow_cards
  * @property int $suspended_weeks
  * @property int $contract_years
+ * @property bool $on_loan
+ * @property int $loan_weeks_remaining
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['user_id', 'is_free_agent', 'name', 'position', 'age', 'potential', 'is_youth', 'training_focus', 'vision', 'passing', 'dribbling', 'finishing', 'tackling', 'pace', 'handling', 'fitness', 'form', 'trait', 'injured_weeks', 'yellow_cards', 'suspended_weeks', 'contract_years'])]
+#[Fillable(['user_id', 'is_free_agent', 'name', 'position', 'age', 'potential', 'is_youth', 'training_focus', 'vision', 'passing', 'dribbling', 'finishing', 'tackling', 'pace', 'handling', 'fitness', 'form', 'trait', 'injured_weeks', 'yellow_cards', 'suspended_weeks', 'contract_years', 'on_loan', 'loan_weeks_remaining'])]
 class Player extends Model
 {
     /** @use HasFactory<PlayerFactory> */
@@ -77,6 +79,11 @@ class Player extends Model
 
     /** Length of a fresh contract, in seasons, and the term a renewal restores. */
     public const int DEFAULT_CONTRACT_YEARS = 3;
+
+    /** Weeks a loaned prospect spends away, and the ceiling lift it comes back with. */
+    public const int LOAN_WEEKS = 12;
+
+    public const int LOAN_RETURN_POTENTIAL = 3;
 
     /** Condition the season clock moves: a match tires, a week of rest recovers. */
     public const int MATCH_DRAIN = 18;
@@ -212,6 +219,8 @@ class Player extends Model
             'yellow_cards' => 'integer',
             'suspended_weeks' => 'integer',
             'contract_years' => 'integer',
+            'on_loan' => 'boolean',
+            'loan_weeks_remaining' => 'integer',
         ];
     }
 }

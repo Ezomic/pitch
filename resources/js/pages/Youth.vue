@@ -3,7 +3,7 @@ import { Head, router } from '@inertiajs/vue3';
 import ConditionIndicator from '@/components/ConditionIndicator.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { focus, index, promote } from '@/routes/youth';
+import { focus, index, loan, promote, recall } from '@/routes/youth';
 import type { StandingRow } from '@/types/season';
 import type { Prospect, YouthFixture } from '@/types/youth';
 
@@ -30,6 +30,14 @@ const attributes: { key: string; label: string }[] = [
 
 function promoteProspect(id: number): void {
     router.post(promote(id).url, {}, { preserveScroll: true });
+}
+
+function loanProspect(id: number): void {
+    router.post(loan(id).url, {}, { preserveScroll: true });
+}
+
+function recallProspect(id: number): void {
+    router.post(recall(id).url, {}, { preserveScroll: true });
 }
 
 function setFocus(prospect: Prospect, key: string): void {
@@ -105,16 +113,40 @@ function setFocus(prospect: Prospect, key: string): void {
                                     >
                                 </p>
                             </div>
-                            <Button
-                                v-if="prospect.promotable"
-                                size="sm"
-                                @click="promoteProspect(prospect.id)"
-                            >
-                                Promote
-                            </Button>
-                            <Badge v-else variant="outline" class="shrink-0">
-                                Developing
-                            </Badge>
+                            <div class="flex shrink-0 items-center gap-2">
+                                <template v-if="prospect.onLoan">
+                                    <Badge variant="secondary">
+                                        On loan &middot;
+                                        {{ prospect.loanWeeks }}w
+                                    </Badge>
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        @click="recallProspect(prospect.id)"
+                                    >
+                                        Recall
+                                    </Button>
+                                </template>
+                                <template v-else>
+                                    <Button
+                                        v-if="prospect.promotable"
+                                        size="sm"
+                                        @click="promoteProspect(prospect.id)"
+                                    >
+                                        Promote
+                                    </Button>
+                                    <Badge v-else variant="outline">
+                                        Developing
+                                    </Badge>
+                                    <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        @click="loanProspect(prospect.id)"
+                                    >
+                                        Loan out
+                                    </Button>
+                                </template>
+                            </div>
                         </div>
 
                         <p class="mt-2 mb-1 text-[11px] text-muted-foreground">

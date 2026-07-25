@@ -26,6 +26,7 @@ class AdvanceWeek
         private readonly PayWages $payWages = new PayWages,
         private readonly PlayCupRound $playCupRound = new PlayCupRound,
         private readonly GenerateTransferOffer $generateTransferOffer = new GenerateTransferOffer,
+        private readonly ProcessLoans $processLoans = new ProcessLoans,
     ) {}
 
     public function handle(Season $season): void
@@ -50,6 +51,7 @@ class AdvanceWeek
         );
 
         $this->mentorYouth->handle($season);
+        $this->processLoans->handle($season);
         $this->playYouthFixtures->handle($season);
         $this->generateTransferOffer->handle($season);
     }
