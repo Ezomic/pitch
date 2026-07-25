@@ -64,4 +64,12 @@ class Season extends Model
     {
         return $this->hasMany(CupTie::class)->orderBy('round')->orderBy('slot');
     }
+
+    /**
+     * @return HasMany<Friendly, $this>
+     */
+    public function friendlies(): HasMany
+    {
+        return $this->hasMany(Friendly::class)->orderBy('slot');
+    }
 }
