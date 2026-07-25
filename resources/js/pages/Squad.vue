@@ -20,12 +20,14 @@ import {
     edit,
     keeper,
     role,
+    setPieces,
     tactics,
     whatIf,
 } from '@/routes/squad';
 import type {
     Keeper,
     PoolPlayer,
+    SetPieceTaker,
     Squad,
     SquadProfile,
     TacticOption,
@@ -35,6 +37,7 @@ const props = defineProps<{
     squad: Squad;
     pool: PoolPlayer[];
     keepers: Keeper[];
+    takers: SetPieceTaker[];
     profile: SquadProfile;
     formations: TacticOption[];
     mentalities: TacticOption[];
@@ -44,6 +47,14 @@ const props = defineProps<{
 function changeKeeper(playerId: string): void {
     router.patch(
         keeper().url,
+        { player_id: Number(playerId) },
+        { preserveScroll: true, preserveState: true },
+    );
+}
+
+function changeTaker(playerId: string): void {
+    router.patch(
+        setPieces().url,
         { player_id: Number(playerId) },
         { preserveScroll: true, preserveState: true },
     );
@@ -254,6 +265,32 @@ function pick(playerId: number): void {
                                     :value="String(k.id)"
                                 >
                                     {{ k.name }} ({{ k.handling }})
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div class="flex-1">
+                        <label class="mb-1 block text-xs text-muted-foreground"
+                            >Set-piece taker</label
+                        >
+                        <Select
+                            :model-value="
+                                props.squad.setPieceTakerId
+                                    ? String(props.squad.setPieceTakerId)
+                                    : ''
+                            "
+                            @update:model-value="(v) => changeTaker(String(v))"
+                        >
+                            <SelectTrigger class="w-full">
+                                <SelectValue placeholder="None" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem
+                                    v-for="t in props.takers"
+                                    :key="t.id"
+                                    :value="String(t.id)"
+                                >
+                                    {{ t.name }} ({{ t.rating }})
                                 </SelectItem>
                             </SelectContent>
                         </Select>

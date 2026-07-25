@@ -24,17 +24,21 @@ use Illuminate\Support\Carbon;
  * @property int $weekly_income
  * @property int $division
  * @property int|null $goalkeeper_id
+ * @property int|null $set_piece_taker_id
  * @property string $formation
  * @property string $mentality
  * @property array<int, array{int, int}>|null $custom_formation
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['user_id', 'name', 'budget', 'bank', 'weekly_income', 'division', 'goalkeeper_id', 'formation', 'mentality', 'custom_formation'])]
+#[Fillable(['user_id', 'name', 'budget', 'bank', 'weekly_income', 'division', 'goalkeeper_id', 'set_piece_taker_id', 'formation', 'mentality', 'custom_formation'])]
 class Squad extends Model
 {
     /** The keeper rating used when no goalkeeper is assigned: a stand-in reserve. */
     public const int DEFAULT_KEEPING = 45;
+
+    /** Set-piece strength with no dedicated taker: a makeshift delivery. */
+    public const int DEFAULT_SET_PIECES = 45;
 
     public const int DEFAULT_BUDGET = 220;
 
@@ -108,6 +112,25 @@ class Squad extends Model
         $keeper = $this->goalkeeper;
 
         return $keeper instanceof Player ? $keeper->keeperRating() : self::DEFAULT_KEEPING;
+    }
+
+    /**
+     * @return BelongsTo<Player, $this>
+     */
+    public function setPieceTaker(): BelongsTo
+    {
+        return $this->belongsTo(Player::class, 'set_piece_taker_id');
+    }
+
+    /**
+     * The dead-ball strength the engine attacks with: the chosen taker's set-piece
+     * rating, or a makeshift level when none is picked.
+     */
+    public function setPieceRating(): int
+    {
+        $taker = $this->setPieceTaker;
+
+        return $taker instanceof Player ? $taker->setPieceRating() : self::DEFAULT_SET_PIECES;
     }
 
     /**
@@ -186,6 +209,7 @@ class Squad extends Model
             $this->formationObject(),
             Mentality::fromId($this->mentality),
             $this->goalkeeping(),
+            $this->setPieceRating(),
         );
     }
 
@@ -218,6 +242,7 @@ class Squad extends Model
             $formation,
             Mentality::fromId($this->mentality),
             $this->goalkeeping(),
+            $this->setPieceRating(),
         );
     }
 }

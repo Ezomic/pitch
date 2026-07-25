@@ -167,6 +167,17 @@ class Player extends Model
         return max(1, min(100, (int) round($this->handling * $this->conditionFactor())));
     }
 
+    /**
+     * A player's set-piece threat as a taker: an even blend of delivery (passing)
+     * and the finish (finishing), scaled by condition.
+     */
+    public function setPieceRating(): int
+    {
+        $base = ($this->passing + $this->finishing) / 2;
+
+        return max(1, min(100, (int) round($base * $this->conditionFactor())));
+    }
+
     public function conditionFactor(): float
     {
         $fitnessFactor = 0.70 + 0.30 * ($this->fitness / self::FITNESS_MAX);
