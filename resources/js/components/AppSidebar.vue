@@ -5,6 +5,7 @@ import {
     BookOpen,
     Clapperboard,
     FolderGit2,
+    Dumbbell,
     LayoutGrid,
     Medal,
     Newspaper,
@@ -32,6 +33,7 @@ import { index as scoutsIndex } from '@/routes/scouts';
 import { show as cupShow } from '@/routes/cup';
 import { index as newsIndex } from '@/routes/news';
 import { show as seasonShow } from '@/routes/season';
+import { index as trainingIndex } from '@/routes/training';
 import { edit as squadEdit } from '@/routes/squad';
 import { index as transfersIndex } from '@/routes/transfers';
 import { index as youthIndex } from '@/routes/youth';
@@ -77,6 +79,11 @@ const mainNavItems: NavItem[] = [
         title: 'Academy',
         href: youthIndex(),
         icon: Sprout,
+    },
+    {
+        title: 'Training',
+        href: trainingIndex(),
+        icon: Dumbbell,
     },
     {
         title: 'Match',

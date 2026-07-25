@@ -27,6 +27,7 @@ class AdvanceWeek
         private readonly PlayCupRound $playCupRound = new PlayCupRound,
         private readonly GenerateTransferOffer $generateTransferOffer = new GenerateTransferOffer,
         private readonly ProcessLoans $processLoans = new ProcessLoans,
+        private readonly TrainSeniors $trainSeniors = new TrainSeniors,
     ) {}
 
     public function handle(Season $season): void
@@ -36,6 +37,7 @@ class AdvanceWeek
         ]);
 
         $this->recoverCondition->handle($season);
+        $this->trainSeniors->handle($season);
         $this->playMatchday->handle($season);
         $this->playCupRound->handle($season);
         $this->deliverProspects->handle($season);
