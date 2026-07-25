@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Actions\Squad\EnsureSquad;
+use App\Actions\Squad\RenewContract;
 use App\Actions\Squad\SellPlayer;
 use App\Actions\Squad\SignPlayer;
 use App\Models\Player;
@@ -21,8 +22,15 @@ class TransferController extends Controller
     {
         $squad = $ensureSquad->handle($this->user($request));
 
+        $wageBill = $squad->wageBill();
+
         return Inertia::render('Transfers', [
             'bank' => $squad->bank,
+            'finances' => [
+                'income' => $squad->weekly_income,
+                'wageBill' => $wageBill,
+                'net' => $squad->weekly_income - $wageBill,
+            ],
             'market' => Player::query()->where('is_free_agent', true)
                 ->orderByDesc('vision')->orderBy('name')->get()
                 ->map(fn (Player $player) => $this->card($player, $squad))->all(),
@@ -46,6 +54,13 @@ class TransferController extends Controller
         return to_route('transfers.index');
     }
 
+    public function renew(Request $request, Player $player, EnsureSquad $ensureSquad, RenewContract $renewContract): RedirectResponse
+    {
+        $renewContract->handle($ensureSquad->handle($this->user($request)), $player);
+
+        return to_route('transfers.index');
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -58,6 +73,8 @@ class TransferController extends Controller
             'age' => $player->age,
             'overall' => $player->overall(),
             'value' => $player->value(),
+            'wage' => $player->weeklyWage(),
+            'contractYears' => $player->contract_years,
             'affordable' => $squad->bank >= $player->value(),
         ];
     }

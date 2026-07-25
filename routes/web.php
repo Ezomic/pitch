@@ -35,6 +35,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('transfers', [TransferController::class, 'index'])->name('transfers.index');
     Route::post('transfers/{player}/sign', [TransferController::class, 'sign'])->name('transfers.sign');
     Route::post('transfers/{player}/sell', [TransferController::class, 'sell'])->name('transfers.sell');
+    Route::post('transfers/{player}/renew', [TransferController::class, 'renew'])->name('transfers.renew');
 
     Route::get('match', [MatchController::class, 'show'])->name('match.show');
     Route::get('match/live/{fixture}', [LiveMatchController::class, 'show'])->name('match.live.show');

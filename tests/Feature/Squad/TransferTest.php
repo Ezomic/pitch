@@ -55,10 +55,11 @@ it('sells an owned player back to the market for bank money', function () {
         ->and($squad->assignments()->where('player_id', $player->id)->exists())->toBeFalse();
 });
 
-it('renders the transfer market', function () {
+it('renders the transfer market with finances and contract details', function () {
     $user = User::factory()->create();
     app(EnsureSquad::class)->handle($user);
     Player::factory()->create(['is_free_agent' => true, 'user_id' => null]);
+    Player::factory()->create(['user_id' => $user->id, 'is_youth' => false]);
 
     $this->actingAs($user)
         ->get(route('transfers.index'))
@@ -66,6 +67,14 @@ it('renders the transfer market', function () {
         ->assertInertia(fn (Assert $page) => $page
             ->component('Transfers')
             ->has('bank')
-            ->has('market.0.value'),
+            ->has('finances', fn (Assert $finances) => $finances
+                ->has('income')
+                ->has('wageBill')
+                ->has('net'),
+            )
+            ->has('market.0.value')
+            ->has('market.0.wage')
+            ->has('owned.0.wage')
+            ->has('owned.0.contractYears'),
         );
 });

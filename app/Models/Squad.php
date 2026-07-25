@@ -21,17 +21,21 @@ use Illuminate\Support\Carbon;
  * @property string $name
  * @property int $budget
  * @property int $bank
+ * @property int $weekly_income
  * @property string $formation
  * @property string $mentality
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['user_id', 'name', 'budget', 'bank', 'formation', 'mentality'])]
+#[Fillable(['user_id', 'name', 'budget', 'bank', 'weekly_income', 'formation', 'mentality'])]
 class Squad extends Model
 {
     public const int DEFAULT_BUDGET = 220;
 
     public const int DEFAULT_BANK = 300;
+
+    /** Cash the club takes in each week, drawn against the wage bill. */
+    public const int DEFAULT_WEEKLY_INCOME = 20;
 
     /**
      * @var array<string, mixed>
@@ -57,6 +61,22 @@ class Squad extends Model
     public function assignments(): HasMany
     {
         return $this->hasMany(SquadPlayer::class)->orderBy('slot');
+    }
+
+    /**
+     * The senior players the club pays: everyone it owns bar academy prospects.
+     *
+     * @return HasMany<Player, $this>
+     */
+    public function seniors(): HasMany
+    {
+        return $this->hasMany(Player::class, 'user_id', 'user_id')->where('is_youth', false);
+    }
+
+    /** The combined weekly wages of every senior on the books. */
+    public function wageBill(): int
+    {
+        return (int) $this->seniors()->get()->sum(fn (Player $player) => $player->weeklyWage());
     }
 
     /** A player fielded out of their natural position plays at this fraction. */

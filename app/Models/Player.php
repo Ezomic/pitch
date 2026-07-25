@@ -36,10 +36,11 @@ use Illuminate\Support\Carbon;
  * @property int $injured_weeks
  * @property int $yellow_cards
  * @property int $suspended_weeks
+ * @property int $contract_years
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['user_id', 'is_free_agent', 'name', 'position', 'age', 'potential', 'is_youth', 'training_focus', 'vision', 'passing', 'dribbling', 'finishing', 'tackling', 'pace', 'fitness', 'form', 'trait', 'injured_weeks', 'yellow_cards', 'suspended_weeks'])]
+#[Fillable(['user_id', 'is_free_agent', 'name', 'position', 'age', 'potential', 'is_youth', 'training_focus', 'vision', 'passing', 'dribbling', 'finishing', 'tackling', 'pace', 'fitness', 'form', 'trait', 'injured_weeks', 'yellow_cards', 'suspended_weeks', 'contract_years'])]
 class Player extends Model
 {
     /** @use HasFactory<PlayerFactory> */
@@ -72,6 +73,9 @@ class Player extends Model
 
     /** Ability at or above this, or turning eighteen, makes a prospect first-team ready. */
     public const int PROMOTION_OVERALL = 70;
+
+    /** Length of a fresh contract, in seasons, and the term a renewal restores. */
+    public const int DEFAULT_CONTRACT_YEARS = 3;
 
     /** Condition the season clock moves: a match tires, a week of rest recovers. */
     public const int MATCH_DRAIN = 18;
@@ -171,6 +175,16 @@ class Player extends Model
     }
 
     /**
+     * Weekly wage, in the same units as the transfer bank. Derived from value so a
+     * better player always costs more to keep, and a squad of stars runs a heavier
+     * bill against the club's income.
+     */
+    public function weeklyWage(): int
+    {
+        return max(1, (int) round($this->value() / 10));
+    }
+
+    /**
      * @return array<string, string>
      */
     protected function casts(): array
@@ -186,6 +200,7 @@ class Player extends Model
             'injured_weeks' => 'integer',
             'yellow_cards' => 'integer',
             'suspended_weeks' => 'integer',
+            'contract_years' => 'integer',
         ];
     }
 }
