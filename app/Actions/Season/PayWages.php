@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Actions\Season;
 
+use App\Actions\News\RecordNews;
+use App\Models\News;
 use App\Models\Player;
 use App\Models\Squad;
 use Illuminate\Support\Facades\DB;
@@ -15,6 +17,10 @@ use Illuminate\Support\Facades\DB;
  */
 class PayWages
 {
+    public function __construct(
+        private readonly RecordNews $recordNews = new RecordNews,
+    ) {}
+
     public function handle(Squad $squad): void
     {
         $income = $squad->weekly_income;
@@ -26,6 +32,12 @@ class PayWages
 
             if ($bank < 0) {
                 $this->applyUnrest($squad);
+                $this->recordNews->handle(
+                    userId: $squad->user_id,
+                    category: News::BOARD,
+                    title: 'Wages in the red',
+                    body: 'The wage bill of £'.$wageBill.'m outran the club\'s income and the bank is £'.$bank.'m. Trim wages or the squad will grow unhappy.',
+                );
             }
         });
     }

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Actions\Season;
 
+use App\Actions\News\RecordNews;
+use App\Models\News;
 use App\Models\Season;
 use App\Models\Squad;
 use App\Models\Team;
@@ -18,6 +20,7 @@ class PromoteRelegate
 {
     public function __construct(
         private readonly Standings $standings = new Standings,
+        private readonly RecordNews $recordNews = new RecordNews,
     ) {}
 
     /**
@@ -40,17 +43,30 @@ class PromoteRelegate
 
         if ($position === 1 && $division > Squad::TOP_DIVISION && $this->divisionHasTeams($division - 1)) {
             $squad->forceFill(['division' => $division - 1])->save();
+            $this->announce($squad->user_id, $season->id, 'Promoted!', 'You won division '.$division.' and go up to division '.($division - 1).' next season.');
 
             return 'promoted';
         }
 
         if ($position === $teams && $division < Squad::BOTTOM_DIVISION && $this->divisionHasTeams($division + 1)) {
             $squad->forceFill(['division' => $division + 1])->save();
+            $this->announce($squad->user_id, $season->id, 'Relegated', 'You finished bottom of division '.$division.' and drop to division '.($division + 1).' next season.');
 
             return 'relegated';
         }
 
         return 'stayed';
+    }
+
+    private function announce(int $userId, int $seasonId, string $title, string $body): void
+    {
+        $this->recordNews->handle(
+            userId: $userId,
+            category: News::BOARD,
+            title: $title,
+            body: $body,
+            seasonId: $seasonId,
+        );
     }
 
     private function divisionHasTeams(int $division): bool

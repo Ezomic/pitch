@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\Season;
 
+use App\Actions\News\GenerateTransferOffer;
 use App\Models\Player;
 use App\Models\Season;
 use Carbon\CarbonImmutable;
@@ -24,6 +25,7 @@ class AdvanceWeek
         private readonly MentorYouth $mentorYouth = new MentorYouth,
         private readonly PayWages $payWages = new PayWages,
         private readonly PlayCupRound $playCupRound = new PlayCupRound,
+        private readonly GenerateTransferOffer $generateTransferOffer = new GenerateTransferOffer,
     ) {}
 
     public function handle(Season $season): void
@@ -49,5 +51,6 @@ class AdvanceWeek
 
         $this->mentorYouth->handle($season);
         $this->playYouthFixtures->handle($season);
+        $this->generateTransferOffer->handle($season);
     }
 }
