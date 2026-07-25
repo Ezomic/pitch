@@ -7,6 +7,7 @@ import {
     FolderGit2,
     LayoutGrid,
     Medal,
+    Newspaper,
     Shirt,
     Sprout,
     Telescope,
@@ -29,6 +30,7 @@ import { dashboard } from '@/routes';
 import { show as matchShow } from '@/routes/match';
 import { index as scoutsIndex } from '@/routes/scouts';
 import { show as cupShow } from '@/routes/cup';
+import { index as newsIndex } from '@/routes/news';
 import { show as seasonShow } from '@/routes/season';
 import { edit as squadEdit } from '@/routes/squad';
 import { index as transfersIndex } from '@/routes/transfers';
@@ -60,6 +62,11 @@ const mainNavItems: NavItem[] = [
         title: 'Transfers',
         href: transfersIndex(),
         icon: ArrowRightLeft,
+    },
+    {
+        title: 'News',
+        href: newsIndex(),
+        icon: Newspaper,
     },
     {
         title: 'Scouting',

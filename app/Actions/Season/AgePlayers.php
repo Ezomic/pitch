@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Actions\Season;
 
+use App\Actions\News\RecordNews;
+use App\Models\News;
 use App\Models\Player;
 use App\Models\SquadPlayer;
 use App\Models\User;
@@ -17,6 +19,10 @@ use App\Models\User;
 class AgePlayers
 {
     private const int PEAK_AGE = 30;
+
+    public function __construct(
+        private readonly RecordNews $recordNews = new RecordNews,
+    ) {}
 
     public function handle(User $user): void
     {
@@ -56,6 +62,17 @@ class AgePlayers
     {
         SquadPlayer::query()->where('player_id', $player->id)->delete();
 
+        $userId = $player->user_id;
+
         $player->forceFill([...$update, 'user_id' => null, 'is_free_agent' => true])->save();
+
+        if ($userId !== null) {
+            $this->recordNews->handle(
+                userId: $userId,
+                category: News::BOARD,
+                title: $player->name.' left on a free',
+                body: $player->name.'\'s contract expired and they have left the club. Renew deals sooner to keep your players.',
+            );
+        }
     }
 }

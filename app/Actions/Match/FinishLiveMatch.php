@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Actions\Match;
 
+use App\Actions\News\RecordNews;
 use App\Actions\Season\ApplyMatchCondition;
 use App\Models\MatchSession;
+use App\Models\News;
 use App\Models\Team;
 
 /**
@@ -17,6 +19,7 @@ class FinishLiveMatch
 {
     public function __construct(
         private readonly ApplyMatchCondition $applyMatchCondition = new ApplyMatchCondition,
+        private readonly RecordNews $recordNews = new RecordNews,
     ) {}
 
     public function handle(MatchSession $session): void
@@ -34,7 +37,11 @@ class FinishLiveMatch
         ]);
 
         $opponentId = $fixture->userIsHome() ? $fixture->away_team_id : $fixture->home_team_id;
-        $stakes = Team::find($opponentId)?->is_derby ? 2 : 1;
+        $opponent = Team::find($opponentId);
+        $stakes = $opponent instanceof Team && $opponent->is_derby ? 2 : 1;
+
+        $opponentName = $opponent instanceof Team ? $opponent->name : 'a rival';
+        $this->recordResult($session, $opponentName, $fixture->userIsHome());
 
         $this->applyMatchCondition->handle(
             array_values(array_map('intval', $session->lineup ?? [])),
@@ -45,5 +52,25 @@ class FinishLiveMatch
         );
 
         $session->delete();
+    }
+
+    private function recordResult(MatchSession $session, string $opponentName, bool $userIsHome): void
+    {
+        $userGoals = $userIsHome ? $session->home_goals : $session->away_goals;
+        $oppGoals = $userIsHome ? $session->away_goals : $session->home_goals;
+
+        $verb = match (true) {
+            $userGoals > $oppGoals => 'Won',
+            $userGoals < $oppGoals => 'Lost',
+            default => 'Drew',
+        };
+
+        $this->recordNews->handle(
+            userId: $session->user_id,
+            category: News::RESULT,
+            title: $verb.' '.$userGoals.'-'.$oppGoals.' '.($userIsHome ? 'vs' : 'at').' '.$opponentName,
+            body: 'Your side '.strtolower($verb).' '.$userGoals.'-'.$oppGoals.' against '.$opponentName.'.',
+            seasonId: $session->fixture->season_id,
+        );
     }
 }

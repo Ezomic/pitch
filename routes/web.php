@@ -4,6 +4,7 @@ use App\Http\Controllers\Auth\LoginCodeController;
 use App\Http\Controllers\CupController;
 use App\Http\Controllers\LiveMatchController;
 use App\Http\Controllers\MatchController;
+use App\Http\Controllers\NewsController;
 use App\Http\Controllers\ScoutController;
 use App\Http\Controllers\SeasonController;
 use App\Http\Controllers\SquadController;
@@ -48,6 +49,9 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('season', [SeasonController::class, 'show'])->name('season.show');
     Route::get('cup', [CupController::class, 'show'])->name('cup.show');
+    Route::get('news', [NewsController::class, 'index'])->name('news.index');
+    Route::post('news/{news}/accept', [NewsController::class, 'accept'])->name('news.accept');
+    Route::post('news/{news}/decline', [NewsController::class, 'decline'])->name('news.decline');
     Route::post('season/advance', [SeasonController::class, 'advance'])->name('season.advance');
     Route::post('season/reset', [SeasonController::class, 'reset'])->name('season.reset');
     Route::post('season/rollover', [SeasonController::class, 'rollover'])->name('season.rollover');
