@@ -16,6 +16,7 @@ use App\Models\Squad;
 use App\Models\SquadPlayer;
 use App\Models\User;
 use App\Sim\Domain\Position;
+use App\Sim\Domain\Zone;
 use App\Sim\Engine\Formation;
 use App\Sim\Engine\Mentality;
 use App\Sim\Squad\SquadProfile;
@@ -44,14 +45,18 @@ class SquadController extends Controller
                 'formation' => $squad->formation,
                 'mentality' => $squad->mentality,
                 'goalkeeperId' => $squad->goalkeeper_id,
+                'isCustom' => $squad->formation === Formation::CUSTOM_ID,
             ],
             'keepers' => $this->keepers($squad),
             'pool' => $this->pool($squad),
             'profile' => $this->profile($evaluateSquad->handle($squad)),
-            'formations' => array_values(array_map(
-                fn (Formation $formation) => ['id' => $formation->id, 'name' => $formation->name],
-                Formation::all(),
-            )),
+            'formations' => [
+                ...array_values(array_map(
+                    fn (Formation $formation) => ['id' => $formation->id, 'name' => $formation->name],
+                    Formation::all(),
+                )),
+                ['id' => Formation::CUSTOM_ID, 'name' => 'Custom'],
+            ],
             'mentalities' => array_map(
                 fn (Mentality $mentality) => ['id' => $mentality->value, 'name' => $mentality->label()],
                 Mentality::cases(),
@@ -127,12 +132,44 @@ class SquadController extends Controller
 
     public function tactics(Request $request, EnsureSquad $ensureSquad): RedirectResponse
     {
+        $formations = [...array_keys(Formation::all()), Formation::CUSTOM_ID];
+
         $data = $request->validate([
-            'formation' => ['required', Rule::in(array_keys(Formation::all()))],
+            'formation' => ['required', Rule::in($formations)],
             'mentality' => ['required', Rule::in(array_column(Mentality::cases(), 'value'))],
         ]);
 
-        $ensureSquad->handle($this->user($request))->update($data);
+        $squad = $ensureSquad->handle($this->user($request));
+
+        // Switching to a custom shape starts from the current preset's layout, so
+        // the editor opens on a valid eleven the user can then rearrange.
+        if ($data['formation'] === Formation::CUSTOM_ID && $squad->custom_formation === null) {
+            $squad->forceFill(['custom_formation' => $squad->formationObject()->placements()])->save();
+        }
+
+        $squad->update($data);
+
+        return to_route('squad.edit');
+    }
+
+    public function customize(Request $request, EnsureSquad $ensureSquad): RedirectResponse
+    {
+        $data = $request->validate([
+            'placements' => ['required', 'array', 'size:10'],
+            'placements.*.slot' => ['required', 'integer', 'min:1', 'max:10'],
+            'placements.*.x' => ['required', 'integer', 'min:1', 'max:'.Zone::MAX_X],
+            'placements.*.y' => ['required', 'integer', 'min:0', 'max:'.Zone::MAX_Y],
+        ]);
+
+        $placements = [];
+        foreach ($data['placements'] as $placement) {
+            $placements[(int) $placement['slot']] = [(int) $placement['x'], (int) $placement['y']];
+        }
+
+        $ensureSquad->handle($this->user($request))->forceFill([
+            'formation' => Formation::CUSTOM_ID,
+            'custom_formation' => $placements,
+        ])->save();
 
         return to_route('squad.edit');
     }
@@ -210,7 +247,7 @@ class SquadController extends Controller
         $bySlot = $squad->assignments->keyBy('slot');
 
         $slots = [];
-        foreach (Formation::fromId($squad->formation)->layout as $slot => [$zone, $position]) {
+        foreach ($squad->formationObject()->layout as $slot => [$zone, $position]) {
             $assignment = $bySlot->get($slot);
             $player = $assignment?->player;
 

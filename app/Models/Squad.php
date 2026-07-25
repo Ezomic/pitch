@@ -26,10 +26,11 @@ use Illuminate\Support\Carbon;
  * @property int|null $goalkeeper_id
  * @property string $formation
  * @property string $mentality
+ * @property array<int, array{int, int}>|null $custom_formation
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['user_id', 'name', 'budget', 'bank', 'weekly_income', 'division', 'goalkeeper_id', 'formation', 'mentality'])]
+#[Fillable(['user_id', 'name', 'budget', 'bank', 'weekly_income', 'division', 'goalkeeper_id', 'formation', 'mentality', 'custom_formation'])]
 class Squad extends Model
 {
     /** The keeper rating used when no goalkeeper is assigned: a stand-in reserve. */
@@ -58,6 +59,29 @@ class Squad extends Model
         'mentality' => 'balanced',
         'division' => self::DEFAULT_DIVISION,
     ];
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'custom_formation' => 'array',
+        ];
+    }
+
+    /**
+     * The shape the squad actually plays: a stored custom layout when one is set,
+     * otherwise the chosen preset.
+     */
+    public function formationObject(): Formation
+    {
+        if ($this->formation === Formation::CUSTOM_ID && is_array($this->custom_formation)) {
+            return Formation::custom($this->custom_formation);
+        }
+
+        return Formation::fromId($this->formation);
+    }
 
     /**
      * @return BelongsTo<User, $this>
@@ -124,7 +148,7 @@ class Squad extends Model
      */
     public function attributesBySlot(): array
     {
-        $formation = Formation::fromId($this->formation);
+        $formation = $this->formationObject();
         $bySlot = [];
 
         foreach ($this->assignments()->with('player')->get() as $assignment) {
@@ -159,7 +183,7 @@ class Squad extends Model
     {
         return new TeamSetup(
             $this->attributesBySlot(),
-            Formation::fromId($this->formation),
+            $this->formationObject(),
             Mentality::fromId($this->mentality),
             $this->goalkeeping(),
         );
@@ -174,7 +198,7 @@ class Squad extends Model
     public function setupFrom(array $lineup): TeamSetup
     {
         $players = Player::query()->whereIn('id', array_values($lineup))->get()->keyBy('id');
-        $formation = Formation::fromId($this->formation);
+        $formation = $this->formationObject();
         $roles = $this->assignments()->pluck('role', 'slot');
 
         $bySlot = [];

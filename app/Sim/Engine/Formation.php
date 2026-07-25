@@ -15,6 +15,8 @@ use App\Sim\Domain\Zone;
  */
 final readonly class Formation
 {
+    public const string CUSTOM_ID = 'custom';
+
     /**
      * @param  array<int, array{Zone, Position}>  $layout  slot id => [zone, position]
      */
@@ -137,6 +139,22 @@ final readonly class Formation
     public function slots(): array
     {
         return array_keys($this->layout);
+    }
+
+    /**
+     * The layout flattened to storable coordinates: slot id => [x, y]. The inverse
+     * of Formation::custom(), used to seed a custom shape from a preset.
+     *
+     * @return array<int, array{int, int}>
+     */
+    public function placements(): array
+    {
+        $placements = [];
+        foreach ($this->layout as $slot => [$zone]) {
+            $placements[$slot] = [$zone->x, $zone->y];
+        }
+
+        return $placements;
     }
 
     public function kickoffZone(): Zone

@@ -16,6 +16,7 @@ import {
 import {
     assign,
     compare,
+    customize,
     edit,
     keeper,
     role,
@@ -44,6 +45,20 @@ function changeKeeper(playerId: string): void {
     router.patch(
         keeper().url,
         { player_id: Number(playerId) },
+        { preserveScroll: true, preserveState: true },
+    );
+}
+
+function moveSlot(slot: number, x: number, y: number): void {
+    const placements = props.squad.slots.map((s) => ({
+        slot: s.slot,
+        x: s.slot === slot ? x : s.zone.x,
+        y: s.slot === slot ? y : s.zone.y,
+    }));
+
+    router.patch(
+        customize().url,
+        { placements },
         { preserveScroll: true, preserveState: true },
     );
 }
@@ -252,10 +267,16 @@ function pick(playerId: number): void {
                 <PitchFormation
                     :slots="props.squad.slots"
                     :selected-slot="selectedSlot"
+                    :editable="props.squad.isCustom"
                     @select="toggleSlot"
+                    @move="moveSlot"
                 />
                 <p class="text-sm text-muted-foreground">
-                    <template v-if="selectedSlot === null">
+                    <template v-if="props.squad.isCustom">
+                        Custom shape: drag any player to a new zone to reshape
+                        the team and watch the profile shift.
+                    </template>
+                    <template v-else-if="selectedSlot === null">
                         Select a position on the pitch, then choose a player to
                         fill it.
                     </template>

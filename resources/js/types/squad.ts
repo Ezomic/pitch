@@ -39,6 +39,7 @@ export interface Squad {
     formation: string;
     mentality: string;
     goalkeeperId: number | null;
+    isCustom: boolean;
 }
 
 export interface Keeper {
