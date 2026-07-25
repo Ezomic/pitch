@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { Head, Link, router } from '@inertiajs/vue3';
 import { Button } from '@/components/ui/button';
-import { advance, rollover, show } from '@/routes/season';
+import { advance, friendlies, rollover, show } from '@/routes/season';
 import type {
     Matchday,
     NextFixture,
@@ -10,11 +10,20 @@ import type {
     StandingRow,
 } from '@/types/season';
 
+interface PreseasonMatch {
+    opponentName: string;
+    home: boolean;
+    played: boolean;
+    userGoals: number | null;
+    opponentGoals: number | null;
+}
+
 const props = defineProps<{
     seasonNumber: number;
     division: number;
     promotes: boolean;
     relegates: boolean;
+    preseason: { pending: boolean; matches: PreseasonMatch[] };
     history: SeasonHistory[];
     objective: SeasonObjective;
     standings: StandingRow[];
@@ -65,6 +74,10 @@ function formatDate(iso: string): string {
 
 function newSeason(): void {
     router.post(rollover().url, {}, { preserveScroll: true });
+}
+
+function playFriendlies(): void {
+    router.post(friendlies().url, {}, { preserveScroll: true });
 }
 
 function ordinal(n: number): string {
@@ -173,6 +186,43 @@ const columns: { key: keyof StandingRow; label: string }[] = [
             >
                 Missed &middot; finished {{ props.objective.position }}
             </span>
+        </div>
+
+        <div
+            v-if="props.preseason.matches.length > 0"
+            class="rounded-xl border border-sidebar-border/70 p-4 dark:border-sidebar-border"
+        >
+            <div class="mb-2 flex items-center justify-between gap-2">
+                <h2 class="text-sm font-medium text-muted-foreground">
+                    Preseason friendlies
+                </h2>
+                <Button
+                    v-if="props.preseason.pending"
+                    size="sm"
+                    variant="outline"
+                    @click="playFriendlies"
+                >
+                    Play friendlies
+                </Button>
+                <span v-else class="text-xs text-muted-foreground"
+                    >Fit for the opener</span
+                >
+            </div>
+            <div class="flex flex-wrap gap-2">
+                <div
+                    v-for="(match, index) in props.preseason.matches"
+                    :key="index"
+                    class="rounded-lg border border-sidebar-border/70 px-3 py-1.5 text-sm dark:border-sidebar-border"
+                >
+                    {{ match.home ? 'vs' : 'at' }} {{ match.opponentName }}
+                    <span
+                        v-if="match.played"
+                        class="ml-1 font-medium tabular-nums"
+                        >{{ match.userGoals }}-{{ match.opponentGoals }}</span
+                    >
+                    <span v-else class="ml-1 text-muted-foreground">—</span>
+                </div>
+            </div>
         </div>
 
         <div class="grid flex-1 gap-4 lg:grid-cols-[1.3fr_1fr]">

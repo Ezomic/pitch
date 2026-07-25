@@ -14,6 +14,7 @@ class EnsureSeason
     public function __construct(
         private readonly ScheduleSeason $scheduleSeason = new ScheduleSeason,
         private readonly DrawCup $drawCup = new DrawCup,
+        private readonly SchedulePreseason $schedulePreseason = new SchedulePreseason,
     ) {}
 
     /**
@@ -42,6 +43,7 @@ class EnsureSeason
 
             $this->scheduleSeason->handle($season);
             $this->drawCup->handle($season);
+            $this->schedulePreseason->handle($season);
 
             return $season;
         });

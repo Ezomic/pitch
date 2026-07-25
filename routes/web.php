@@ -57,6 +57,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('news/{news}/accept', [NewsController::class, 'accept'])->name('news.accept');
     Route::post('news/{news}/decline', [NewsController::class, 'decline'])->name('news.decline');
     Route::post('season/advance', [SeasonController::class, 'advance'])->name('season.advance');
+    Route::post('season/friendlies', [SeasonController::class, 'friendlies'])->name('season.friendlies');
     Route::post('season/reset', [SeasonController::class, 'reset'])->name('season.reset');
     Route::post('season/rollover', [SeasonController::class, 'rollover'])->name('season.rollover');
     Route::get('season/fixtures/{fixture}/report', [SeasonController::class, 'report'])->name('season.report');

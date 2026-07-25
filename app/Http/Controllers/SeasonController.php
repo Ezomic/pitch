@@ -6,6 +6,7 @@ namespace App\Http\Controllers;
 
 use App\Actions\Season\AdvanceWeek;
 use App\Actions\Season\EnsureSeason;
+use App\Actions\Season\PlayPreseason;
 use App\Actions\Season\RolloverSeason;
 use App\Actions\Season\ScoutOpponent;
 use App\Actions\Season\Standings;
@@ -43,6 +44,7 @@ class SeasonController extends Controller
             'promotes' => $season->division > Squad::TOP_DIVISION,
             'relegates' => $season->division < Squad::BOTTOM_DIVISION,
             'history' => $this->history($this->user($request), $standings),
+            'preseason' => $this->preseason($season, $teams),
             'objective' => $this->objective($table, $current === null),
             'standings' => $table,
             'matchdays' => $this->matchdays($season, $teams),
@@ -105,6 +107,42 @@ class SeasonController extends Controller
             ->whereDate('scheduled_on', '<=', $season->current_date)
             ->orderBy('matchday')
             ->first();
+    }
+
+    public function friendlies(Request $request, EnsureSeason $ensureSeason, PlayPreseason $playPreseason): RedirectResponse
+    {
+        $playPreseason->handle($ensureSeason->handle($this->user($request)));
+
+        return to_route('season.show');
+    }
+
+    /**
+     * The preseason friendlies and whether any are still to be played.
+     *
+     * @param  Collection<int, Team>  $teams
+     * @return array{pending: bool, matches: list<array<string, mixed>>}
+     */
+    private function preseason(Season $season, Collection $teams): array
+    {
+        $friendlies = $season->friendlies()->get();
+
+        $matches = [];
+        foreach ($friendlies as $friendly) {
+            $opponent = $teams->get($friendly->opponent_team_id);
+
+            $matches[] = [
+                'opponentName' => $opponent instanceof Team ? $opponent->name : 'Rival',
+                'home' => $friendly->home,
+                'played' => $friendly->played,
+                'userGoals' => $friendly->user_goals,
+                'opponentGoals' => $friendly->opponent_goals,
+            ];
+        }
+
+        return [
+            'pending' => $friendlies->contains(fn ($f) => ! $f->played),
+            'matches' => $matches,
+        ];
     }
 
     public function reset(Request $request, EnsureSeason $ensureSeason): RedirectResponse

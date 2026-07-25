@@ -24,6 +24,7 @@ class RolloverSeason
         private readonly PromoteRelegate $promoteRelegate = new PromoteRelegate,
         private readonly EnsureSquad $ensureSquad = new EnsureSquad,
         private readonly DrawCup $drawCup = new DrawCup,
+        private readonly SchedulePreseason $schedulePreseason = new SchedulePreseason,
     ) {}
 
     public function handle(Season $current): Season
@@ -47,6 +48,7 @@ class RolloverSeason
 
             $this->scheduleSeason->handle($next);
             $this->drawCup->handle($next);
+            $this->schedulePreseason->handle($next);
 
             return $next;
         });
