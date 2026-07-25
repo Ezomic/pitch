@@ -13,12 +13,15 @@ use Illuminate\Support\Carbon;
 /**
  * @property int $id
  * @property int $user_id
+ * @property int $number
+ * @property int $division
  * @property Carbon $starts_on
  * @property Carbon $current_date
+ * @property Carbon|null $completed_at
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['user_id', 'starts_on', 'current_date'])]
+#[Fillable(['user_id', 'number', 'division', 'starts_on', 'current_date', 'completed_at'])]
 class Season extends Model
 {
     /** The campaign always kicks off on this date; matchdays fall one week apart. */
@@ -38,8 +41,11 @@ class Season extends Model
     protected function casts(): array
     {
         return [
+            'number' => 'integer',
+            'division' => 'integer',
             'starts_on' => 'date',
             'current_date' => 'date',
+            'completed_at' => 'datetime',
         ];
     }
 
@@ -49,5 +55,21 @@ class Season extends Model
     public function fixtures(): HasMany
     {
         return $this->hasMany(Fixture::class)->orderBy('matchday')->orderBy('id');
+    }
+
+    /**
+     * @return HasMany<CupTie, $this>
+     */
+    public function cupTies(): HasMany
+    {
+        return $this->hasMany(CupTie::class)->orderBy('round')->orderBy('slot');
+    }
+
+    /**
+     * @return HasMany<Friendly, $this>
+     */
+    public function friendlies(): HasMany
+    {
+        return $this->hasMany(Friendly::class)->orderBy('slot');
     }
 }

@@ -22,6 +22,13 @@ final readonly class Defense
 
     private const float SHOT_WEIGHT = 0.15;
 
+    /**
+     * How strongly the keeper's shot-stopping suppresses a shot becoming a goal.
+     * Sized so the gap between a poor and an elite keeper is worth several goals a
+     * season, cleanly separate from the outfield back line's contribution.
+     */
+    private const float KEEPER_WEIGHT = 0.20;
+
     private const string BACK = 'back';
 
     private const string MID = 'mid';
@@ -39,6 +46,7 @@ final readonly class Defense
         private array $coverage,
         private float $defenceBias,
         private bool $active,
+        private int $goalkeeping = 0,
     ) {}
 
     public static function none(): self
@@ -49,7 +57,7 @@ final readonly class Defense
     /**
      * @param  array<int, Attributes>  $bySlot  slot id => attributes
      */
-    public static function fromAttributes(array $bySlot, ?Formation $formation = null, float $defenceBias = 1.0): self
+    public static function fromAttributes(array $bySlot, ?Formation $formation = null, float $defenceBias = 1.0, int $goalkeeping = 0): self
     {
         $formation ??= Formation::balanced();
 
@@ -76,7 +84,7 @@ final readonly class Defense
             $coverage[$line] = $line === self::BACK ? count($attributes) / 4 : 1.0;
         }
 
-        return new self($tackling, $pace, $coverage, $defenceBias, true);
+        return new self($tackling, $pace, $coverage, $defenceBias, true, $goalkeeping);
     }
 
     public function pressureBonus(Zone $ballZone): float
@@ -109,7 +117,28 @@ final readonly class Defense
 
         $line = $this->lineForZone($ballZone);
 
-        return ($this->tackling[$line] / 100) * $this->coverage[$line] * self::SHOT_WEIGHT * $this->defenceBias;
+        $backLine = ($this->tackling[$line] / 100) * $this->coverage[$line] * self::SHOT_WEIGHT * $this->defenceBias;
+
+        // The keeper stops shots wherever they come from, so its save weight is
+        // added on top of the outfield line and does not scale with the ball zone.
+        return $backLine + ($this->goalkeeping / 100) * self::KEEPER_WEIGHT;
+    }
+
+    /**
+     * How well the defence smothers a dead-ball delivery: the keeper claiming it
+     * and the back line clearing it. Zero for Defense::none(), so a bare defence
+     * offers no set-piece resistance.
+     */
+    public function setPieceResistance(): float
+    {
+        if (! $this->active) {
+            return 0.0;
+        }
+
+        $keeper = ($this->goalkeeping / 100) * 0.20;
+        $backLine = ($this->tackling[self::BACK] / 100) * $this->coverage[self::BACK] * 0.12;
+
+        return $keeper + $backLine;
     }
 
     private function lineForZone(Zone $ballZone): string

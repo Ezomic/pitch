@@ -4,13 +4,20 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers;
 
+use App\Actions\Squad\AssignKeeper;
+use App\Actions\Squad\AssignSetPieceTaker;
 use App\Actions\Squad\AssignSquadSlot;
+use App\Actions\Squad\CompareSetups;
 use App\Actions\Squad\EnsureSquad;
 use App\Actions\Squad\EvaluateSquad;
+use App\Actions\Squad\MarginalValue;
 use App\Http\Requests\AssignSquadSlotRequest;
 use App\Models\Player;
 use App\Models\Squad;
+use App\Models\SquadPlayer;
 use App\Models\User;
+use App\Sim\Domain\Position;
+use App\Sim\Domain\Zone;
 use App\Sim\Engine\Formation;
 use App\Sim\Engine\Mentality;
 use App\Sim\Squad\SquadProfile;
@@ -24,7 +31,7 @@ class SquadController extends Controller
 {
     public function edit(Request $request, EnsureSquad $ensureSquad, EvaluateSquad $evaluateSquad): Response
     {
-        $squad = $ensureSquad->handle($this->user($request))->load('assignments.player');
+        $squad = $ensureSquad->handle($this->user($request))->load('assignments.player', 'goalkeeper', 'setPieceTaker');
 
         $spent = (int) $squad->assignments->sum(fn ($assignment) => $assignment->player->value());
 
@@ -38,9 +45,71 @@ class SquadController extends Controller
                 'remaining' => $squad->budget - $spent,
                 'formation' => $squad->formation,
                 'mentality' => $squad->mentality,
+                'goalkeeperId' => $squad->goalkeeper_id,
+                'setPieceTakerId' => $squad->set_piece_taker_id,
+                'isCustom' => $squad->formation === Formation::CUSTOM_ID,
             ],
+            'keepers' => $this->keepers($squad),
+            'takers' => $this->takers($squad),
             'pool' => $this->pool($squad),
             'profile' => $this->profile($evaluateSquad->handle($squad)),
+            'formations' => [
+                ...array_values(array_map(
+                    fn (Formation $formation) => ['id' => $formation->id, 'name' => $formation->name],
+                    Formation::all(),
+                )),
+                ['id' => Formation::CUSTOM_ID, 'name' => 'Custom'],
+            ],
+            'mentalities' => array_map(
+                fn (Mentality $mentality) => ['id' => $mentality->value, 'name' => $mentality->label()],
+                Mentality::cases(),
+            ),
+            'roles' => array_map(
+                fn (string $role) => ['id' => $role, 'name' => ucwords(str_replace('_', ' ', $role))],
+                array_keys(SquadPlayer::ROLES),
+            ),
+        ]);
+    }
+
+    public function whatIf(Request $request, EnsureSquad $ensureSquad, MarginalValue $marginalValue): Response
+    {
+        $squad = $ensureSquad->handle($this->user($request));
+
+        return Inertia::render('SquadWhatIf', [
+            'marginal' => $marginalValue->handle($squad),
+        ]);
+    }
+
+    public function compare(Request $request, EnsureSquad $ensureSquad, CompareSetups $compareSetups): Response
+    {
+        $squad = $ensureSquad->handle($this->user($request));
+
+        $formations = array_keys(Formation::all());
+        $mentalities = array_column(Mentality::cases(), 'value');
+
+        $data = $request->validate([
+            'formationA' => ['nullable', Rule::in($formations)],
+            'mentalityA' => ['nullable', Rule::in($mentalities)],
+            'formationB' => ['nullable', Rule::in($formations)],
+            'mentalityB' => ['nullable', Rule::in($mentalities)],
+        ]);
+
+        $setup = [
+            'formationA' => $data['formationA'] ?? $squad->formation,
+            'mentalityA' => $data['mentalityA'] ?? $squad->mentality,
+            'formationB' => $data['formationB'] ?? '442',
+            'mentalityB' => $data['mentalityB'] ?? 'attacking',
+        ];
+
+        return Inertia::render('SquadCompare', [
+            'setup' => $setup,
+            'profiles' => $compareSetups->handle(
+                $squad,
+                $setup['formationA'],
+                $setup['mentalityA'],
+                $setup['formationB'],
+                $setup['mentalityB'],
+            ),
             'formations' => array_values(array_map(
                 fn (Formation $formation) => ['id' => $formation->id, 'name' => $formation->name],
                 Formation::all(),
@@ -66,14 +135,135 @@ class SquadController extends Controller
 
     public function tactics(Request $request, EnsureSquad $ensureSquad): RedirectResponse
     {
+        $formations = [...array_keys(Formation::all()), Formation::CUSTOM_ID];
+
         $data = $request->validate([
-            'formation' => ['required', Rule::in(array_keys(Formation::all()))],
+            'formation' => ['required', Rule::in($formations)],
             'mentality' => ['required', Rule::in(array_column(Mentality::cases(), 'value'))],
         ]);
 
-        $ensureSquad->handle($this->user($request))->update($data);
+        $squad = $ensureSquad->handle($this->user($request));
+
+        // Switching to a custom shape starts from the current preset's layout, so
+        // the editor opens on a valid eleven the user can then rearrange.
+        if ($data['formation'] === Formation::CUSTOM_ID && $squad->custom_formation === null) {
+            $squad->forceFill(['custom_formation' => $squad->formationObject()->placements()])->save();
+        }
+
+        $squad->update($data);
 
         return to_route('squad.edit');
+    }
+
+    public function customize(Request $request, EnsureSquad $ensureSquad): RedirectResponse
+    {
+        $data = $request->validate([
+            'placements' => ['required', 'array', 'size:10'],
+            'placements.*.slot' => ['required', 'integer', 'min:1', 'max:10'],
+            'placements.*.x' => ['required', 'integer', 'min:1', 'max:'.Zone::MAX_X],
+            'placements.*.y' => ['required', 'integer', 'min:0', 'max:'.Zone::MAX_Y],
+        ]);
+
+        $placements = [];
+        foreach ($data['placements'] as $placement) {
+            $placements[(int) $placement['slot']] = [(int) $placement['x'], (int) $placement['y']];
+        }
+
+        $ensureSquad->handle($this->user($request))->forceFill([
+            'formation' => Formation::CUSTOM_ID,
+            'custom_formation' => $placements,
+        ])->save();
+
+        return to_route('squad.edit');
+    }
+
+    public function role(Request $request, EnsureSquad $ensureSquad): RedirectResponse
+    {
+        $data = $request->validate([
+            'slot' => ['required', 'integer'],
+            'role' => ['nullable', Rule::in(array_keys(SquadPlayer::ROLES))],
+        ]);
+
+        $ensureSquad->handle($this->user($request))
+            ->assignments()
+            ->where('slot', $data['slot'])
+            ->update(['role' => $data['role'] ?? null]);
+
+        return to_route('squad.edit');
+    }
+
+    public function keeper(Request $request, EnsureSquad $ensureSquad, AssignKeeper $assignKeeper): RedirectResponse
+    {
+        $data = $request->validate([
+            'player_id' => ['required', 'integer'],
+        ]);
+
+        $squad = $ensureSquad->handle($this->user($request));
+        $assignKeeper->handle($squad, Player::findOrFail((int) $data['player_id']));
+
+        return to_route('squad.edit');
+    }
+
+    public function setPieces(Request $request, EnsureSquad $ensureSquad, AssignSetPieceTaker $assignSetPieceTaker): RedirectResponse
+    {
+        $data = $request->validate([
+            'player_id' => ['required', 'integer'],
+        ]);
+
+        $squad = $ensureSquad->handle($this->user($request));
+        $assignSetPieceTaker->handle($squad, Player::findOrFail((int) $data['player_id']));
+
+        return to_route('squad.edit');
+    }
+
+    /**
+     * The goalkeepers the user can pick between, ranked by shot-stopping.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function keepers(Squad $squad): array
+    {
+        $keepers = [];
+        foreach (Player::query()
+            ->selectableFor($squad->user_id)
+            ->where('position', Position::Goalkeeper)
+            ->orderByDesc('handling')
+            ->get() as $keeper) {
+            $keepers[] = [
+                'id' => $keeper->id,
+                'name' => $keeper->name,
+                'age' => $keeper->age,
+                'handling' => $keeper->handling,
+                'value' => $keeper->value(),
+                'fitness' => $keeper->fitness,
+                'form' => $keeper->form,
+            ];
+        }
+
+        return $keepers;
+    }
+
+    /**
+     * The outfielders the user can nominate to take set pieces, best delivery first.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private function takers(Squad $squad): array
+    {
+        $takers = [];
+        foreach (Player::query()
+            ->selectableFor($squad->user_id)
+            ->where('position', '!=', Position::Goalkeeper)
+            ->orderByRaw('(passing + finishing) desc')
+            ->get() as $taker) {
+            $takers[] = [
+                'id' => $taker->id,
+                'name' => $taker->name,
+                'rating' => $taker->setPieceRating(),
+            ];
+        }
+
+        return $takers;
     }
 
     private function user(Request $request): User
@@ -95,14 +285,16 @@ class SquadController extends Controller
         $bySlot = $squad->assignments->keyBy('slot');
 
         $slots = [];
-        foreach (Formation::fromId($squad->formation)->layout as $slot => [$zone, $position]) {
-            $player = $bySlot->get($slot)?->player;
+        foreach ($squad->formationObject()->layout as $slot => [$zone, $position]) {
+            $assignment = $bySlot->get($slot);
+            $player = $assignment?->player;
 
             $slots[] = [
                 'slot' => $slot,
                 'zone' => ['x' => $zone->x, 'y' => $zone->y],
                 'position' => $position->value,
                 'player' => $player !== null ? $this->player($player) : null,
+                'role' => $assignment?->role,
             ];
         }
 
@@ -118,12 +310,21 @@ class SquadController extends Controller
 
         $players = Player::query()
             ->selectableFor($squad->user_id)
+            ->where('position', '!=', Position::Goalkeeper)
             ->orderBy('position')
             ->orderBy('name')
             ->get();
 
+        // The user's own injured or suspended players are shown too, greyed out.
+        $unavailable = Player::query()
+            ->where('user_id', $squad->user_id)
+            ->where('is_youth', false)
+            ->where(fn ($query) => $query->where('injured_weeks', '>', 0)->orWhere('suspended_weeks', '>', 0))
+            ->orderBy('name')
+            ->get();
+
         $pool = [];
-        foreach ($players as $player) {
+        foreach ($players->concat($unavailable) as $player) {
             $pool[] = [
                 ...$this->player($player),
                 'slot' => $assignedSlot->get($player->id)?->slot,
@@ -152,6 +353,9 @@ class SquadController extends Controller
             'value' => $player->value(),
             'fitness' => $player->fitness,
             'form' => $player->form,
+            'trait' => $player->trait,
+            'injuredWeeks' => $player->injured_weeks,
+            'suspendedWeeks' => $player->suspended_weeks,
         ];
     }
 

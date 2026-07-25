@@ -1,17 +1,43 @@
 <script setup lang="ts">
 import { Head, Link, router } from '@inertiajs/vue3';
 import { Button } from '@/components/ui/button';
-import { advance, reset, show } from '@/routes/season';
-import type { Matchday, NextFixture, StandingRow } from '@/types/season';
+import { advance, friendlies, rollover, show } from '@/routes/season';
+import type {
+    Matchday,
+    NextFixture,
+    SeasonHistory,
+    SeasonObjective,
+    StandingRow,
+} from '@/types/season';
+
+interface PreseasonMatch {
+    opponentName: string;
+    home: boolean;
+    played: boolean;
+    userGoals: number | null;
+    opponentGoals: number | null;
+}
 
 const props = defineProps<{
+    seasonNumber: number;
+    division: number;
+    promotes: boolean;
+    relegates: boolean;
+    preseason: { pending: boolean; matches: PreseasonMatch[] };
+    history: SeasonHistory[];
+    objective: SeasonObjective;
     standings: StandingRow[];
     matchdays: Matchday[];
     currentMatchday: number | null;
     currentDate: string;
     nextFixtureDate: string | null;
     nextFixture: NextFixture | null;
-    liveFixture: { opponentName: string; home: boolean; url: string } | null;
+    liveFixture: {
+        opponentName: string;
+        home: boolean;
+        url: string;
+        scoutUrl: string;
+    } | null;
     complete: boolean;
 }>();
 
@@ -31,6 +57,12 @@ function playLive(): void {
     }
 }
 
+function scoutOpponent(): void {
+    if (props.liveFixture) {
+        router.get(props.liveFixture.scoutUrl);
+    }
+}
+
 function formatDate(iso: string): string {
     return new Date(iso).toLocaleDateString(undefined, {
         weekday: 'short',
@@ -41,7 +73,11 @@ function formatDate(iso: string): string {
 }
 
 function newSeason(): void {
-    router.post(reset().url, {}, { preserveScroll: true });
+    router.post(rollover().url, {}, { preserveScroll: true });
+}
+
+function playFriendlies(): void {
+    router.post(friendlies().url, {}, { preserveScroll: true });
 }
 
 function ordinal(n: number): string {
@@ -101,8 +137,7 @@ const columns: { key: keyof StandingRow; label: string }[] = [
                 </div>
                 <div v-else>
                     <p class="text-sm text-muted-foreground">
-                        {{ formatDate(props.currentDate) }} &middot; Season
-                        complete
+                        Season {{ props.seasonNumber }} complete
                     </p>
                     <p class="text-lg font-medium">
                         You finished {{ userPosition() }} of
@@ -110,15 +145,83 @@ const columns: { key: keyof StandingRow; label: string }[] = [
                     </p>
                 </div>
 
-                <Button v-if="props.liveFixture" @click="playLive">
-                    Play your match
-                </Button>
+                <template v-if="props.liveFixture">
+                    <Button variant="outline" @click="scoutOpponent">
+                        Scout opponent
+                    </Button>
+                    <Button @click="playLive"> Play your match </Button>
+                </template>
                 <Button v-else-if="!props.complete" @click="advanceWeek">
                     Advance week
                 </Button>
                 <Button v-else variant="outline" @click="newSeason">
-                    Start new season
+                    Start season {{ props.seasonNumber + 1 }}
                 </Button>
+            </div>
+        </div>
+
+        <div
+            class="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-sidebar-border/70 p-4 dark:border-sidebar-border"
+        >
+            <p class="text-sm">
+                <span class="text-muted-foreground">Board objective:</span>
+                finish top {{ props.objective.target }} of
+                {{ props.objective.teams }}
+            </p>
+            <span
+                v-if="props.objective.met === null"
+                class="text-sm text-muted-foreground"
+            >
+                Currently {{ props.objective.position }}
+            </span>
+            <span
+                v-else-if="props.objective.met"
+                class="rounded-md bg-emerald-500/15 px-2 py-0.5 text-sm font-medium text-emerald-600 dark:text-emerald-400"
+            >
+                Met &middot; finished {{ props.objective.position }}
+            </span>
+            <span
+                v-else
+                class="rounded-md bg-red-500/15 px-2 py-0.5 text-sm font-medium text-red-600 dark:text-red-400"
+            >
+                Missed &middot; finished {{ props.objective.position }}
+            </span>
+        </div>
+
+        <div
+            v-if="props.preseason.matches.length > 0"
+            class="rounded-xl border border-sidebar-border/70 p-4 dark:border-sidebar-border"
+        >
+            <div class="mb-2 flex items-center justify-between gap-2">
+                <h2 class="text-sm font-medium text-muted-foreground">
+                    Preseason friendlies
+                </h2>
+                <Button
+                    v-if="props.preseason.pending"
+                    size="sm"
+                    variant="outline"
+                    @click="playFriendlies"
+                >
+                    Play friendlies
+                </Button>
+                <span v-else class="text-xs text-muted-foreground"
+                    >Fit for the opener</span
+                >
+            </div>
+            <div class="flex flex-wrap gap-2">
+                <div
+                    v-for="(match, index) in props.preseason.matches"
+                    :key="index"
+                    class="rounded-lg border border-sidebar-border/70 px-3 py-1.5 text-sm dark:border-sidebar-border"
+                >
+                    {{ match.home ? 'vs' : 'at' }} {{ match.opponentName }}
+                    <span
+                        v-if="match.played"
+                        class="ml-1 font-medium tabular-nums"
+                        >{{ match.userGoals }}-{{ match.opponentGoals }}</span
+                    >
+                    <span v-else class="ml-1 text-muted-foreground">—</span>
+                </div>
             </div>
         </div>
 
@@ -126,9 +229,14 @@ const columns: { key: keyof StandingRow; label: string }[] = [
             <div
                 class="rounded-xl border border-sidebar-border/70 p-4 dark:border-sidebar-border"
             >
-                <h2 class="mb-3 text-sm font-medium text-muted-foreground">
-                    Standings
-                </h2>
+                <div class="mb-3 flex items-center justify-between gap-2">
+                    <h2 class="text-sm font-medium text-muted-foreground">
+                        Standings
+                    </h2>
+                    <span class="text-xs font-medium"
+                        >Division {{ props.division }}</span
+                    >
+                </div>
                 <table class="w-full text-sm">
                     <thead>
                         <tr class="text-muted-foreground">
@@ -155,7 +263,22 @@ const columns: { key: keyof StandingRow; label: string }[] = [
                             "
                         >
                             <td class="py-1.5 pr-2 tabular-nums">
-                                {{ index + 1 }}
+                                <span class="inline-flex items-center gap-1.5">
+                                    <span
+                                        v-if="props.promotes && index === 0"
+                                        class="inline-block h-2 w-2 rounded-full bg-emerald-500"
+                                        title="Promotion place"
+                                    />
+                                    <span
+                                        v-else-if="
+                                            props.relegates &&
+                                            index === props.standings.length - 1
+                                        "
+                                        class="inline-block h-2 w-2 rounded-full bg-destructive"
+                                        title="Relegation place"
+                                    />
+                                    {{ index + 1 }}
+                                </span>
                             </td>
                             <td class="py-1.5">{{ row.name }}</td>
                             <td
@@ -192,10 +315,19 @@ const columns: { key: keyof StandingRow; label: string }[] = [
                             fixture.isUser ? 'bg-accent/40 font-medium' : ''
                         "
                     >
-                        <span class="truncate">
-                            {{ fixture.homeName }}
-                            <span class="text-muted-foreground">v</span>
-                            {{ fixture.awayName }}
+                        <span
+                            class="flex min-w-0 items-center gap-1.5 truncate"
+                        >
+                            <span class="truncate">
+                                {{ fixture.homeName }}
+                                <span class="text-muted-foreground">v</span>
+                                {{ fixture.awayName }}
+                            </span>
+                            <span
+                                v-if="fixture.isDerby"
+                                class="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400"
+                                >Derby</span
+                            >
                         </span>
                         <span class="flex shrink-0 items-center gap-2">
                             <span v-if="fixture.played" class="tabular-nums">
@@ -211,6 +343,28 @@ const columns: { key: keyof StandingRow; label: string }[] = [
                             </Link>
                         </span>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <div
+            v-if="props.history.length > 0"
+            class="rounded-xl border border-sidebar-border/70 p-4 dark:border-sidebar-border"
+        >
+            <h2 class="mb-3 text-sm font-medium text-muted-foreground">
+                Past seasons
+            </h2>
+            <div class="flex flex-col gap-1">
+                <div
+                    v-for="entry in props.history"
+                    :key="entry.number"
+                    class="flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-sm"
+                >
+                    <span>Season {{ entry.number }}</span>
+                    <span class="text-muted-foreground">
+                        finished {{ entry.position }} of {{ entry.teams }} on
+                        {{ entry.points }} pts
+                    </span>
                 </div>
             </div>
         </div>

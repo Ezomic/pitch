@@ -19,15 +19,20 @@ final readonly class TeamSetup
 {
     /**
      * @param  array<int, Attributes>  $bySlot  slot id => attributes
+     * @param  int  $goalkeeping  the keeper's shot-stopping, 0..100
+     * @param  int  $setPiece  the side's dead-ball strength, 0..100
      */
     public function __construct(
         public array $bySlot,
         public Formation $formation,
         public Mentality $mentality,
+        public int $goalkeeping = 55,
+        public int $setPiece = 50,
     ) {}
 
     /**
-     * A neutral opponent: an average side in a balanced shape.
+     * A neutral opponent: an average side in a balanced shape with an average
+     * keeper and set-piece threat.
      */
     public static function baseline(): self
     {
@@ -36,7 +41,7 @@ final readonly class TeamSetup
             $bySlot[$slot] = new Attributes(55, 55, 55, 55, 55, 55);
         }
 
-        return new self($bySlot, Formation::balanced(), Mentality::Balanced);
+        return new self($bySlot, Formation::balanced(), Mentality::Balanced, 55, 50);
     }
 
     /**
@@ -49,7 +54,7 @@ final readonly class TeamSetup
 
     public function defence(): Defense
     {
-        return Defense::fromAttributes($this->bySlot, $this->formation, $this->mentality->defenceBias());
+        return Defense::fromAttributes($this->bySlot, $this->formation, $this->mentality->defenceBias(), $this->goalkeeping);
     }
 
     public function attackBias(): float

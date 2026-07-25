@@ -19,6 +19,7 @@ export interface FixtureView {
     awayGoals: number | null;
     played: boolean;
     isUser: boolean;
+    isDerby: boolean;
     reportUrl: string | null;
 }
 
@@ -30,4 +31,18 @@ export interface Matchday {
 export interface NextFixture {
     opponentName: string;
     home: boolean;
+}
+
+export interface SeasonHistory {
+    number: number;
+    position: number;
+    points: number;
+    teams: number;
+}
+
+export interface SeasonObjective {
+    target: number;
+    position: number;
+    teams: number;
+    met: boolean | null;
 }

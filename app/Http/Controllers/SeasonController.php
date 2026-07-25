@@ -6,11 +6,15 @@ namespace App\Http\Controllers;
 
 use App\Actions\Season\AdvanceWeek;
 use App\Actions\Season\EnsureSeason;
+use App\Actions\Season\PlayPreseason;
+use App\Actions\Season\RolloverSeason;
+use App\Actions\Season\ScoutOpponent;
 use App\Actions\Season\Standings;
 use App\Actions\Squad\EnsureSquad;
 use App\Actions\Squad\SimulateMatch;
 use App\Models\Fixture;
 use App\Models\Season;
+use App\Models\Squad;
 use App\Models\Team;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
@@ -32,8 +36,17 @@ class SeasonController extends Controller
         $current = $nextUnplayed?->matchday;
         $due = $this->dueUserFixture($season);
 
+        $table = $standings->handle($season);
+
         return Inertia::render('Season', [
-            'standings' => $standings->handle($season),
+            'seasonNumber' => $season->number,
+            'division' => $season->division,
+            'promotes' => $season->division > Squad::TOP_DIVISION,
+            'relegates' => $season->division < Squad::BOTTOM_DIVISION,
+            'history' => $this->history($this->user($request), $standings),
+            'preseason' => $this->preseason($season, $teams),
+            'objective' => $this->objective($table, $current === null),
+            'standings' => $table,
             'matchdays' => $this->matchdays($season, $teams),
             'currentMatchday' => $current,
             'currentDate' => $season->current_date->toDateString(),
@@ -43,6 +56,7 @@ class SeasonController extends Controller
                 'opponentName' => $this->sideName($due->userIsHome() ? $due->away_team_id : $due->home_team_id, $teams),
                 'home' => $due->userIsHome(),
                 'url' => route('match.live.show', $due),
+                'scoutUrl' => route('season.scout', $due),
             ],
             'complete' => $current === null,
         ]);
@@ -60,6 +74,30 @@ class SeasonController extends Controller
         return to_route('season.show');
     }
 
+    public function scout(
+        Request $request,
+        Fixture $fixture,
+        EnsureSeason $ensureSeason,
+        EnsureSquad $ensureSquad,
+        ScoutOpponent $scoutOpponent,
+    ): Response {
+        $user = $this->user($request);
+        $season = $ensureSeason->handle($user);
+
+        abort_unless($fixture->season_id === $season->id && $fixture->involvesUser() && ! $fixture->played, 404);
+
+        $opponent = Team::findOrFail($fixture->userIsHome() ? $fixture->away_team_id : $fixture->home_team_id);
+        $scout = $scoutOpponent->handle($ensureSquad->handle($user), $opponent);
+
+        return Inertia::render('Scout', [
+            'opponentName' => $opponent->name,
+            'style' => $opponent->style,
+            'home' => $fixture->userIsHome(),
+            'opponent' => $scout['opponent'],
+            'matchup' => $scout['matchup'],
+        ]);
+    }
+
     private function dueUserFixture(Season $season): ?Fixture
     {
         return $season->fixtures()
@@ -71,11 +109,118 @@ class SeasonController extends Controller
             ->first();
     }
 
+    public function friendlies(Request $request, EnsureSeason $ensureSeason, PlayPreseason $playPreseason): RedirectResponse
+    {
+        $playPreseason->handle($ensureSeason->handle($this->user($request)));
+
+        return to_route('season.show');
+    }
+
+    /**
+     * The preseason friendlies and whether any are still to be played.
+     *
+     * @param  Collection<int, Team>  $teams
+     * @return array{pending: bool, matches: list<array<string, mixed>>}
+     */
+    private function preseason(Season $season, Collection $teams): array
+    {
+        $friendlies = $season->friendlies()->get();
+
+        $matches = [];
+        foreach ($friendlies as $friendly) {
+            $opponent = $teams->get($friendly->opponent_team_id);
+
+            $matches[] = [
+                'opponentName' => $opponent instanceof Team ? $opponent->name : 'Rival',
+                'home' => $friendly->home,
+                'played' => $friendly->played,
+                'userGoals' => $friendly->user_goals,
+                'opponentGoals' => $friendly->opponent_goals,
+            ];
+        }
+
+        return [
+            'pending' => $friendlies->contains(fn ($f) => ! $f->played),
+            'matches' => $matches,
+        ];
+    }
+
     public function reset(Request $request, EnsureSeason $ensureSeason): RedirectResponse
     {
         $ensureSeason->handle($this->user($request))->delete();
 
         return to_route('season.show');
+    }
+
+    public function rollover(Request $request, EnsureSeason $ensureSeason, RolloverSeason $rolloverSeason): RedirectResponse
+    {
+        $season = $ensureSeason->handle($this->user($request));
+
+        // Only roll over once the campaign is done: no unplayed senior fixtures left.
+        if ($season->fixtures()->where('youth', false)->where('played', false)->doesntExist()) {
+            $rolloverSeason->handle($season);
+        }
+
+        return to_route('season.show');
+    }
+
+    /**
+     * The board's expectation for the campaign: a top-half finish. Returns the
+     * target position, the user's current standing, and (once the season is done)
+     * whether it was met.
+     *
+     * @param  list<array<string, mixed>>  $table
+     * @return array{target: int, position: int, teams: int, met: bool|null}
+     */
+    private function objective(array $table, bool $complete): array
+    {
+        $teams = count($table);
+        $target = max(1, intdiv($teams, 2));
+
+        $position = $teams;
+        foreach ($table as $index => $row) {
+            if ($row['isUser'] === true) {
+                $position = $index + 1;
+                break;
+            }
+        }
+
+        return [
+            'target' => $target,
+            'position' => $position,
+            'teams' => $teams,
+            'met' => $complete ? $position <= $target : null,
+        ];
+    }
+
+    /**
+     * @return list<array{number: int, position: int, points: int, teams: int}>
+     */
+    private function history(User $user, Standings $standings): array
+    {
+        $history = [];
+
+        foreach ($user->seasons()->whereNotNull('completed_at')->orderByDesc('number')->get() as $season) {
+            $table = $standings->handle($season);
+            $position = 0;
+            foreach ($table as $index => $row) {
+                if ($row['isUser'] === true) {
+                    $position = $index + 1;
+                    break;
+                }
+            }
+
+            $userRow = collect($table)->firstWhere('isUser', true);
+
+            $history[] = [
+                'number' => $season->number,
+                'position' => $position,
+                'points' => is_array($userRow) ? (int) $userRow['points'] : 0,
+                'teams' => count($table),
+            ];
+        }
+
+        return $history;
     }
 
     public function report(
@@ -120,6 +265,8 @@ class SeasonController extends Controller
                     'awayGoals' => $fixture->away_goals,
                     'played' => $fixture->played,
                     'isUser' => $fixture->involvesUser(),
+                    'isDerby' => $fixture->involvesUser()
+                        && (bool) $teams->get($fixture->home_team_id ?? $fixture->away_team_id)->is_derby,
                     'reportUrl' => $fixture->involvesUser() && $fixture->played
                         ? route('season.report', $fixture)
                         : null,

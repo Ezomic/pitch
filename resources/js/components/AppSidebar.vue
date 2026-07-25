@@ -1,10 +1,14 @@
 <script setup lang="ts">
 import { Link } from '@inertiajs/vue3';
 import {
+    ArrowRightLeft,
     BookOpen,
     Clapperboard,
     FolderGit2,
+    Dumbbell,
     LayoutGrid,
+    Medal,
+    Newspaper,
     Shirt,
     Sprout,
     Telescope,
@@ -26,8 +30,12 @@ import {
 import { dashboard } from '@/routes';
 import { show as matchShow } from '@/routes/match';
 import { index as scoutsIndex } from '@/routes/scouts';
+import { show as cupShow } from '@/routes/cup';
+import { index as newsIndex } from '@/routes/news';
 import { show as seasonShow } from '@/routes/season';
+import { index as trainingIndex } from '@/routes/training';
 import { edit as squadEdit } from '@/routes/squad';
+import { index as transfersIndex } from '@/routes/transfers';
 import { index as youthIndex } from '@/routes/youth';
 import type { NavItem } from '@/types';
 
@@ -48,6 +56,21 @@ const mainNavItems: NavItem[] = [
         icon: Trophy,
     },
     {
+        title: 'Cup',
+        href: cupShow(),
+        icon: Medal,
+    },
+    {
+        title: 'Transfers',
+        href: transfersIndex(),
+        icon: ArrowRightLeft,
+    },
+    {
+        title: 'News',
+        href: newsIndex(),
+        icon: Newspaper,
+    },
+    {
         title: 'Scouting',
         href: scoutsIndex(),
         icon: Telescope,
@@ -56,6 +79,11 @@ const mainNavItems: NavItem[] = [
         title: 'Academy',
         href: youthIndex(),
         icon: Sprout,
+    },
+    {
+        title: 'Training',
+        href: trainingIndex(),
+        icon: Dumbbell,
     },
     {
         title: 'Match',

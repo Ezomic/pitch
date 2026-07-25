@@ -35,7 +35,7 @@ it('gives the stronger side more goals over many fixtures', function () {
     $strong = 0;
     $weak = 0;
     for ($seed = 1; $seed <= 80; $seed++) {
-        $result = $resolver->resolve(team(16), team(7), $seed);
+        $result = $resolver->resolve(team(72), team(38), $seed);
         $strong += $result['home'];
         $weak += $result['away'];
     }

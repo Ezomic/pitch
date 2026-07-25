@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { Head, router } from '@inertiajs/vue3';
+import { Head, Link, router } from '@inertiajs/vue3';
+import { Columns2, TrendingUp } from '@lucide/vue';
 import { computed, ref, watch } from 'vue';
 import BudgetBar from '@/components/squad/BudgetBar.vue';
 import PitchFormation from '@/components/squad/PitchFormation.vue';
@@ -12,9 +13,21 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { assign, edit, tactics } from '@/routes/squad';
+import {
+    assign,
+    compare,
+    customize,
+    edit,
+    keeper,
+    role,
+    setPieces,
+    tactics,
+    whatIf,
+} from '@/routes/squad';
 import type {
+    Keeper,
     PoolPlayer,
+    SetPieceTaker,
     Squad,
     SquadProfile,
     TacticOption,
@@ -23,10 +36,43 @@ import type {
 const props = defineProps<{
     squad: Squad;
     pool: PoolPlayer[];
+    keepers: Keeper[];
+    takers: SetPieceTaker[];
     profile: SquadProfile;
     formations: TacticOption[];
     mentalities: TacticOption[];
+    roles: TacticOption[];
 }>();
+
+function changeKeeper(playerId: string): void {
+    router.patch(
+        keeper().url,
+        { player_id: Number(playerId) },
+        { preserveScroll: true, preserveState: true },
+    );
+}
+
+function changeTaker(playerId: string): void {
+    router.patch(
+        setPieces().url,
+        { player_id: Number(playerId) },
+        { preserveScroll: true, preserveState: true },
+    );
+}
+
+function moveSlot(slot: number, x: number, y: number): void {
+    const placements = props.squad.slots.map((s) => ({
+        slot: s.slot,
+        x: s.slot === slot ? x : s.zone.x,
+        y: s.slot === slot ? y : s.zone.y,
+    }));
+
+    router.patch(
+        customize().url,
+        { placements },
+        { preserveScroll: true, preserveState: true },
+    );
+}
 
 function changeTactics(formation: string, mentality: string): void {
     router.patch(
@@ -35,6 +81,16 @@ function changeTactics(formation: string, mentality: string): void {
         { preserveScroll: true, preserveState: true },
     );
 }
+
+function setRole(slot: number, value: string): void {
+    router.patch(
+        role().url,
+        { slot, role: value === '' ? null : value },
+        { preserveScroll: true, preserveState: true },
+    );
+}
+
+const filledSlots = () => props.squad.slots.filter((s) => s.player !== null);
 
 defineOptions({
     layout: {
@@ -75,7 +131,12 @@ function affordable(player: PoolPlayer): boolean {
 }
 
 function canPick(player: PoolPlayer): boolean {
-    return selectedSlot.value !== null && affordable(player);
+    return (
+        selectedSlot.value !== null &&
+        player.injuredWeeks === 0 &&
+        player.suspendedWeeks === 0 &&
+        affordable(player)
+    );
 }
 
 function unaffordable(player: PoolPlayer): boolean {
@@ -103,6 +164,22 @@ function pick(playerId: number): void {
     <Head title="Squad" />
 
     <div class="flex h-full flex-1 flex-col gap-4 p-4">
+        <div class="flex items-center justify-end gap-2">
+            <Link
+                :href="compare().url"
+                class="flex items-center gap-1.5 rounded-md border border-sidebar-border/70 px-2.5 py-1.5 text-sm text-muted-foreground transition hover:bg-accent/40 dark:border-sidebar-border"
+            >
+                <Columns2 class="h-4 w-4" />
+                A/B compare
+            </Link>
+            <Link
+                :href="whatIf().url"
+                class="flex items-center gap-1.5 rounded-md border border-sidebar-border/70 px-2.5 py-1.5 text-sm text-muted-foreground transition hover:bg-accent/40 dark:border-sidebar-border"
+            >
+                <TrendingUp class="h-4 w-4" />
+                What-if analysis
+            </Link>
+        </div>
         <TeamProfile :profile="props.profile" :previous="previousProfile" />
 
         <div class="grid flex-1 gap-4 lg:grid-cols-[1.4fr_1fr]">
@@ -166,6 +243,58 @@ function pick(playerId: number): void {
                             </SelectContent>
                         </Select>
                     </div>
+                    <div class="flex-1">
+                        <label class="mb-1 block text-xs text-muted-foreground"
+                            >Goalkeeper</label
+                        >
+                        <Select
+                            :model-value="
+                                props.squad.goalkeeperId
+                                    ? String(props.squad.goalkeeperId)
+                                    : ''
+                            "
+                            @update:model-value="(v) => changeKeeper(String(v))"
+                        >
+                            <SelectTrigger class="w-full">
+                                <SelectValue placeholder="None" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem
+                                    v-for="k in props.keepers"
+                                    :key="k.id"
+                                    :value="String(k.id)"
+                                >
+                                    {{ k.name }} ({{ k.handling }})
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div class="flex-1">
+                        <label class="mb-1 block text-xs text-muted-foreground"
+                            >Set-piece taker</label
+                        >
+                        <Select
+                            :model-value="
+                                props.squad.setPieceTakerId
+                                    ? String(props.squad.setPieceTakerId)
+                                    : ''
+                            "
+                            @update:model-value="(v) => changeTaker(String(v))"
+                        >
+                            <SelectTrigger class="w-full">
+                                <SelectValue placeholder="None" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem
+                                    v-for="t in props.takers"
+                                    :key="t.id"
+                                    :value="String(t.id)"
+                                >
+                                    {{ t.name }} ({{ t.rating }})
+                                </SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
                 </div>
                 <BudgetBar
                     :budget="props.squad.budget"
@@ -175,10 +304,16 @@ function pick(playerId: number): void {
                 <PitchFormation
                     :slots="props.squad.slots"
                     :selected-slot="selectedSlot"
+                    :editable="props.squad.isCustom"
                     @select="toggleSlot"
+                    @move="moveSlot"
                 />
                 <p class="text-sm text-muted-foreground">
-                    <template v-if="selectedSlot === null">
+                    <template v-if="props.squad.isCustom">
+                        Custom shape: drag any player to a new zone to reshape
+                        the team and watch the profile shift.
+                    </template>
+                    <template v-else-if="selectedSlot === null">
                         Select a position on the pitch, then choose a player to
                         fill it.
                     </template>
@@ -187,6 +322,46 @@ function pick(playerId: number): void {
                         swap in, or choose another position.
                     </template>
                 </p>
+
+                <div
+                    v-if="filledSlots().length > 0"
+                    class="rounded-xl border border-sidebar-border/70 p-3 dark:border-sidebar-border"
+                >
+                    <h2 class="mb-2 text-sm font-medium text-muted-foreground">
+                        Roles
+                    </h2>
+                    <div class="grid gap-x-4 gap-y-1.5 sm:grid-cols-2">
+                        <label
+                            v-for="s in filledSlots()"
+                            :key="s.slot"
+                            class="flex items-center justify-between gap-2 text-sm"
+                        >
+                            <span class="min-w-0 truncate">{{
+                                s.player?.name
+                            }}</span>
+                            <select
+                                class="shrink-0 rounded-md border border-sidebar-border/70 bg-transparent px-1.5 py-1 text-xs dark:border-sidebar-border"
+                                :value="s.role ?? ''"
+                                @change="
+                                    setRole(
+                                        s.slot,
+                                        ($event.target as HTMLSelectElement)
+                                            .value,
+                                    )
+                                "
+                            >
+                                <option value="">No role</option>
+                                <option
+                                    v-for="r in props.roles"
+                                    :key="r.id"
+                                    :value="r.id"
+                                >
+                                    {{ r.name }}
+                                </option>
+                            </select>
+                        </label>
+                    </div>
+                </div>
             </div>
 
             <div

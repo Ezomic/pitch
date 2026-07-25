@@ -115,7 +115,7 @@ it('exposes tactics and options on the squad page', function () {
         ->assertInertia(fn (Assert $page) => $page
             ->where('squad.formation', '433')
             ->where('squad.mentality', 'balanced')
-            ->has('formations', 6)
+            ->has('formations', 7) // six presets plus the custom option
             ->has('mentalities', 3),
         );
 });

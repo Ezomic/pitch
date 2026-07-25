@@ -21,8 +21,15 @@ class RecoverCondition
         foreach ($players as $player) {
             $fitness = min(Player::FITNESS_MAX, $player->fitness + Player::WEEKLY_RECOVERY);
             $form = $player->form - ($player->form <=> 0);
+            $injuredWeeks = max(0, $player->injured_weeks - 1);
+            $suspendedWeeks = max(0, $player->suspended_weeks - 1);
 
-            $player->forceFill(['fitness' => $fitness, 'form' => $form])->save();
+            $player->forceFill([
+                'fitness' => $fitness,
+                'form' => $form,
+                'injured_weeks' => $injuredWeeks,
+                'suspended_weeks' => $suspendedWeeks,
+            ])->save();
         }
     }
 }

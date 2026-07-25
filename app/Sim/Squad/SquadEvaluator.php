@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace App\Sim\Squad;
 
 use App\Sim\Engine\MatchEngine;
+use App\Sim\Engine\SetPieces;
 
 final class SquadEvaluator
 {
     public function __construct(
         private readonly MatchEngine $engine = new MatchEngine,
+        private readonly SetPieces $setPieces = new SetPieces,
     ) {}
 
     /**
@@ -42,15 +44,18 @@ final class SquadEvaluator
             $attack = $this->engine->simulate($userAttackers, $seed, $opponentDefence, $user->formation, $user->attackBias());
             $defence = $this->engine->simulate($opponentAttackers, $seed, $userDefence, $opponent->formation, $opponent->attackBias());
 
+            $attackSet = $this->setPieces->resolve($user->setPiece, $opponentDefence, $seed, $attack->shots);
+            $defenceSet = $this->setPieces->resolve($opponent->setPiece, $userDefence, $seed + 1, $defence->shots);
+
             $gapSum += $attack->decisionGapSum;
             $decisions += $attack->decisionCount;
             $progressive += $attack->progressivePasses;
             $passes += $attack->passesCompleted;
-            $shots += $attack->shots;
-            $goals += $attack->goals;
+            $shots += $attack->shots + $attackSet['chances'];
+            $goals += $attack->goals + $attackSet['goals'];
 
-            $shotsConceded += $defence->shots;
-            $goalsConceded += $defence->goals;
+            $shotsConceded += $defence->shots + $defenceSet['chances'];
+            $goalsConceded += $defence->goals + $defenceSet['goals'];
         }
 
         return new SquadProfile(

@@ -31,9 +31,16 @@ const stats: { key: keyof PoolPlayer; label: string; key_metric: boolean }[] = [
         @click="emit('pick', props.player.id)"
     >
         <div class="mb-2 flex items-center justify-between gap-2">
-            <span class="truncate text-sm font-medium">{{
-                props.player.name
-            }}</span>
+            <span class="flex min-w-0 items-center gap-1.5">
+                <span class="truncate text-sm font-medium">{{
+                    props.player.name
+                }}</span>
+                <span
+                    v-if="props.player.trait"
+                    class="shrink-0 rounded bg-accent px-1.5 py-0.5 text-[10px] font-medium text-accent-foreground capitalize"
+                    >{{ props.player.trait }}</span
+                >
+            </span>
             <div class="flex shrink-0 items-center gap-1">
                 <span class="text-xs text-muted-foreground tabular-nums"
                     >{{ props.player.age }}y</span
@@ -42,7 +49,21 @@ const stats: { key: keyof PoolPlayer; label: string; key_metric: boolean }[] = [
                     >£{{ props.player.value }}m</span
                 >
                 <Badge variant="secondary">{{ props.player.position }}</Badge>
-                <Badge v-if="props.player.slot !== null" variant="outline">
+                <Badge
+                    v-if="props.player.injuredWeeks > 0"
+                    variant="outline"
+                    class="border-red-500/40 text-red-600 dark:text-red-400"
+                >
+                    Injured {{ props.player.injuredWeeks }}w
+                </Badge>
+                <Badge
+                    v-else-if="props.player.suspendedWeeks > 0"
+                    variant="outline"
+                    class="border-amber-500/40 text-amber-600 dark:text-amber-400"
+                >
+                    Suspended {{ props.player.suspendedWeeks }}w
+                </Badge>
+                <Badge v-else-if="props.player.slot !== null" variant="outline">
                     Slot {{ props.player.slot }}
                 </Badge>
                 <Badge
