@@ -49,12 +49,24 @@ const to = computed(() =>
     cur.value ? { x: px(cur.value.x2), y: py(cur.value.y2) } : { x: 50, y: 50 },
 );
 
-// The ball is animated from `from` to `to` on every frame so a pass is visibly
-// travelling from the player on the ball to the receiver.
-const ball = ref({ x: 50, y: 50 });
-const ballAnim = ref(false);
+// The ball is animated frame by frame along a curved path so a pass arcs, a
+// cross loops, a dribble carries with the player and a shot fizzes into the
+// goal. `scale` lends it a little height and weight in flight.
+const ball = ref({ x: 50, y: 50, scale: 1 });
 
-function place(frame: TimelineFrame | null) {
+function easing(type: string): (t: number) => number {
+    if (type === 'shot' || type === 'header') {
+        return (t) => t * t; // accelerate into the strike
+    }
+
+    if (type === 'dribble') {
+        return (t) => t; // a steady carry
+    }
+
+    return (t) => 1 - (1 - t) * (1 - t); // a pass eases to its target
+}
+
+function animateBall(frame: TimelineFrame | null) {
     if (raf !== null) {
         cancelAnimationFrame(raf);
         raf = null;
@@ -64,24 +76,49 @@ function place(frame: TimelineFrame | null) {
         return;
     }
 
-    if (reduceMotion) {
-        ball.value = { x: to.value.x, y: to.value.y };
-        ballAnim.value = false;
+    const p0 = { x: from.value.x, y: from.value.y };
+    const p1 = { x: to.value.x, y: to.value.y };
+    const dx = p1.x - p0.x;
+    const dy = p1.y - p0.y;
+    const dist = Math.hypot(dx, dy);
+
+    if (reduceMotion || dist < 0.5) {
+        ball.value = { x: p1.x, y: p1.y, scale: 1 };
 
         return;
     }
 
-    ballAnim.value = false;
-    ball.value = { x: from.value.x, y: from.value.y };
-    raf = requestAnimationFrame(() => {
-        raf = requestAnimationFrame(() => {
-            ballAnim.value = true;
-            ball.value = { x: to.value.x, y: to.value.y };
-        });
-    });
+    const isShot = frame.t === 'shot' || frame.t === 'header';
+    const isCross = frame.t === 'cross';
+    // A control point offset perpendicular to the pass bows its path; crosses
+    // bow hardest, shots fly straight. The side alternates so play isn't lopsided.
+    const bow = isShot ? 0 : dist * (isCross ? 0.28 : 0.12);
+    const side = index.value % 2 === 0 ? 1 : -1;
+    const cx = (p0.x + p1.x) / 2 + (-dy / dist) * bow * side;
+    const cy = (p0.y + p1.y) / 2 + (dx / dist) * bow * side;
+
+    // Longer balls travel a touch quicker; everything still lands within the frame.
+    const duration = Math.min(durMs.value, 220 + dist * 9);
+    const ease = easing(frame.t);
+    const loft = isShot ? 0 : isCross ? 0.6 : 0.25;
+    const start = performance.now();
+
+    const step = (now: number) => {
+        const t = Math.min(1, (now - start) / duration);
+        const e = ease(t);
+        const m = 1 - e;
+        ball.value = {
+            x: m * m * p0.x + 2 * m * e * cx + e * e * p1.x,
+            y: m * m * p0.y + 2 * m * e * cy + e * e * p1.y,
+            scale: 1 + (isShot ? 0.4 * e : loft * Math.sin(Math.PI * e)),
+        };
+        raf = t < 1 ? requestAnimationFrame(step) : null;
+    };
+
+    raf = requestAnimationFrame(step);
 }
 
-watch(index, () => place(cur.value), { immediate: true });
+watch(index, () => animateBall(cur.value), { immediate: true });
 
 const isMoving = computed(
     () =>
@@ -341,16 +378,10 @@ onBeforeUnmount(() => {
             <div
                 v-if="cur"
                 class="absolute z-20 -translate-x-1/2 -translate-y-1/2"
-                :style="{
-                    left: `${ball.x}%`,
-                    top: `${ball.y}%`,
-                    transition: ballAnim
-                        ? `left ${durMs}ms linear, top ${durMs}ms linear`
-                        : 'none',
-                }"
+                :style="{ left: `${ball.x}%`, top: `${ball.y}%` }"
             >
                 <span
-                    class="block rounded-full bg-white shadow ring-1 ring-black/30"
+                    class="block rounded-full bg-white ring-1 ring-black/30"
                     :class="
                         cur.goal
                             ? 'size-3.5 ring-4 ring-white/50'
@@ -358,6 +389,10 @@ onBeforeUnmount(() => {
                               ? 'size-3'
                               : 'size-2'
                     "
+                    :style="{
+                        transform: `scale(${ball.scale})`,
+                        filter: `drop-shadow(0 ${ball.scale}px ${ball.scale}px rgba(0,0,0,0.45))`,
+                    }"
                 ></span>
             </div>
 
