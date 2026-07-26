@@ -48,6 +48,36 @@ it('generates real match activity', function () {
         ->and($result->decisionCount)->toBeGreaterThan(0);
 });
 
+it('works the ball through the whole team rather than one long ball', function () {
+    $engine = new MatchEngine;
+    $result = $engine->simulate(Roster::build(template(60)), 7);
+
+    $carriers = [];
+    foreach ($result->events as $event) {
+        $carriers[$event->actorId] = true;
+    }
+
+    // Distance-aware build-up plus varied possession starts should involve most
+    // of the outfielders, not just the deep player and the striker.
+    expect(count($carriers))->toBeGreaterThanOrEqual(8);
+});
+
+it('starts attacks from different players across a match', function () {
+    $engine = new MatchEngine;
+    $result = $engine->simulate(Roster::build(template(60)), 7);
+
+    $openers = [];
+    $lastMinute = -1;
+    foreach ($result->events as $event) {
+        if ($event->minute !== $lastMinute) {
+            $openers[$event->actorId] = true;
+            $lastMinute = $event->minute;
+        }
+    }
+
+    expect(count($openers))->toBeGreaterThan(1);
+});
+
 it('detects a progressive pass only when the ball advances', function () {
     $forward = new MatchEvent(1, EventType::Pass, 1, 2, new Zone(1, 1), new Zone(3, 1), true, null, null);
     $sideways = new MatchEvent(1, EventType::Pass, 1, 2, new Zone(3, 1), new Zone(3, 0), true, null, null);
