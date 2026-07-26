@@ -20,7 +20,13 @@ const props = withDefaults(
 
 const PAD_X = 5; // keep markers inside the touchlines / behind the goals
 const PAD_Y = 10;
-const SEG_MS = 850; // base time per event at 1×; the clock runs continuously
+const SEG_MS = 850; // base time to move REF_SPAN of the pitch at 1×
+// Playback time is proportional to how far things actually move, so the ball and
+// players travel at a roughly constant speed instead of the whole event taking a
+// fixed time (which made long moves sprint and short ones drag).
+const REF_SPAN = 0.14; // a typical pass, in 0..1 pitch units, defines the base speed
+const MIN_FACTOR = 0.4; // a near-still ball still gets a brief, visible beat
+const MAX_FACTOR = 2.6; // the longest move is slowed to this, never a teleport
 
 const reduceMotion =
     typeof window !== 'undefined' &&
@@ -121,7 +127,9 @@ function ballPointAt(ph: number): {
         return { x: a.x, y: a.y, seg, t };
     }
 
-    const e = isShot ? t * t : type === 'dribble' ? t : 1 - (1 - t) * (1 - t);
+    // Linear in open play so the ball holds a constant speed through the segment
+    // (its duration already scales with distance); a shot keeps a little zip.
+    const e = isShot ? t * t : t;
 
     if (isShot) {
         return { x: a.x + (b.x - a.x) * e, y: a.y + (b.y - a.y) * e, seg, t };
@@ -182,7 +190,15 @@ const trail = computed(() => {
     );
 });
 
-const minute = computed(() => cur.value?.m ?? 0);
+// A smooth match clock in mm:ss, driven by the continuous playhead across the
+// 90 minutes so the seconds tick evenly rather than jumping frame to frame.
+const clock = computed(() => {
+    const total = count.value;
+    const frac = total > 0 ? Math.min(playhead.value, total) / total : 0;
+    const secs = Math.floor(frac * 90 * 60);
+
+    return `${Math.floor(secs / 60)}:${(secs % 60).toString().padStart(2, '0')}`;
+});
 
 const score = computed(() => {
     let h = 0;
@@ -345,6 +361,42 @@ const highlightSegs = computed(() => {
     return set;
 });
 
+// How far the busiest thing (the ball, or any player) travels in each segment, in
+// 0..1 pitch units. Playback stretches a segment's duration by this so speed stays
+// even and a big move becomes a glide rather than a one-beat sprint.
+const segSpans = computed<number[]>(() => {
+    const tl = props.timeline;
+    const pos = props.positions;
+    const spans: number[] = [];
+
+    for (let s = 0; s < tl.length; s++) {
+        const f = tl[s];
+        let span = Math.hypot(f.x2 - f.x1, f.y2 - f.y1);
+
+        const p0 = pos[s];
+        const p1 = pos[Math.min(s + 1, pos.length - 1)];
+
+        if (p0 && p1) {
+            for (let i = 0; i < p0.p.length; i++) {
+                const a = p0.p[i];
+                const b = p1.p[i];
+
+                if (a && b) {
+                    const d = Math.hypot(b[0] - a[0], b[1] - a[1]);
+
+                    if (d > span) {
+                        span = d;
+                    }
+                }
+            }
+        }
+
+        spans.push(span);
+    }
+
+    return spans;
+});
+
 function loop(ts: number) {
     if (!playing.value) {
         return;
@@ -359,36 +411,32 @@ function loop(ts: number) {
     const dt = Math.min(ts - lastTs, 64);
     lastTs = ts;
 
-    // A settled ball (a tackle, a clearance, a corner) is passed through quickly
-    // so the replay lingers on movement, not on dead moments.
-    const fp = framePts.value;
     const seg = Math.min(
         Math.max(0, Math.floor(playhead.value)),
-        Math.max(0, fp.length - 1),
+        Math.max(0, count.value - 1),
     );
-    const a = fp[seg]?.a;
-    const b = fp[seg]?.b;
     const frame = props.timeline[seg];
-    const still = a && b && Math.hypot(b.x - a.x, b.y - a.y) < 0.5;
     const isShot = frame?.t === 'shot' || frame?.t === 'header';
 
-    let pace: number;
+    // The segment's duration is scaled by how far things move, so the ball and
+    // players glide at a roughly constant speed instead of surging on long moves
+    // and dragging on short ones. Shots stay quick and goals linger regardless.
+    let factor: number;
 
     if (highlights.value && !highlightSegs.value.has(seg)) {
-        pace = 9; // blitz through the routine stuff between chances
+        factor = 0.11; // blitz through the routine stuff between chances
     } else if (frame?.goal) {
-        pace = 0.6; // linger on the goal and the celebration
+        factor = 1.4; // savour the goal and its celebration
     } else if (isShot) {
-        pace = 0.7; // savour the strike
-    } else if (still) {
-        pace = 1.25; // gently skim a settled ball
+        factor = 0.7; // a strike is quick whatever distance it covers
     } else {
-        pace = 1;
+        const span = segSpans.value[seg] ?? REF_SPAN;
+        factor = Math.max(MIN_FACTOR, Math.min(MAX_FACTOR, span / REF_SPAN));
     }
 
     playhead.value = Math.min(
         count.value,
-        playhead.value + (dt / SEG_MS) * speed.value * pace,
+        playhead.value + (dt / (SEG_MS * factor)) * speed.value,
     );
 
     if (playhead.value >= count.value) {
@@ -541,7 +589,7 @@ onBeforeUnmount(pause);
                         class="flex items-center justify-center rounded-full font-semibold tabular-nums shadow-sm"
                         :class="[
                             p.gk
-                                ? 'size-3 text-[6px]'
+                                ? 'size-3.5 text-[7px] ring-1 ring-black/20'
                                 : p.ball
                                   ? 'size-5 text-[9px] ring-2 ring-black/50'
                                   : 'size-4 text-[7px] ring-1 ring-black/30',
@@ -553,7 +601,7 @@ onBeforeUnmount(pause);
                                   ? 'bg-rose-300 text-rose-950'
                                   : 'bg-amber-400 text-amber-950',
                         ]"
-                        >{{ p.gk ? '' : p.slot }}</span
+                        >{{ p.gk ? 1 : p.slot }}</span
                     >
                     <span
                         v-if="(p.ball || p.target) && p.name"
@@ -629,7 +677,7 @@ onBeforeUnmount(pause);
             <div
                 class="absolute top-2 left-2 rounded-md bg-black/45 px-2 py-0.5 font-mono text-xs text-white tabular-nums"
             >
-                {{ minute }}'
+                {{ clock }}
             </div>
             <!-- Caption -->
             <div
