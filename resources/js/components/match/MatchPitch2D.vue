@@ -49,39 +49,32 @@ const cur = computed<TimelineFrame | null>(
 );
 
 // A small, stable per-point offset so the ball doesn't snap between a handful of
-// zone centres. Deterministic, so the replay stays reproducible.
-const jitter = (i: number, axis: number) => {
-    const h = Math.sin(i * 12.9898 + axis * 78.233) * 43758.5453;
+// zone centres. Keyed on the coordinate itself (not the frame index) so the same
+// spot always gets the same nudge: a pass's destination and the next carry's
+// origin are the same point, so the ball flows through them without a hitch.
+const jitter = (nx: number, ny: number, axis: number) => {
+    const h = Math.sin((nx * 127.1 + ny * 311.7 + axis * 74.7) * 43758.5453);
 
     return (h - Math.floor(h) - 0.5) * 2.4; // ±1.2% of the pitch
 };
 const clampPct = (v: number, pad: number) =>
     Math.max(pad, Math.min(100 - pad, v));
 
-// The ball's path as a continuous chain of points: the very first origin, then
-// each event's destination, each nudged off its zone centre. The ball flows
-// through them without ever stopping.
-const keypoints = computed<{ x: number; y: number }[]>(() => {
-    const tl = props.timeline;
-
-    if (tl.length === 0) {
-        return [];
-    }
-
-    const raw: [number, number][] = [[tl[0].x1, tl[0].y1]];
-
-    for (const f of tl) {
-        raw.push([f.x2, f.y2]);
-    }
-
-    return raw.map(([nx, ny], i) => ({
-        x: clampPct(px(nx) + jitter(i, 1), 2),
-        y: clampPct(py(ny) + jitter(i, 2), 3),
-    }));
+const pointAt = (nx: number, ny: number) => ({
+    x: clampPct(px(nx) + jitter(nx, ny, 0), 2),
+    y: clampPct(py(ny) + jitter(nx, ny, 1), 3),
 });
 
-// A Catmull-Rom pass so the ball weaves smoothly through the keypoints rather
-// than kinking at each one.
+// Every frame's ball path as its own origin → destination pair, in screen space.
+// This is the same origin PlayerMotion sits the carrier on and the same
+// destination it sends the receiver to, so the ball is always on a player and
+// only ever cuts when possession genuinely restarts somewhere else.
+const framePts = computed<{ a: { x: number; y: number }; b: { x: number; y: number } }[]>(
+    () => props.timeline.map((f) => ({ a: pointAt(f.x1, f.y1), b: pointAt(f.x2, f.y2) })),
+);
+
+// A Catmull-Rom pass so the ball weaves smoothly through consecutive touches
+// rather than kinking at each one.
 const catmull = (p0: number, p1: number, p2: number, p3: number, t: number) => {
     const t2 = t * t;
     const t3 = t2 * t;
@@ -103,21 +96,24 @@ function ballPointAt(ph: number): {
     seg: number;
     t: number;
 } {
-    const kp = keypoints.value;
+    const fp = framePts.value;
 
-    if (kp.length < 2) {
+    if (fp.length === 0) {
         return { x: 50, y: 50, seg: 0, t: 0 };
     }
 
-    const seg = Math.min(Math.floor(ph), kp.length - 2);
+    const seg = Math.min(Math.max(0, Math.floor(ph)), fp.length - 1);
     const t = Math.min(1, Math.max(0, ph - seg));
-    const a = kp[seg];
-    const b = kp[seg + 1];
-    const type = props.timeline[seg]?.t ?? 'pass';
+    const a = fp[seg].a;
+    const b = fp[seg].b;
+    const frame = props.timeline[seg];
+    const type = frame?.t ?? 'pass';
     const isShot = type === 'shot' || type === 'header';
 
+    // A settled ball (a tackle, clearance, foul, corner, kick-off tap that goes
+    // nowhere) just sits where it is.
     if (Math.hypot(b.x - a.x, b.y - a.y) < 0.5) {
-        return { x: b.x, y: b.y, seg, t };
+        return { x: a.x, y: a.y, seg, t };
     }
 
     const e = isShot ? t * t : type === 'dribble' ? t : 1 - (1 - t) * (1 - t);
@@ -126,8 +122,12 @@ function ballPointAt(ph: number): {
         return { x: a.x + (b.x - a.x) * e, y: a.y + (b.y - a.y) * e, seg, t };
     }
 
-    const p0 = kp[seg - 1] ?? a;
-    const p3 = kp[seg + 2] ?? b;
+    // Curve control points stay inside this possession: `start` marks its first
+    // frame (nothing before), and a following frame that itself starts a new
+    // possession means this touch is the last (nothing after).
+    const nextFrame = props.timeline[seg + 1];
+    const p0 = frame && !frame.start ? (fp[seg - 1]?.a ?? a) : a;
+    const p3 = nextFrame && !nextFrame.start ? (fp[seg + 1]?.b ?? b) : b;
 
     return {
         x: catmull(p0.x, a.x, b.x, p3.x, e),
@@ -163,13 +163,19 @@ const ball = computed(() => {
 });
 
 // A short fading trail behind the ball to sell its speed and direction.
-const trail = computed(() =>
-    reduceMotion
-        ? []
-        : [0.05, 0.11, 0.18].map((d) =>
-              ballPointAt(Math.max(0, playhead.value - d)),
-          ),
-);
+const trail = computed(() => {
+    if (reduceMotion) {
+        return [];
+    }
+
+    // Keep the trail within the current frame so it traces the ball's path, not
+    // a line back to where the previous possession happened to end.
+    const seg = Math.floor(playhead.value);
+
+    return [0.05, 0.11, 0.18].map((d) =>
+        ballPointAt(Math.max(seg, playhead.value - d)),
+    );
+});
 
 const from = computed(() =>
     cur.value ? { x: px(cur.value.x1), y: py(cur.value.y1) } : { x: 50, y: 50 },
@@ -288,14 +294,14 @@ const players = computed<LivePlayer[]>(() => {
     });
 
     // The keeper dives across to meet a shot he saves.
-    const kp = keypoints.value;
+    const fp = framePts.value;
 
-    if (frame?.t === 'save' && kp[seg]) {
+    if (frame?.t === 'save' && fp[seg]) {
         const gk = out.find((p) => p.gk && p.s === frame.s);
 
         if (gk) {
-            gk.x += (kp[seg].x - gk.x) * 0.6;
-            gk.y += (kp[seg].y - gk.y) * 0.6;
+            gk.x += (fp[seg].b.x - gk.x) * 0.6;
+            gk.y += (fp[seg].b.y - gk.y) * 0.6;
         }
     }
 
@@ -362,13 +368,13 @@ function loop(ts: number) {
 
     // A settled ball (a tackle, a clearance, a corner) is passed through quickly
     // so the replay lingers on movement, not on dead moments.
-    const kp = keypoints.value;
+    const fp = framePts.value;
     const seg = Math.min(
-        Math.floor(playhead.value),
-        Math.max(0, kp.length - 2),
+        Math.max(0, Math.floor(playhead.value)),
+        Math.max(0, fp.length - 1),
     );
-    const a = kp[seg];
-    const b = kp[seg + 1];
+    const a = fp[seg]?.a;
+    const b = fp[seg]?.b;
     const frame = props.timeline[seg];
     const still = a && b && Math.hypot(b.x - a.x, b.y - a.y) < 0.5;
     const isShot = frame?.t === 'shot' || frame?.t === 'header';
