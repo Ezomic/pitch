@@ -20,7 +20,7 @@ class MatchController extends Controller
 
         return Inertia::render('Match', [
             'seed' => $seed,
-            'report' => $simulateMatch->handle($squad, $seed)->toArray(),
+            'report' => $simulateMatch->handle($squad, $seed, positional: true)->toArray(),
         ]);
     }
 

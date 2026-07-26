@@ -36,6 +36,28 @@ export interface PlayerPositions {
     p: [number, number][]; // [x, y] per player, lineups order, 0..1
 }
 
+export interface PitchStreamPlayer {
+    s: 0 | 1;
+    slot: number;
+    name: string | null;
+    gk: boolean;
+}
+
+export interface PitchStreamFrame {
+    m: number; // minute
+    b: [number, number]; // ball position, 0..1
+    c: number; // carrier index in players[], -1 if none
+    s: 0 | 1; // possessing side
+    p: [number, number][]; // [x, y] per player, players[] order, 0..1
+    cap: string; // caption for this frame
+}
+
+export interface PitchStream {
+    players: PitchStreamPlayer[];
+    frames: PitchStreamFrame[];
+    goals: { m: number; s: 0 | 1 }[];
+}
+
 export interface MatchReport {
     homeGoals: number;
     awayGoals: number;
@@ -46,6 +68,7 @@ export interface MatchReport {
     timeline: TimelineFrame[];
     lineups: LineupPlayer[];
     positions: PlayerPositions[];
+    stream?: PitchStream;
 }
 
 export interface LiveMoment {
