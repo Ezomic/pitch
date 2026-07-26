@@ -29,6 +29,11 @@ export interface LineupPlayer {
     gk: boolean;
 }
 
+export interface PlayerPositions {
+    b: number; // index (in lineups order) of the ball carrier, -1 if none
+    p: [number, number][]; // [x, y] per player, lineups order, 0..1
+}
+
 export interface MatchReport {
     homeGoals: number;
     awayGoals: number;
@@ -38,6 +43,7 @@ export interface MatchReport {
     moments: MatchMoment[];
     timeline: TimelineFrame[];
     lineups: LineupPlayer[];
+    positions: PlayerPositions[];
 }
 
 export interface LiveMoment {
