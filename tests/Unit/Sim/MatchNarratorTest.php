@@ -10,7 +10,7 @@ use App\Sim\Squad\MatchNarrator;
 function narratedReport(int $seed, int $opponentGoals = 2)
 {
     $result = (new MatchEngine)->simulate(
-        Roster::build(new Attributes(16, 16, 16, 16, 16, 16)),
+        Roster::build(new Attributes(70, 70, 70, 70, 70, 70)),
         $seed,
     );
 

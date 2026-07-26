@@ -60,7 +60,13 @@ final class MatchTimeline
                 continue;
             }
 
-            $isShot = $event->type === EventType::Shot;
+            if (in_array($event->type, [EventType::Foul, EventType::Corner], true)) {
+                $frames[] = $this->flavourFrame($event, $side, $mirror, $names);
+
+                continue;
+            }
+
+            $isShot = $event->type->isShot();
 
             [$x1, $y1] = $this->point($event->from->x / Zone::MAX_X, $event->from->y / Zone::MAX_Y, $mirror);
             [$x2, $y2] = $this->destination($event, $isShot, $mirror);
@@ -111,6 +117,33 @@ final class MatchTimeline
             'goal' => false,
             'start' => false,
             'actor' => null,
+            'target' => null,
+        ];
+    }
+
+    /**
+     * A dead ball the attack won (a foul or corner): a stationary marker on the
+     * attacking side, named where we have the player.
+     *
+     * @param  array<int, string>  $names
+     * @return array<string, mixed>
+     */
+    private function flavourFrame(MatchEvent $event, int $side, bool $mirror, array $names): array
+    {
+        [$x, $y] = $this->point($event->from->x / Zone::MAX_X, $event->from->y / Zone::MAX_Y, $mirror);
+
+        return [
+            'm' => $event->minute,
+            's' => $side,
+            'x1' => $x,
+            'y1' => $y,
+            'x2' => $x,
+            'y2' => $y,
+            't' => $event->type->value,
+            'ok' => true,
+            'goal' => false,
+            'start' => false,
+            'actor' => $this->name($event->actorId, $side, $names),
             'target' => null,
         ];
     }

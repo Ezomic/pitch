@@ -66,13 +66,31 @@ final class MatchNarrator
             return $this->defensiveMoment($event);
         }
 
+        if ($event->type === EventType::Foul) {
+            return new MatchMoment($event->minute, 'setpiece', 'A foul concedes a free-kick in a dangerous area.');
+        }
+
+        if ($event->type === EventType::Corner) {
+            return new MatchMoment($event->minute, 'setpiece', 'The pressure earns a corner.');
+        }
+
         $actor = $names[$event->actorId] ?? "Player {$event->actorId}";
         $target = $event->targetId !== null ? ($names[$event->targetId] ?? "Player {$event->targetId}") : null;
+
+        if ($event->type === EventType::Header) {
+            return $event->success
+                ? new MatchMoment($event->minute, 'goal', "GOAL! {$actor} heads it home.")
+                : new MatchMoment($event->minute, 'shot', "{$actor} gets on the end of the cross but cannot score.");
+        }
 
         if ($event->type === EventType::Shot) {
             return $event->success
                 ? new MatchMoment($event->minute, 'goal', "GOAL! {$actor} finds the net.")
                 : new MatchMoment($event->minute, 'shot', "{$actor} shoots, but it is saved.");
+        }
+
+        if ($event->type === EventType::Cross && $event->success) {
+            return new MatchMoment($event->minute, 'chance', "{$actor} whips a cross towards {$target}.");
         }
 
         if ($event->isProgressivePass() && $event->to !== null && $event->to->x >= 4) {
@@ -100,9 +118,13 @@ final class MatchNarrator
         $text = match ($event->type) {
             EventType::Tackle => 'A crunching tackle wins it back.',
             EventType::Clearance => 'The defence hacks the danger clear.',
+            EventType::Save => 'The keeper gets down to save it.',
+            EventType::Block => 'A defender throws himself in front of the shot.',
             default => 'The pass is cut out.',
         };
 
-        return new MatchMoment($event->minute, 'turnover', $text);
+        $kind = in_array($event->type, [EventType::Save, EventType::Block], true) ? 'save' : 'turnover';
+
+        return new MatchMoment($event->minute, $kind, $text);
     }
 }

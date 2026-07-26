@@ -92,20 +92,28 @@ const score = computed(() => {
     return { h, a };
 });
 
-const DEFENSIVE: Record<string, string> = {
+const FIXED: Record<string, string> = {
     interception: 'Intercepted',
     tackle: 'Tackled — ball won',
     clearance: 'Cleared',
+    save: 'Saved!',
+    block: 'Blocked!',
+    foul: 'Free-kick won',
+    corner: 'Corner',
 };
 
 const caption = computed(() => {
     const f = cur.value;
     if (!f) return '';
-    if (f.t in DEFENSIVE) return DEFENSIVE[f.t];
+    if (f.t in FIXED) return FIXED[f.t];
     const actor = f.actor ?? 'The ball';
     if (f.goal) return `GOAL — ${actor}`;
+    if (f.t === 'header')
+        return f.ok ? `${actor} heads it in` : `${actor} heads wide`;
     if (f.t === 'shot')
         return f.ok ? `${actor} shoots` : `${actor} shoots, saved`;
+    if (f.t === 'cross')
+        return f.target ? `${actor} crosses to ${f.target}` : `${actor} crosses`;
     if (f.t === 'dribble')
         return f.ok ? `${actor} drives forward` : `${actor} is dispossessed`;
     // pass
@@ -120,9 +128,13 @@ const sideName = computed(() =>
     cur.value?.s === 1 ? props.awayName : props.homeName,
 );
 
-// Show the receiver marker only for a completed pass to a named team-mate.
+// Show the receiver marker only for a moving ball that is not an attempt on goal.
 const showTarget = computed(
-    () => !!cur.value && cur.value.t !== 'shot' && isMoving.value,
+    () =>
+        !!cur.value &&
+        cur.value.t !== 'shot' &&
+        cur.value.t !== 'header' &&
+        isMoving.value,
 );
 
 function clear() {
@@ -322,7 +334,7 @@ onBeforeUnmount(() => {
                     :class="
                         cur.goal
                             ? 'size-3.5 ring-4 ring-white/50'
-                            : cur.t === 'shot'
+                            : cur.t === 'shot' || cur.t === 'header'
                               ? 'size-3'
                               : 'size-2'
                     "

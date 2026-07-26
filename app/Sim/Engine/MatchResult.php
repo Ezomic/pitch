@@ -46,7 +46,7 @@ final readonly class MatchResult
                 }
             }
 
-            if ($event->type === EventType::Shot) {
+            if ($event->type->isShot()) {
                 $shots++;
                 if ($event->success) {
                     $goals++;

@@ -12,5 +12,7 @@ final class MatchState
         public Zone $ballZone,
         public int $carrierId,
         public int $minute = 0,
+        // Set the tick after a cross connects, so the next attempt is a header.
+        public bool $headerNext = false,
     ) {}
 }
