@@ -62,7 +62,7 @@ final class MatchEngine
                     $state->carrierId,
                     $choice->option->targetPlayerId,
                     $state->ballZone,
-                    $choice->option->type === EventType::Shot ? null : $choice->option->resultZone,
+                    $choice->option->type->isShot() ? null : $choice->option->resultZone,
                     $outcome->success,
                     $choice->decision,
                     $outcome->roll,
@@ -70,17 +70,11 @@ final class MatchEngine
 
                 if ($outcome->possessionEnds) {
                     if ($outcome->turnover !== null) {
-                        $events[] = new MatchEvent(
-                            $state->minute,
-                            $outcome->turnover,
-                            self::DEFENDER_ID,
-                            null,
-                            $state->ballZone,
-                            null,
-                            true,
-                            null,
-                            null,
-                        );
+                        $events[] = $this->followUp($outcome->turnover, self::DEFENDER_ID, $state);
+                    }
+
+                    if ($outcome->deadBall !== null) {
+                        $events[] = $this->followUp($outcome->deadBall, $state->carrierId, $state);
                     }
 
                     break;
@@ -93,10 +87,18 @@ final class MatchEngine
                 if ($outcome->newCarrierId !== null) {
                     $state->carrierId = $outcome->newCarrierId;
                 }
+
+                $state->headerNext = $outcome->setsHeader;
             }
         }
 
         return new MatchResult($events);
+    }
+
+    /** A follow-up event (a defensive stop or a won dead ball) at the ball's spot. */
+    private function followUp(EventType $type, int $actorId, MatchState $state): MatchEvent
+    {
+        return new MatchEvent($state->minute, $type, $actorId, null, $state->ballZone, null, true, null, null);
     }
 
     /**

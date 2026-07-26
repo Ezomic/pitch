@@ -57,11 +57,47 @@ final class OptionBuilder
             );
         }
 
+        // A cross from a wide, advanced position swings the ball into the box for
+        // a striker to attack, an alternative to working it through the middle.
+        if ($state->ballZone->x >= 4 && $state->ballZone->y !== Zone::CENTRE_Y) {
+            $box = new Zone(Zone::MAX_X, Zone::CENTRE_Y);
+            $target = $this->targetInBox($players, $state->carrierId);
+            if ($target !== null) {
+                $options[] = new Option(EventType::Cross, $box, $target, $box->threat());
+            }
+        }
+
         if ($state->ballZone->inShootingRange()) {
-            $options[] = new Option(EventType::Shot, $state->ballZone, null, $state->ballZone->threat());
+            $type = $state->headerNext ? EventType::Header : EventType::Shot;
+            $options[] = new Option($type, $state->ballZone, null, $state->ballZone->threat());
         }
 
         return $options;
+    }
+
+    /**
+     * The most central, advanced teammate to aim a cross at, if any.
+     *
+     * @param  array<int, Player>  $players
+     */
+    private function targetInBox(array $players, int $carrierId): ?int
+    {
+        $best = null;
+        $bestScore = null;
+
+        foreach ($players as $player) {
+            if ($player->id === $carrierId) {
+                continue;
+            }
+
+            $score = [$player->zone->x, -abs($player->zone->y - Zone::CENTRE_Y)];
+            if ($bestScore === null || $score > $bestScore) {
+                $bestScore = $score;
+                $best = $player->id;
+            }
+        }
+
+        return $best;
     }
 
     /**

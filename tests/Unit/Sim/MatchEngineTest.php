@@ -93,6 +93,21 @@ it('credits the defence with ball-winning events when possession is lost', funct
     }
 });
 
+it('produces wide play and dead-ball events across a season of matches', function () {
+    $engine = new MatchEngine;
+    $seen = [];
+
+    foreach (range(1, 20) as $seed) {
+        foreach ($engine->simulate(Roster::build(template(72)), $seed)->events as $event) {
+            $seen[$event->type->value] = true;
+        }
+    }
+
+    foreach (['cross', 'header', 'save', 'block', 'foul', 'corner'] as $type) {
+        expect($seen)->toHaveKey($type);
+    }
+});
+
 it('detects a progressive pass only when the ball advances', function () {
     $forward = new MatchEvent(1, EventType::Pass, 1, 2, new Zone(1, 1), new Zone(3, 1), true, null, null);
     $sideways = new MatchEvent(1, EventType::Pass, 1, 2, new Zone(3, 1), new Zone(3, 0), true, null, null);

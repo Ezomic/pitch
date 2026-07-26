@@ -18,7 +18,11 @@ final readonly class ResolveOutcome
         public ?int $newCarrierId,
         public bool $chanceCreated,
         public bool $goal,
-        // The defensive action that won the ball, when possession was lost.
+        // The defending side's stop that ended the possession (tackle, save, ...).
         public ?EventType $turnover = null,
+        // A dead ball the attack won at the same moment (a foul or a corner).
+        public ?EventType $deadBall = null,
+        // Set by a connecting cross so the next attempt is resolved as a header.
+        public bool $setsHeader = false,
     ) {}
 }
