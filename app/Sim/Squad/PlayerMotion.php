@@ -1,0 +1,163 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Sim\Squad;
+
+/**
+ * A deterministic motion layer for the 2D replay, DERIVED from the ball-position
+ * timeline rather than simulated. The zone engine only ever tracks the ball, so
+ * this nudges each of the 22 players around their formation anchor to suggest a
+ * living shape: the team in possession pushes up and shifts ball-side, the team
+ * out of possession drops toward its own goal and the nearest defender presses,
+ * and the player closest to the ball carries it. Same timeline in, same motion
+ * out, so the replay stays reproducible.
+ *
+ * Positions are emitted per timeline frame in a compact shape: `b` is the index
+ * of the ball carrier and `p` holds an [x, y] pair for each player, both in the
+ * same order as the lineups, so the frontend pairs identity (lineups) with
+ * movement (positions) by index without shipping the identity fields again.
+ */
+final class PlayerMotion
+{
+    private const float FOLLOW_ATTACK = 0.34;
+
+    private const float FOLLOW_DEFEND = 0.24;
+
+    private const float BALL_SIDE = 0.22;
+
+    private const float PRESS = 0.6;
+
+    private const float MIN = 0.03;
+
+    private const float MAX = 0.97;
+
+    /**
+     * @param  list<array<string, mixed>>  $timeline  ball-position frames
+     * @param  list<array{s: int, slot: int, name: ?string, x: float, y: float, gk: bool}>  $lineups
+     * @return list<array{b: int, p: list<array{float, float}>}>
+     */
+    public function build(array $timeline, array $lineups): array
+    {
+        $frames = [];
+
+        foreach ($timeline as $frame) {
+            $frames[] = $this->positions($frame, $lineups);
+        }
+
+        return $frames;
+    }
+
+    /**
+     * @param  array<string, mixed>  $frame
+     * @param  list<array{s: int, slot: int, name: ?string, x: float, y: float, gk: bool}>  $lineups
+     * @return array{b: int, p: list<array{float, float}>}
+     */
+    private function positions(array $frame, array $lineups): array
+    {
+        $possessing = (int) $frame['s'];
+        $originX = (float) $frame['x1'];
+        $originY = (float) $frame['y1'];
+        $ballX = (float) $frame['x2'];
+        $ballY = (float) $frame['y2'];
+        $isShot = in_array($frame['t'], ['shot', 'header'], true);
+        $moving = $originX !== $ballX || $originY !== $ballY;
+
+        $players = [];
+        foreach ($lineups as $line) {
+            $players[] = $this->drift($line, $possessing, $ballX, $ballY);
+        }
+
+        // The nearest team-mate to where the ball started carries it.
+        $carrier = $this->nearest($players, $possessing, $originX, $originY, skip: -1);
+        if (isset($players[$carrier])) {
+            $players[$carrier] = [...$players[$carrier], 'x' => $originX, 'y' => $originY, 'hasBall' => true];
+        }
+
+        // On a pass or carry, the receiver runs onto the destination.
+        if ($moving && ! $isShot) {
+            $receiver = $this->nearest($players, $possessing, $ballX, $ballY, skip: $carrier);
+            if (isset($players[$receiver])) {
+                $players[$receiver] = [...$players[$receiver], 'x' => $ballX, 'y' => $ballY];
+            }
+        }
+
+        // The nearest defender closes the ball down.
+        $presser = $this->nearest($players, 1 - $possessing, $ballX, $ballY, skip: -1);
+        if (isset($players[$presser])) {
+            $defender = $players[$presser];
+            $players[$presser] = [
+                ...$defender,
+                'x' => $this->clamp($defender['x'] + self::PRESS * ($ballX - $defender['x'])),
+                'y' => $this->clamp($defender['y'] + self::PRESS * ($ballY - $defender['y'])),
+            ];
+        }
+
+        $p = [];
+        foreach ($players as $player) {
+            $p[] = [round($player['x'], 3), round($player['y'], 3)];
+        }
+
+        return ['b' => $carrier, 'p' => $p];
+    }
+
+    /**
+     * @param  array{s: int, slot: int, name: ?string, x: float, y: float, gk: bool}  $line
+     * @return array{s: int, slot: int, x: float, y: float, gk: bool, hasBall: bool}
+     */
+    private function drift(array $line, int $possessing, float $ballX, float $ballY): array
+    {
+        if ($line['gk']) {
+            // The keeper holds his line and only shuffles across with the ball.
+            return [
+                's' => $line['s'],
+                'slot' => $line['slot'],
+                'x' => $line['x'],
+                'y' => round($this->clamp(0.5 + 0.18 * ($ballY - 0.5)), 3),
+                'gk' => true,
+                'hasBall' => false,
+            ];
+        }
+
+        $follow = $line['s'] === $possessing ? self::FOLLOW_ATTACK : self::FOLLOW_DEFEND;
+
+        return [
+            's' => $line['s'],
+            'slot' => $line['slot'],
+            'x' => round($this->clamp($line['x'] + $follow * ($ballX - $line['x'])), 3),
+            'y' => round($this->clamp($line['y'] + self::BALL_SIDE * ($ballY - $line['y'])), 3),
+            'gk' => false,
+            'hasBall' => false,
+        ];
+    }
+
+    /**
+     * The index of the outfielder on the given side nearest to a point.
+     *
+     * @param  list<array{s: int, slot: int, x: float, y: float, gk: bool, hasBall: bool}>  $players
+     */
+    private function nearest(array $players, int $side, float $x, float $y, int $skip): int
+    {
+        $best = -1;
+        $bestDist = INF;
+
+        foreach ($players as $i => $player) {
+            if ($i === $skip || $player['s'] !== $side || $player['gk']) {
+                continue;
+            }
+
+            $dist = ($player['x'] - $x) ** 2 + ($player['y'] - $y) ** 2;
+            if ($dist < $bestDist) {
+                $bestDist = $dist;
+                $best = $i;
+            }
+        }
+
+        return $best;
+    }
+
+    private function clamp(float $value): float
+    {
+        return max(self::MIN, min(self::MAX, $value));
+    }
+}
