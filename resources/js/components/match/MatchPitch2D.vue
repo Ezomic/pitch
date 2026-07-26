@@ -47,8 +47,19 @@ const cur = computed<TimelineFrame | null>(
     () => props.timeline[index.value] ?? null,
 );
 
+// A small, stable per-point offset so the ball doesn't snap between a handful of
+// zone centres. Deterministic, so the replay stays reproducible.
+const jitter = (i: number, axis: number) => {
+    const h = Math.sin(i * 12.9898 + axis * 78.233) * 43758.5453;
+
+    return (h - Math.floor(h) - 0.5) * 5; // ±2.5% of the pitch
+};
+const clampPct = (v: number, pad: number) =>
+    Math.max(pad, Math.min(100 - pad, v));
+
 // The ball's path as a continuous chain of points: the very first origin, then
-// each event's destination. The ball flows through them without ever stopping.
+// each event's destination, each nudged off its zone centre. The ball flows
+// through them without ever stopping.
 const keypoints = computed<{ x: number; y: number }[]>(() => {
     const tl = props.timeline;
 
@@ -56,16 +67,34 @@ const keypoints = computed<{ x: number; y: number }[]>(() => {
         return [];
     }
 
-    const kp = [{ x: px(tl[0].x1), y: py(tl[0].y1) }];
+    const raw: [number, number][] = [[tl[0].x1, tl[0].y1]];
 
     for (const f of tl) {
-        kp.push({ x: px(f.x2), y: py(f.y2) });
+        raw.push([f.x2, f.y2]);
     }
 
-    return kp;
+    return raw.map(([nx, ny], i) => ({
+        x: clampPct(px(nx) + jitter(i, 1), 2),
+        y: clampPct(py(ny) + jitter(i, 2), 3),
+    }));
 });
 
-// The ball, curved along the current segment and lofted by the event type.
+// A Catmull-Rom pass so the ball weaves smoothly through the keypoints rather
+// than kinking at each one.
+const catmull = (p0: number, p1: number, p2: number, p3: number, t: number) => {
+    const t2 = t * t;
+    const t3 = t2 * t;
+
+    return (
+        0.5 *
+        (2 * p1 +
+            (-p0 + p2) * t +
+            (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 +
+            (-p0 + 3 * p1 - 3 * p2 + p3) * t3)
+    );
+};
+
+// The ball: a spline in open play, a straight fizz for a shot, lofted by type.
 const ball = computed(() => {
     const kp = keypoints.value;
 
@@ -78,29 +107,32 @@ const ball = computed(() => {
     const a = kp[seg];
     const b = kp[seg + 1];
     const type = props.timeline[seg]?.t ?? 'pass';
-    const dx = b.x - a.x;
-    const dy = b.y - a.y;
-    const dist = Math.hypot(dx, dy);
 
-    if (reduceMotion || dist < 0.5) {
+    if (reduceMotion || Math.hypot(b.x - a.x, b.y - a.y) < 0.5) {
         return { x: b.x, y: b.y, scale: 1 };
     }
 
     const isShot = type === 'shot' || type === 'header';
     const isCross = type === 'cross';
-    // A control point bows the path (crosses hardest, shots straight); the side
-    // alternates so play isn't lopsided.
-    const bow = isShot ? 0 : dist * (isCross ? 0.28 : 0.12);
-    const side = seg % 2 === 0 ? 1 : -1;
-    const cx = (a.x + b.x) / 2 + (-dy / dist) * bow * side;
-    const cy = (a.y + b.y) / 2 + (dx / dist) * bow * side;
     const e = isShot ? t * t : type === 'dribble' ? t : 1 - (1 - t) * (1 - t);
-    const m = 1 - e;
     const loft = isShot ? 0 : isCross ? 0.6 : 0.25;
 
+    let x: number;
+    let y: number;
+
+    if (isShot) {
+        x = a.x + (b.x - a.x) * e;
+        y = a.y + (b.y - a.y) * e;
+    } else {
+        const p0 = kp[seg - 1] ?? a;
+        const p3 = kp[seg + 2] ?? b;
+        x = catmull(p0.x, a.x, b.x, p3.x, e);
+        y = catmull(p0.y, a.y, b.y, p3.y, e);
+    }
+
     return {
-        x: m * m * a.x + 2 * m * e * cx + e * e * b.x,
-        y: m * m * a.y + 2 * m * e * cy + e * e * b.y,
+        x,
+        y,
         scale: 1 + (isShot ? 0.4 * e : loft * Math.sin(Math.PI * e)),
     };
 });
@@ -176,7 +208,7 @@ const players = computed<LivePlayer[]>(() => {
     const b = pos[Math.min(seg + 1, nMax)] ?? a;
     const carrier = a?.b ?? -1;
 
-    return lu.map((line, i) => {
+    const out = lu.map((line, i) => {
         const pa = a?.p[i];
         const pb = b?.p[i] ?? pa;
 
@@ -191,6 +223,26 @@ const players = computed<LivePlayer[]>(() => {
             ball: carrier === i,
         };
     });
+
+    // Pin the two players involved in this event onto the ball's path, so the
+    // ball leaves the real carrier and arrives at the real receiver.
+    const kp = keypoints.value;
+    const frame = props.timeline[seg];
+    const isShot = frame && (frame.t === 'shot' || frame.t === 'header');
+
+    if (out[carrier] && kp[seg]) {
+        out[carrier].x = kp[seg].x;
+        out[carrier].y = kp[seg].y;
+    }
+
+    const receiver = b?.b ?? -1;
+
+    if (!isShot && out[receiver] && kp[seg + 1]) {
+        out[receiver].x = kp[seg + 1].x;
+        out[receiver].y = kp[seg + 1].y;
+    }
+
+    return out;
 });
 
 // A gentle broadcast-camera drift toward the ball: the pitch is scaled up a

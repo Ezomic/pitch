@@ -120,15 +120,28 @@ final class PlayerMotion
         }
 
         $follow = $line['s'] === $possessing ? self::FOLLOW_ATTACK : self::FOLLOW_DEFEND;
+        // A stable per-player nudge off the formation anchor so the lines don't
+        // sit on a perfect lattice. Constant per player, so it staggers the shape
+        // without adding any frame-to-frame jitter.
+        $ax = $line['x'] + $this->offset($line['slot'], $line['s'], 0);
+        $ay = $line['y'] + $this->offset($line['slot'], $line['s'], 1);
 
         return [
             's' => $line['s'],
             'slot' => $line['slot'],
-            'x' => round($this->clamp($line['x'] + $follow * ($ballX - $line['x'])), 3),
-            'y' => round($this->clamp($line['y'] + self::BALL_SIDE * ($ballY - $line['y'])), 3),
+            'x' => round($this->clamp($ax + $follow * ($ballX - $ax)), 3),
+            'y' => round($this->clamp($ay + self::BALL_SIDE * ($ballY - $ay)), 3),
             'gk' => false,
             'hasBall' => false,
         ];
+    }
+
+    /** A deterministic sub-zone offset (±0.03) for a player, stable across the match. */
+    private function offset(int $slot, int $side, int $axis): float
+    {
+        $h = ($slot * 73856093) ^ ($side * 19349663) ^ ($axis * 83492791);
+
+        return ((($h % 1000) + 1000) % 1000 / 1000 - 0.5) * 0.06;
     }
 
     /**
