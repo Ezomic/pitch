@@ -182,18 +182,6 @@ const trail = computed(() => {
     );
 });
 
-const from = computed(() =>
-    cur.value ? { x: px(cur.value.x1), y: py(cur.value.y1) } : { x: 50, y: 50 },
-);
-const to = computed(() =>
-    cur.value ? { x: px(cur.value.x2), y: py(cur.value.y2) } : { x: 50, y: 50 },
-);
-const isMoving = computed(
-    () =>
-        !!cur.value &&
-        (cur.value.x1 !== cur.value.x2 || cur.value.y1 !== cur.value.y2),
-);
-
 const minute = computed(() => cur.value?.m ?? 0);
 
 const score = computed(() => {
@@ -540,29 +528,6 @@ onBeforeUnmount(pause);
                         <line x1="0" y1="42" x2="0" y2="58" />
                         <line x1="150" y1="42" x2="150" y2="58" />
                     </g>
-                </svg>
-
-                <!-- Pass line: from the ball carrier to the receiver / goal -->
-                <svg
-                    v-if="cur && isMoving"
-                    class="pointer-events-none absolute inset-0 h-full w-full"
-                    viewBox="0 0 100 100"
-                    preserveAspectRatio="none"
-                >
-                    <line
-                        :x1="from.x"
-                        :y1="from.y"
-                        :x2="to.x"
-                        :y2="to.y"
-                        :class="
-                            cur.s === 1
-                                ? 'stroke-amber-300/50'
-                                : 'stroke-white/50'
-                        "
-                        stroke-width="0.4"
-                        stroke-dasharray="1.5 1.5"
-                        stroke-linecap="round"
-                    />
                 </svg>
 
                 <!-- The 22 living players, in kit and numbered -->
