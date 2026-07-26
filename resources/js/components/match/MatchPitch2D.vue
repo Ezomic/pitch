@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Pause, Play, RotateCcw } from '@lucide/vue';
-import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import type { LineupPlayer, TimelineFrame } from '@/types/match';
 
 const props = withDefaults(
@@ -54,11 +54,15 @@ function place(frame: TimelineFrame | null) {
         cancelAnimationFrame(raf);
         raf = null;
     }
-    if (!frame) return;
+
+    if (!frame) {
+        return;
+    }
 
     if (reduceMotion) {
         ball.value = { x: to.value.x, y: to.value.y };
         ballAnim.value = false;
+
         return;
     }
 
@@ -85,10 +89,19 @@ const minute = computed(() => cur.value?.m ?? 0);
 const score = computed(() => {
     let h = 0;
     let a = 0;
+
     for (let i = 0; i <= index.value && i < props.timeline.length; i++) {
         const f = props.timeline[i];
-        if (f.goal) f.s === 0 ? h++ : a++;
+
+        if (f.goal) {
+            if (f.s === 0) {
+                h++;
+            } else {
+                a++;
+            }
+        }
     }
+
     return { h, a };
 });
 
@@ -119,19 +132,30 @@ function clear() {
 function schedule() {
     clear();
     timer = window.setTimeout(() => {
-        if (!playing.value) return;
-        if (index.value >= last.value) {
-            playing.value = false;
+        if (!playing.value) {
             return;
         }
+
+        if (index.value >= last.value) {
+            playing.value = false;
+
+            return;
+        }
+
         index.value++;
         schedule();
     }, durMs.value);
 }
 
 function play() {
-    if (props.timeline.length === 0) return;
-    if (index.value >= last.value) index.value = 0;
+    if (props.timeline.length === 0) {
+        return;
+    }
+
+    if (index.value >= last.value) {
+        index.value = 0;
+    }
+
     playing.value = true;
     schedule();
 }
@@ -142,7 +166,11 @@ function pause() {
 }
 
 function toggle() {
-    playing.value ? pause() : play();
+    if (playing.value) {
+        pause();
+    } else {
+        play();
+    }
 }
 
 function restart() {
@@ -159,7 +187,10 @@ function cycleSpeed() {
               : speed.value === 4
                 ? 8
                 : 1;
-    if (playing.value) schedule();
+
+    if (playing.value) {
+        schedule();
+    }
 }
 
 function onScrub(event: Event) {
@@ -169,7 +200,10 @@ function onScrub(event: Event) {
 
 onBeforeUnmount(() => {
     clear();
-    if (raf !== null) cancelAnimationFrame(raf);
+
+    if (raf !== null) {
+        cancelAnimationFrame(raf);
+    }
 });
 </script>
 

@@ -28,13 +28,13 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
-import { show as matchShow } from '@/routes/match';
-import { index as scoutsIndex } from '@/routes/scouts';
 import { show as cupShow } from '@/routes/cup';
+import { show as matchShow } from '@/routes/match';
 import { index as newsIndex } from '@/routes/news';
+import { index as scoutsIndex } from '@/routes/scouts';
 import { show as seasonShow } from '@/routes/season';
-import { index as trainingIndex } from '@/routes/training';
 import { edit as squadEdit } from '@/routes/squad';
+import { index as trainingIndex } from '@/routes/training';
 import { index as transfersIndex } from '@/routes/transfers';
 import { index as youthIndex } from '@/routes/youth';
 import type { NavItem } from '@/types';
