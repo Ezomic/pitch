@@ -1,7 +1,11 @@
 <script setup lang="ts">
 import { Pause, Play, RotateCcw } from '@lucide/vue';
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
-import type { LineupPlayer, TimelineFrame } from '@/types/match';
+import type {
+    LineupPlayer,
+    PlayerPositions,
+    TimelineFrame,
+} from '@/types/match';
 
 const props = withDefaults(
     defineProps<{
@@ -9,8 +13,9 @@ const props = withDefaults(
         homeName: string;
         awayName: string;
         lineups?: LineupPlayer[];
+        positions?: PlayerPositions[];
     }>(),
-    { lineups: () => [] },
+    { lineups: () => [], positions: () => [] },
 );
 
 const PAD_X = 5; // keep markers inside the touchlines / behind the goals
@@ -113,13 +118,41 @@ const sideName = computed(() =>
     cur.value?.s === 1 ? props.awayName : props.homeName,
 );
 
-// Show the receiver marker only for a moving ball that is not an attempt on goal.
-const showTarget = computed(
-    () =>
-        !!cur.value &&
-        cur.value.t !== 'shot' &&
-        cur.value.t !== 'header' &&
-        isMoving.value,
+// The 22 living players for the current frame: each lineup's identity paired
+// with its position this frame (falling back to the resting formation spot when
+// no motion track is available), and a flag for whoever is on the ball.
+interface LivePlayer {
+    key: number;
+    x: number;
+    y: number;
+    s: 0 | 1;
+    gk: boolean;
+    name: string | null;
+    ball: boolean;
+}
+
+const players = computed<LivePlayer[]>(() => {
+    const frame = props.positions[index.value];
+
+    return props.lineups.map((line, i) => {
+        const spot = frame?.p[i];
+
+        return {
+            key: i,
+            x: px(spot ? spot[0] : line.x),
+            y: py(spot ? spot[1] : line.y),
+            s: line.s,
+            gk: line.gk,
+            name: line.name,
+            ball: frame ? frame.b === i : false,
+        };
+    });
+});
+
+const playerTransition = computed(() =>
+    reduceMotion
+        ? 'none'
+        : `left ${durMs.value}ms ease, top ${durMs.value}ms ease`,
 );
 
 function clear() {
@@ -248,23 +281,7 @@ onBeforeUnmount(() => {
                 ></div>
             </div>
 
-            <!-- Both teams at their formation positions -->
-            <div
-                v-for="(p, i) in lineups"
-                :key="`lp-${i}`"
-                class="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2"
-                :style="{ left: `${px(p.x)}%`, top: `${py(p.y)}%` }"
-            >
-                <span
-                    class="block rounded-full ring-1 ring-black/25"
-                    :class="[
-                        p.gk ? 'size-2 ring-2 ring-black/40' : 'size-2.5',
-                        p.s === 0 ? 'bg-white/45' : 'bg-amber-400/45',
-                    ]"
-                ></span>
-            </div>
-
-            <!-- Pass line: passer → receiver / goal -->
+            <!-- Pass line: from the ball carrier to the receiver / goal -->
             <svg
                 v-if="cur && isMoving"
                 class="pointer-events-none absolute inset-0 h-full w-full"
@@ -277,49 +294,46 @@ onBeforeUnmount(() => {
                     :x2="to.x"
                     :y2="to.y"
                     :class="
-                        cur.s === 1 ? 'stroke-amber-300/60' : 'stroke-white/60'
+                        cur.s === 1 ? 'stroke-amber-300/50' : 'stroke-white/50'
                     "
-                    stroke-width="0.5"
+                    stroke-width="0.4"
                     stroke-dasharray="1.5 1.5"
                     stroke-linecap="round"
                 />
             </svg>
 
-            <!-- Passer marker + name -->
+            <!-- The 22 living players, each easing to its position each frame -->
             <div
-                v-if="cur"
+                v-for="p in players"
+                :key="`pl-${p.key}`"
                 class="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-1/2"
-                :style="{ left: `${from.x}%`, top: `${from.y}%` }"
+                :style="{
+                    left: `${p.x}%`,
+                    top: `${p.y}%`,
+                    transition: playerTransition,
+                }"
             >
                 <span
-                    class="block size-2.5 rounded-full ring-2 ring-black/20"
-                    :class="cur.s === 0 ? 'bg-white' : 'bg-amber-400'"
+                    class="block rounded-full"
+                    :class="[
+                        p.gk
+                            ? 'size-2 ring-2 ring-black/40'
+                            : p.ball
+                              ? 'size-3 ring-2 ring-black/40'
+                              : 'size-2.5 ring-1 ring-black/25',
+                        p.s === 0
+                            ? p.ball
+                                ? 'bg-white'
+                                : 'bg-white/70'
+                            : p.ball
+                              ? 'bg-amber-400'
+                              : 'bg-amber-400/70',
+                    ]"
                 ></span>
                 <span
-                    v-if="cur.actor"
+                    v-if="p.ball && p.name"
                     class="absolute top-3.5 left-1/2 -translate-x-1/2 rounded bg-black/55 px-1 py-px text-[10px] leading-tight font-medium whitespace-nowrap text-white"
-                    >{{ cur.actor }}</span
-                >
-            </div>
-
-            <!-- Receiver marker + name -->
-            <div
-                v-if="showTarget"
-                class="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-1/2"
-                :style="{ left: `${to.x}%`, top: `${to.y}%` }"
-            >
-                <span
-                    class="block size-2.5 rounded-full border-2 bg-transparent"
-                    :class="
-                        cur && cur.s === 0
-                            ? 'border-white/80'
-                            : 'border-amber-300/80'
-                    "
-                ></span>
-                <span
-                    v-if="cur?.target"
-                    class="absolute top-3.5 left-1/2 -translate-x-1/2 rounded bg-black/40 px-1 py-px text-[10px] leading-tight whitespace-nowrap text-white/90"
-                    >{{ cur.target }}</span
+                    >{{ p.name }}</span
                 >
             </div>
 
