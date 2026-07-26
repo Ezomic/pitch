@@ -43,7 +43,56 @@ final class MatchTimeline
         // intact and home ties fall before away ties, giving a coherent to-and-fro.
         usort($frames, fn (array $a, array $b): int => $a['m'] <=> $b['m']);
 
-        return $this->withKickoffs($frames);
+        return $this->threadBall($this->withKickoffs($frames));
+    }
+
+    /**
+     * Thread the ball continuously through the replay: every frame begins where
+     * the previous one ended, so the ball flows from touch to touch instead of
+     * teleporting to each possession's formation start or snapping back to a
+     * turnover logged at the pass origin. A stationary marker (a defensive win, a
+     * dead ball) is moved onto where the ball actually is, and a kick-off keeps
+     * the centre spot since the ball is genuinely reset there.
+     *
+     * @param  list<array<string, mixed>>  $frames
+     * @return list<array<string, mixed>>
+     */
+    private function threadBall(array $frames): array
+    {
+        $prevX = null;
+        $prevY = null;
+
+        foreach ($frames as $i => $frame) {
+            if ($frame['t'] === 'kickoff') {
+                $prevX = $frame['x2'];
+                $prevY = $frame['y2'];
+
+                continue;
+            }
+
+            // A turnover or dead ball is stationary and moves onto the ball; a
+            // shot only looks stationary when taken from the goal-mouth zone, so
+            // it is excluded and keeps its flight to goal.
+            $isShot = $frame['t'] === 'shot' || $frame['t'] === 'header';
+            $stationary = ! $isShot
+                && $frame['x1'] === $frame['x2']
+                && $frame['y1'] === $frame['y2'];
+
+            if ($prevX !== null) {
+                $frames[$i]['x1'] = $prevX;
+                $frames[$i]['y1'] = $prevY;
+
+                if ($stationary) {
+                    $frames[$i]['x2'] = $prevX;
+                    $frames[$i]['y2'] = $prevY;
+                }
+            }
+
+            $prevX = $frames[$i]['x2'];
+            $prevY = $frames[$i]['y2'];
+        }
+
+        return $frames;
     }
 
     /**
