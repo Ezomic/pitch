@@ -20,11 +20,19 @@ namespace App\Sim\Squad;
  */
 final class PlayerMotion
 {
-    private const float FOLLOW_ATTACK = 0.34;
+    private const float FOLLOW_ATTACK = 0.32;
 
-    private const float FOLLOW_DEFEND = 0.24;
+    private const float FOLLOW_DEFEND = 0.26;
 
     private const float BALL_SIDE = 0.22;
+
+    /**
+     * Where the out-of-possession block sits, along the line from the ball to the
+     * goal it defends: 0 hugs the ball, 1 sits on its own line. Half keeps the
+     * team goal-side of the ball rather than chasing it up the pitch, so the far
+     * third of the pitch stays populated instead of emptying out.
+     */
+    private const float RETREAT = 0.5;
 
     private const float PRESS = 0.6;
 
@@ -38,7 +46,7 @@ final class PlayerMotion
     private const float RUN = 0.4;
 
     /** How strongly a defender tucks toward the nearest attacker to mark. */
-    private const float MARK = 0.25;
+    private const float MARK = 0.18;
 
     private const float MIN = 0.03;
 
@@ -145,11 +153,12 @@ final class PlayerMotion
         $ax = $line['x'] + $this->offset($line['slot'], $line['s'], 0);
         $ay = $line['y'] + $this->offset($line['slot'], $line['s'], 1);
 
-        $follow = $attacking ? self::FOLLOW_ATTACK : self::FOLLOW_DEFEND;
-        $nx = $ax + $follow * ($ballX - $ax);
         $ny = $ay + self::BALL_SIDE * ($ballY - $ay);
+        $nx = $ax;
 
         if ($attacking) {
+            $nx = $ax + self::FOLLOW_ATTACK * ($ballX - $ax);
+
             // Fan out wide in possession.
             $ny += self::SPREAD * ($ay - 0.5);
 
@@ -158,6 +167,12 @@ final class PlayerMotion
                 $nx += self::RUN * ($goalX - $nx) * abs($ballX - $ownGoalX);
             }
         } else {
+            // Drop into a block goal-side of the ball rather than chasing its exact
+            // position up the pitch, so the defending shape holds and the third of
+            // the pitch nearest its own goal does not empty out.
+            $blockX = $ballX + self::RETREAT * ($ownGoalX - $ballX);
+            $nx = $ax + self::FOLLOW_DEFEND * ($blockX - $ax);
+
             // Squeeze toward the middle out of possession.
             $ny += self::COMPACT * (0.5 - $ay);
         }

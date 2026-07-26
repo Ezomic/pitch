@@ -19,6 +19,8 @@ use App\Sim\Engine\MatchResult;
  */
 final class MatchTimeline
 {
+    private const int HALF_MINUTE = 45;
+
     public function __construct(
         private readonly MatchCommentary $commentary = new MatchCommentary,
     ) {}
@@ -41,7 +43,67 @@ final class MatchTimeline
         // intact and home ties fall before away ties, giving a coherent to-and-fro.
         usort($frames, fn (array $a, array $b): int => $a['m'] <=> $b['m']);
 
-        return $frames;
+        return $this->withKickoffs($frames);
+    }
+
+    /**
+     * Insert a kick-off from the centre spot where a real match has one: at the
+     * opening whistle, at the start of the second half, and after every goal (the
+     * conceding side restarts). Purely presentational, so the deterministic engine
+     * never sees them.
+     *
+     * @param  list<array<string, mixed>>  $frames
+     * @return list<array<string, mixed>>
+     */
+    private function withKickoffs(array $frames): array
+    {
+        if ($frames === []) {
+            return [];
+        }
+
+        $out = [$this->kickoff(0, (int) $frames[0]['m'])];
+        $secondHalf = false;
+
+        foreach ($frames as $frame) {
+            if (! $secondHalf && (int) $frame['m'] >= self::HALF_MINUTE) {
+                $out[] = $this->kickoff(1, (int) $frame['m']);
+                $secondHalf = true;
+            }
+
+            $out[] = $frame;
+
+            if ($frame['goal'] === true) {
+                $out[] = $this->kickoff($frame['s'] === 0 ? 1 : 0, (int) $frame['m']);
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * A kick-off: the ball on the centre spot, tapped back into the restarting
+     * side's own half. Home (0) attacks left to right, so it taps left; the
+     * mirrored opponent taps right.
+     *
+     * @return array<string, mixed>
+     */
+    private function kickoff(int $side, int $minute): array
+    {
+        return [
+            'm' => $minute,
+            's' => $side,
+            'x1' => 0.5,
+            'y1' => 0.5,
+            'x2' => $side === 0 ? 0.44 : 0.56,
+            'y2' => 0.5,
+            't' => 'kickoff',
+            'ok' => true,
+            'goal' => false,
+            'start' => true,
+            'actor' => null,
+            'target' => null,
+            'label' => 'Kick-off',
+        ];
     }
 
     /**

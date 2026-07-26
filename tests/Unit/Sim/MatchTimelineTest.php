@@ -16,11 +16,22 @@ function ev(int $minute, EventType $type, int $fromX, int $fromY, bool $success,
     return new MatchEvent($minute, $type, 1, $targetId, new Zone($fromX, $fromY), $to, $success, null, null);
 }
 
+/**
+ * The real play, with the presentational kick-off frames stripped out.
+ *
+ * @param  list<array<string, mixed>>  $frames
+ * @return list<array<string, mixed>>
+ */
+function play(array $frames): array
+{
+    return array_values(array_filter($frames, fn (array $f) => $f['t'] !== 'kickoff'));
+}
+
 it('places the home side left to right and mirrors the opponent', function () {
     $home = new MatchResult([ev(10, EventType::Shot, 5, 2, true)]);
     $away = new MatchResult([ev(10, EventType::Pass, 5, 0, false, targetId: 3)]);
 
-    $frames = (new MatchTimeline)->build($home, $away, [1 => 'Striker']);
+    $frames = play((new MatchTimeline)->build($home, $away, [1 => 'Striker']));
 
     $homeFrame = collect($frames)->firstWhere('s', 0);
     $awayFrame = collect($frames)->firstWhere('s', 1);
@@ -39,7 +50,7 @@ it('carries both endpoints and the receiver for a pass', function () {
         ev(12, EventType::Pass, 2, 1, true, targetId: 7, to: new Zone(4, 1)),
     ]);
 
-    $frames = (new MatchTimeline)->build($home, null, [1 => 'Smith', 7 => 'Jones']);
+    $frames = play((new MatchTimeline)->build($home, null, [1 => 'Smith', 7 => 'Jones']));
     $frame = $frames[0];
 
     expect($frame['actor'])->toBe('Smith')
@@ -51,7 +62,7 @@ it('carries both endpoints and the receiver for a pass', function () {
 it('sends a shot without a target zone toward the goal', function () {
     $home = new MatchResult([ev(20, EventType::Shot, 4, 2, false)]);
 
-    $frame = (new MatchTimeline)->build($home, null, [1 => 'Striker'])[0];
+    $frame = play((new MatchTimeline)->build($home, null, [1 => 'Striker']))[0];
 
     // No `to` on the event, so the ball is aimed at the attacking goal mouth.
     expect($frame['x2'])->toBe(1.0)
@@ -64,7 +75,7 @@ it('shows a home-leg defensive event on the opposition side without a pass', fun
         ev(30, EventType::Clearance, 4, 2, true),
     ]);
 
-    $frame = (new MatchTimeline)->build($home, null, [])[0];
+    $frame = play((new MatchTimeline)->build($home, null, []))[0];
 
     // The clearance happens during the home attack but is the opposition winning
     // the ball, so it renders as the away side, stationary, with no players named.
@@ -83,10 +94,43 @@ it('marks a possession start after a shot or a lost duel', function () {
         ev(6, EventType::Dribble, 0, 2, true),             // new possession
     ]);
 
-    $frames = (new MatchTimeline)->build($home, null, []);
+    $frames = play((new MatchTimeline)->build($home, null, []));
     $starts = array_map(fn ($f) => $f['start'], $frames);
 
     expect($starts)->toBe([true, false, false, true]);
+});
+
+it('kicks off from the centre at the start, at half-time and after each goal', function () {
+    $home = new MatchResult([
+        ev(2, EventType::Shot, 5, 2, true),    // home goal
+        ev(50, EventType::Pass, 2, 2, true, targetId: 2),
+    ]);
+    $away = new MatchResult([ev(60, EventType::Shot, 5, 2, true)]); // away goal
+
+    $frames = (new MatchTimeline)->build($home, $away, [1 => 'Striker']);
+    $kickoffs = array_values(array_filter($frames, fn ($f) => $f['t'] === 'kickoff'));
+
+    // Opening kick-off, one for the second half, and one after each of the two goals.
+    expect($kickoffs)->toHaveCount(4);
+
+    foreach ($kickoffs as $ko) {
+        expect($ko['x1'])->toBe(0.5)
+            ->and($ko['y1'])->toBe(0.5)
+            ->and($ko['start'])->toBeTrue()
+            ->and($ko['label'])->toBe('Kick-off');
+    }
+
+    // The opening kick-off is the very first frame and belongs to the home side.
+    expect($frames[0]['t'])->toBe('kickoff')
+        ->and($frames[0]['s'])->toBe(0);
+
+    // The conceding side restarts: the away side after the home goal, the home
+    // side after the away goal.
+    $afterHomeGoal = $frames[array_search(true, array_map(
+        fn ($f) => $f['t'] !== 'kickoff' && $f['s'] === 0 && $f['goal'], $frames,
+    )) + 1];
+    expect($afterHomeGoal['t'])->toBe('kickoff')
+        ->and($afterHomeGoal['s'])->toBe(1);
 });
 
 it('is deterministic and its goal frames match the scoreline', function () {
