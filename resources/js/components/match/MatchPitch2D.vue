@@ -1,13 +1,17 @@
 <script setup lang="ts">
 import { Pause, Play, RotateCcw } from '@lucide/vue';
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
-import type { TimelineFrame } from '@/types/match';
+import type { LineupPlayer, TimelineFrame } from '@/types/match';
 
-const props = defineProps<{
-    timeline: TimelineFrame[];
-    homeName: string;
-    awayName: string;
-}>();
+const props = withDefaults(
+    defineProps<{
+        timeline: TimelineFrame[];
+        homeName: string;
+        awayName: string;
+        lineups?: LineupPlayer[];
+    }>(),
+    { lineups: () => [] },
+);
 
 const PAD_X = 5; // keep markers inside the touchlines / behind the goals
 const PAD_Y = 10;
@@ -34,14 +38,10 @@ const px = (n: number) => PAD_X + n * (100 - 2 * PAD_X);
 const py = (n: number) => PAD_Y + n * (100 - 2 * PAD_Y);
 
 const from = computed(() =>
-    cur.value
-        ? { x: px(cur.value.x1), y: py(cur.value.y1) }
-        : { x: 50, y: 50 },
+    cur.value ? { x: px(cur.value.x1), y: py(cur.value.y1) } : { x: 50, y: 50 },
 );
 const to = computed(() =>
-    cur.value
-        ? { x: px(cur.value.x2), y: py(cur.value.y2) }
-        : { x: 50, y: 50 },
+    cur.value ? { x: px(cur.value.x2), y: py(cur.value.y2) } : { x: 50, y: 50 },
 );
 
 // The ball is animated from `from` to `to` on every frame so a pass is visibly
@@ -75,7 +75,9 @@ function place(frame: TimelineFrame | null) {
 watch(index, () => place(cur.value), { immediate: true });
 
 const isMoving = computed(
-    () => !!cur.value && (cur.value.x1 !== cur.value.x2 || cur.value.y1 !== cur.value.y2),
+    () =>
+        !!cur.value &&
+        (cur.value.x1 !== cur.value.x2 || cur.value.y1 !== cur.value.y2),
 );
 
 const minute = computed(() => cur.value?.m ?? 0);
@@ -95,11 +97,15 @@ const caption = computed(() => {
     if (!f) return '';
     const actor = f.actor ?? 'The ball';
     if (f.goal) return `GOAL — ${actor}`;
-    if (f.t === 'shot') return f.ok ? `${actor} shoots` : `${actor} shoots, saved`;
+    if (f.t === 'shot')
+        return f.ok ? `${actor} shoots` : `${actor} shoots, saved`;
     if (f.t === 'dribble')
         return f.ok ? `${actor} drives forward` : `${actor} is dispossessed`;
     // pass
-    if (!f.ok) return f.target ? `${actor} → ${f.target}, cut out` : `${actor} loses it`;
+    if (!f.ok)
+        return f.target
+            ? `${actor} → ${f.target}, cut out`
+            : `${actor} loses it`;
     return f.target ? `${actor} → ${f.target}` : `${actor} passes`;
 });
 
@@ -155,7 +161,13 @@ function restart() {
 
 function cycleSpeed() {
     speed.value =
-        speed.value === 1 ? 2 : speed.value === 2 ? 4 : speed.value === 4 ? 8 : 1;
+        speed.value === 1
+            ? 2
+            : speed.value === 2
+              ? 4
+              : speed.value === 4
+                ? 8
+                : 1;
     if (playing.value) schedule();
 }
 
@@ -211,6 +223,22 @@ onBeforeUnmount(() => {
                 ></div>
             </div>
 
+            <!-- Both teams at their formation positions -->
+            <div
+                v-for="(p, i) in lineups"
+                :key="`lp-${i}`"
+                class="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2"
+                :style="{ left: `${px(p.x)}%`, top: `${py(p.y)}%` }"
+            >
+                <span
+                    class="block rounded-full ring-1 ring-black/25"
+                    :class="[
+                        p.gk ? 'size-2 ring-2 ring-black/40' : 'size-2.5',
+                        p.s === 0 ? 'bg-white/45' : 'bg-amber-400/45',
+                    ]"
+                ></span>
+            </div>
+
             <!-- Pass line: passer → receiver / goal -->
             <svg
                 v-if="cur && isMoving"
@@ -223,7 +251,9 @@ onBeforeUnmount(() => {
                     :y1="from.y"
                     :x2="to.x"
                     :y2="to.y"
-                    :class="cur.s === 1 ? 'stroke-amber-300/60' : 'stroke-white/60'"
+                    :class="
+                        cur.s === 1 ? 'stroke-amber-300/60' : 'stroke-white/60'
+                    "
                     stroke-width="0.5"
                     stroke-dasharray="1.5 1.5"
                     stroke-linecap="round"

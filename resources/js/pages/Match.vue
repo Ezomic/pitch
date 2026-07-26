@@ -100,6 +100,7 @@ const stats = [
             </h2>
             <MatchPitch2D
                 :timeline="props.report.timeline"
+                :lineups="props.report.lineups"
                 home-name="Your squad"
                 :away-name="props.opponentName"
             />

@@ -19,6 +19,15 @@ export interface TimelineFrame {
     target: string | null; // receiver, or null for a shot
 }
 
+export interface LineupPlayer {
+    s: 0 | 1; // side: 0 home, 1 away
+    slot: number; // formation slot id (0 = goalkeeper)
+    name: string | null; // home player name; null for the unnamed opponent
+    x: number; // 0..1 left to right
+    y: number; // 0..1 top to bottom
+    gk: boolean;
+}
+
 export interface MatchReport {
     homeGoals: number;
     awayGoals: number;
@@ -27,6 +36,7 @@ export interface MatchReport {
     progressivePasses: number;
     moments: MatchMoment[];
     timeline: TimelineFrame[];
+    lineups: LineupPlayer[];
 }
 
 export interface LiveMoment {

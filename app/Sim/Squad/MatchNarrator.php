@@ -20,8 +20,9 @@ final class MatchNarrator
      * leg is supplied, a 2D-replay timeline is folded in from both legs.
      *
      * @param  array<int, string>  $names  slot id => player name
+     * @param  list<array<string, mixed>>  $lineups  both teams' formation positions
      */
-    public function narrate(MatchResult $attack, int $opponentGoals, array $names, ?MatchResult $defence = null): MatchReport
+    public function narrate(MatchResult $attack, int $opponentGoals, array $names, ?MatchResult $defence = null, array $lineups = []): MatchReport
     {
         return new MatchReport(
             homeGoals: $attack->goals,
@@ -31,6 +32,7 @@ final class MatchNarrator
             progressivePasses: $attack->progressivePasses,
             moments: $this->feed($attack, $names),
             timeline: $defence !== null ? $this->timeline->build($attack, $defence, $names) : [],
+            lineups: $defence !== null ? $lineups : [],
         );
     }
 
