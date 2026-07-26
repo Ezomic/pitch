@@ -29,23 +29,23 @@ function play(array $frames): array
 
 it('places the home side left to right and mirrors the opponent', function () {
     $home = new MatchResult([ev(10, EventType::Shot, 5, 2, true)]);
-    $away = new MatchResult([ev(10, EventType::Pass, 5, 0, false, targetId: 3)]);
+    $away = new MatchResult([ev(10, EventType::Shot, 5, 2, true)]);
 
     $frames = play((new MatchTimeline)->build($home, $away, [1 => 'Striker']));
 
     $homeFrame = collect($frames)->firstWhere('s', 0);
     $awayFrame = collect($frames)->firstWhere('s', 1);
 
-    // Home shot from the attacking edge sits at the far right; the mirrored
-    // opponent event from their attacking edge sits at the far left.
-    expect($homeFrame['x1'])->toBe(1.0)
-        ->and($awayFrame['x1'])->toBe(0.0)
+    // Home attacks left to right, so its shot flies at the right-hand goal; the
+    // mirrored opponent attacks the other way, at the left-hand goal.
+    expect($homeFrame['x2'])->toBe(1.0)
+        ->and($awayFrame['x2'])->toBe(0.0)
         ->and($homeFrame['goal'])->toBeTrue()
         ->and($homeFrame['actor'])->toBe('Striker')
         ->and($awayFrame['actor'])->toBe('Opposition');
 });
 
-it('carries both endpoints and the receiver for a pass', function () {
+it('carries the receiver and the destination for a pass', function () {
     $home = new MatchResult([
         ev(12, EventType::Pass, 2, 1, true, targetId: 7, to: new Zone(4, 1)),
     ]);
@@ -53,12 +53,34 @@ it('carries both endpoints and the receiver for a pass', function () {
     $frames = play((new MatchTimeline)->build($home, null, [1 => 'Smith', 7 => 'Jones']));
     $frame = $frames[0];
 
+    // x1 is threaded off the opening kick-off for a continuous ball; the pass's
+    // own destination is what the frame carries.
     expect($frame['actor'])->toBe('Smith')
         ->and($frame['target'])->toBe('Jones')
         ->and($frame['actorSlot'])->toBe(1)
         ->and($frame['targetSlot'])->toBe(7)
-        ->and($frame['x1'])->toBe(round(2 / Zone::MAX_X, 3))
         ->and($frame['x2'])->toBe(round(4 / Zone::MAX_X, 3));
+});
+
+it('threads the ball continuously so it never teleports mid-play', function () {
+    $engine = new MatchEngine;
+    $players = Roster::build(new Attributes(70, 70, 70, 70, 70, 70));
+    $frames = (new MatchTimeline)->build(
+        $engine->simulate($players, 7),
+        $engine->simulate($players, 11),
+        [],
+    );
+
+    // Every frame begins where the previous one ended, except a kick-off, where
+    // the ball is genuinely reset to the centre spot.
+    for ($i = 1; $i < count($frames); $i++) {
+        if ($frames[$i]['t'] === 'kickoff') {
+            continue;
+        }
+
+        expect($frames[$i]['x1'])->toBe($frames[$i - 1]['x2'])
+            ->and($frames[$i]['y1'])->toBe($frames[$i - 1]['y2']);
+    }
 });
 
 it('sends a shot without a target zone toward the goal', function () {
