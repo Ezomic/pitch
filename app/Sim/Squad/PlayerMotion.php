@@ -8,10 +8,12 @@ namespace App\Sim\Squad;
  * A deterministic motion layer for the 2D replay, DERIVED from the ball-position
  * timeline rather than simulated. The zone engine only ever tracks the ball, so
  * this nudges each of the 22 players around their formation anchor to suggest a
- * living shape: the team in possession pushes up and shifts ball-side, the team
- * out of possession drops toward its own goal and the nearest defender presses,
- * and the player closest to the ball carries it. Same timeline in, same motion
- * out, so the replay stays reproducible.
+ * living shape: the team in possession pushes up and shifts ball-side while its
+ * most advanced players hold a high outlet, the team out of possession drops into
+ * a block goal-side of the ball and the nearest defender presses, the engine's
+ * real actor carries the ball, and as a shot nears a couple of attackers time a
+ * run into the box. Same timeline in, same motion out, so the replay stays
+ * reproducible.
  *
  * Positions are emitted per timeline frame in a compact shape: `b` is the index
  * of the ball carrier and `p` holds an [x, y] pair for each player, both in the
@@ -48,6 +50,18 @@ final class PlayerMotion
     /** How strongly a defender tucks toward the nearest attacker to mark. */
     private const float MARK = 0.18;
 
+    /** How many frames ahead a shot is felt, so runs into the box can build up. */
+    private const int LOOKAHEAD = 3;
+
+    /** How hard the box runners crash the penalty area as a shot is taken. */
+    private const float BOX_RUN = 0.5;
+
+    /** Attackers anchored within this of the goal hold as an outlet, not chase the ball. */
+    private const float OUTLET_BAND = 0.35;
+
+    /** How much a high outlet's ball-follow is damped so it holds its line. */
+    private const float OUTLET_DAMP = 0.5;
+
     private const float MIN = 0.03;
 
     private const float MAX = 0.97;
@@ -59,13 +73,61 @@ final class PlayerMotion
      */
     public function build(array $timeline, array $lineups): array
     {
+        $imminence = $this->shotImminence($timeline);
         $frames = [];
 
-        foreach ($timeline as $frame) {
-            $frames[] = $this->positions($frame, $lineups);
+        foreach ($timeline as $i => $frame) {
+            $frames[] = $this->positions($frame, $lineups, $imminence[$i]);
         }
 
         return $frames;
+    }
+
+    /**
+     * Per-frame 0..1 sense of how close a shot is within the current possession,
+     * so off-ball attackers can time a run into the box and arrive as the shot is
+     * struck rather than after it. The shot frame itself reads 1; earlier frames
+     * in the same possession ramp up toward it.
+     *
+     * @param  list<array<string, mixed>>  $timeline
+     * @return list<float>
+     */
+    private function shotImminence(array $timeline): array
+    {
+        $n = count($timeline);
+        $imminence = [];
+
+        foreach ($timeline as $i => $frame) {
+            $imminence[] = $this->imminenceAt($timeline, $i, $n, $frame);
+        }
+
+        return $imminence;
+    }
+
+    /**
+     * How imminent a shot is at frame $i: 1 on the shot itself, ramping up over
+     * the few frames of the same possession before it, else 0.
+     *
+     * @param  list<array<string, mixed>>  $timeline
+     * @param  array<string, mixed>  $frame
+     */
+    private function imminenceAt(array $timeline, int $i, int $n, array $frame): float
+    {
+        if (in_array($frame['t'], ['shot', 'header'], true)) {
+            return 1.0;
+        }
+
+        for ($j = $i + 1; $j <= min($i + self::LOOKAHEAD, $n - 1); $j++) {
+            if (($timeline[$j]['start'] ?? false) === true) {
+                break; // a fresh possession: its shot is not this one's to build to
+            }
+
+            if (in_array($timeline[$j]['t'], ['shot', 'header'], true)) {
+                return 1.0 - ($j - $i - 1) / self::LOOKAHEAD;
+            }
+        }
+
+        return 0.0;
     }
 
     /**
@@ -73,7 +135,7 @@ final class PlayerMotion
      * @param  list<array{s: int, slot: int, name: ?string, x: float, y: float, gk: bool}>  $lineups
      * @return array{b: int, p: list<array{float, float}>}
      */
-    private function positions(array $frame, array $lineups): array
+    private function positions(array $frame, array $lineups, float $imminence): array
     {
         $possessing = (int) $frame['s'];
         $originX = (float) $frame['x1'];
@@ -106,6 +168,7 @@ final class PlayerMotion
         // On a pass or cross, the engine's actual target receives it at their spot;
         // a dribble has no target, so the carrier travels on with the ball instead
         // of a phantom receiver appearing on the destination.
+        $receiver = -1;
         if ($moving && ! $isShot && $targetSlot !== null) {
             $receiver = $this->slotIndex($lineups, $possessing, $targetSlot)
                 ?? $this->nearest($players, $possessing, $ballX, $ballY, skip: $carrier);
@@ -113,6 +176,10 @@ final class PlayerMotion
                 $players[$receiver] = [...$players[$receiver], 'x' => $ballX, 'y' => $ballY];
             }
         }
+
+        // As a shot nears, one or two off-ball attackers time a run into the box so
+        // the strike arrives into a populated area rather than out of nowhere.
+        $players = $this->boxRuns($players, $possessing, $imminence, [$carrier, $receiver]);
 
         // The nearest defender closes the ball down.
         $presser = $this->nearest($players, 1 - $possessing, $ballX, $ballY, skip: -1);
@@ -165,7 +232,13 @@ final class PlayerMotion
         $nx = $ax;
 
         if ($attacking) {
-            $nx = $ax + self::FOLLOW_ATTACK * ($ballX - $ax);
+            // The most advanced attackers hold their line as a high outlet instead
+            // of all dropping onto the ball, so there is always a target up the
+            // pitch and the team keeps a shape rather than herding to the ball.
+            $follow = abs($ax - $goalX) < self::OUTLET_BAND
+                ? self::FOLLOW_ATTACK * self::OUTLET_DAMP
+                : self::FOLLOW_ATTACK;
+            $nx = $ax + $follow * ($ballX - $ax);
 
             // Fan out wide in possession.
             $ny += self::SPREAD * ($ay - 0.5);
@@ -216,6 +289,51 @@ final class PlayerMotion
                     'y' => $this->clamp($defender['y'] + self::MARK * ($players[$man]['y'] - $defender['y'])),
                 ];
             }
+        }
+
+        return $players;
+    }
+
+    /**
+     * As a shot nears, send the two furthest-forward off-ball attackers on a run
+     * to the near and far post, scaled by how imminent the shot is, so a strike
+     * lands in a busy box. Players already committed to the ball are left alone.
+     *
+     * @param  list<array{s: int, slot: int, x: float, y: float, gk: bool, hasBall: bool}>  $players
+     * @param  list<int>  $skip  indices on the ball (carrier, receiver)
+     * @return list<array{s: int, slot: int, x: float, y: float, gk: bool, hasBall: bool}>
+     */
+    private function boxRuns(array $players, int $possessing, float $imminence, array $skip): array
+    {
+        if ($imminence <= 0.0) {
+            return $players;
+        }
+
+        $runX = $possessing === 0 ? 0.9 : 0.1;
+
+        $advance = [];
+        foreach ($players as $i => $player) {
+            if (in_array($i, $skip, true) || $player['gk'] || $player['s'] !== $possessing) {
+                continue;
+            }
+            $advance[$i] = $possessing === 0 ? $player['x'] : 1.0 - $player['x'];
+        }
+        arsort($advance);
+
+        $posts = [[$runX, 0.4], [$runX, 0.6]];
+        $post = 0;
+        foreach (array_keys($advance) as $i) {
+            if ($post >= count($posts)) {
+                break;
+            }
+            [$tx, $ty] = $posts[$post];
+            $player = $players[$i];
+            $players[$i] = [
+                ...$player,
+                'x' => $this->clamp($player['x'] + self::BOX_RUN * $imminence * ($tx - $player['x'])),
+                'y' => $this->clamp($player['y'] + self::BOX_RUN * $imminence * ($ty - $player['y'])),
+            ];
+            $post++;
         }
 
         return $players;
