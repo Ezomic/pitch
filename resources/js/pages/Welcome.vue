@@ -25,8 +25,10 @@ let raf = 0;
 watch(goalsTarget, (target) => {
     if (reduceMotion) {
         displayed.value = target;
+
         return;
     }
+
     cancelAnimationFrame(raf);
     const from = displayed.value;
     const start = performance.now();
@@ -35,7 +37,10 @@ watch(goalsTarget, (target) => {
         const t = Math.min(1, (now - start) / dur);
         const eased = 1 - Math.pow(1 - t, 3);
         displayed.value = from + (target - from) * eased;
-        if (t < 1) raf = requestAnimationFrame(step);
+
+        if (t < 1) {
+            raf = requestAnimationFrame(step);
+        }
     };
     raf = requestAnimationFrame(step);
 });
