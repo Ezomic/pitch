@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Pause, Play, RotateCcw } from '@lucide/vue';
-import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, ref } from 'vue';
 import type {
     LineupPlayer,
     PlayerPositions,
@@ -20,27 +20,90 @@ const props = withDefaults(
 
 const PAD_X = 5; // keep markers inside the touchlines / behind the goals
 const PAD_Y = 10;
-const BASE_MS = 900; // per-event dwell at 1×; the ball travels the pass in this time
+const SEG_MS = 460; // base time per event at 1×; the clock runs continuously
 
 const reduceMotion =
     typeof window !== 'undefined' &&
     window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-const index = ref(0);
+// A single continuous playhead (in frame units) drives the whole replay, so the
+// ball and players glide from one event into the next instead of stopping on
+// each. `index` is just the frame the playhead currently sits in.
+const playhead = ref(0);
 const playing = ref(false);
 const speed = ref(2);
-let timer: number | null = null;
 let raf: number | null = null;
-
-const durMs = computed(() => BASE_MS / speed.value);
-const last = computed(() => Math.max(0, props.timeline.length - 1));
-const cur = computed<TimelineFrame | null>(
-    () => props.timeline[index.value] ?? null,
-);
+let lastTs: number | null = null;
 
 // Normalised (0..1) pitch coords → percentage inside the padded playing area.
 const px = (n: number) => PAD_X + n * (100 - 2 * PAD_X);
 const py = (n: number) => PAD_Y + n * (100 - 2 * PAD_Y);
+
+const count = computed(() => props.timeline.length);
+const index = computed(() =>
+    Math.min(Math.floor(playhead.value), Math.max(0, count.value - 1)),
+);
+const cur = computed<TimelineFrame | null>(
+    () => props.timeline[index.value] ?? null,
+);
+
+// The ball's path as a continuous chain of points: the very first origin, then
+// each event's destination. The ball flows through them without ever stopping.
+const keypoints = computed<{ x: number; y: number }[]>(() => {
+    const tl = props.timeline;
+
+    if (tl.length === 0) {
+        return [];
+    }
+
+    const kp = [{ x: px(tl[0].x1), y: py(tl[0].y1) }];
+
+    for (const f of tl) {
+        kp.push({ x: px(f.x2), y: py(f.y2) });
+    }
+
+    return kp;
+});
+
+// The ball, curved along the current segment and lofted by the event type.
+const ball = computed(() => {
+    const kp = keypoints.value;
+
+    if (kp.length < 2) {
+        return { x: 50, y: 50, scale: 1 };
+    }
+
+    const seg = Math.min(Math.floor(playhead.value), kp.length - 2);
+    const t = Math.min(1, Math.max(0, playhead.value - seg));
+    const a = kp[seg];
+    const b = kp[seg + 1];
+    const type = props.timeline[seg]?.t ?? 'pass';
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const dist = Math.hypot(dx, dy);
+
+    if (reduceMotion || dist < 0.5) {
+        return { x: b.x, y: b.y, scale: 1 };
+    }
+
+    const isShot = type === 'shot' || type === 'header';
+    const isCross = type === 'cross';
+    // A control point bows the path (crosses hardest, shots straight); the side
+    // alternates so play isn't lopsided.
+    const bow = isShot ? 0 : dist * (isCross ? 0.28 : 0.12);
+    const side = seg % 2 === 0 ? 1 : -1;
+    const cx = (a.x + b.x) / 2 + (-dy / dist) * bow * side;
+    const cy = (a.y + b.y) / 2 + (dx / dist) * bow * side;
+    const e = isShot ? t * t : type === 'dribble' ? t : 1 - (1 - t) * (1 - t);
+    const m = 1 - e;
+    const loft = isShot ? 0 : isCross ? 0.6 : 0.25;
+
+    return {
+        x: m * m * a.x + 2 * m * e * cx + e * e * b.x,
+        y: m * m * a.y + 2 * m * e * cy + e * e * b.y,
+        scale: 1 + (isShot ? 0.4 * e : loft * Math.sin(Math.PI * e)),
+    };
+});
 
 const from = computed(() =>
     cur.value ? { x: px(cur.value.x1), y: py(cur.value.y1) } : { x: 50, y: 50 },
@@ -48,78 +111,6 @@ const from = computed(() =>
 const to = computed(() =>
     cur.value ? { x: px(cur.value.x2), y: py(cur.value.y2) } : { x: 50, y: 50 },
 );
-
-// The ball is animated frame by frame along a curved path so a pass arcs, a
-// cross loops, a dribble carries with the player and a shot fizzes into the
-// goal. `scale` lends it a little height and weight in flight.
-const ball = ref({ x: 50, y: 50, scale: 1 });
-
-function easing(type: string): (t: number) => number {
-    if (type === 'shot' || type === 'header') {
-        return (t) => t * t; // accelerate into the strike
-    }
-
-    if (type === 'dribble') {
-        return (t) => t; // a steady carry
-    }
-
-    return (t) => 1 - (1 - t) * (1 - t); // a pass eases to its target
-}
-
-function animateBall(frame: TimelineFrame | null) {
-    if (raf !== null) {
-        cancelAnimationFrame(raf);
-        raf = null;
-    }
-
-    if (!frame) {
-        return;
-    }
-
-    const p0 = { x: from.value.x, y: from.value.y };
-    const p1 = { x: to.value.x, y: to.value.y };
-    const dx = p1.x - p0.x;
-    const dy = p1.y - p0.y;
-    const dist = Math.hypot(dx, dy);
-
-    if (reduceMotion || dist < 0.5) {
-        ball.value = { x: p1.x, y: p1.y, scale: 1 };
-
-        return;
-    }
-
-    const isShot = frame.t === 'shot' || frame.t === 'header';
-    const isCross = frame.t === 'cross';
-    // A control point offset perpendicular to the pass bows its path; crosses
-    // bow hardest, shots fly straight. The side alternates so play isn't lopsided.
-    const bow = isShot ? 0 : dist * (isCross ? 0.28 : 0.12);
-    const side = index.value % 2 === 0 ? 1 : -1;
-    const cx = (p0.x + p1.x) / 2 + (-dy / dist) * bow * side;
-    const cy = (p0.y + p1.y) / 2 + (dx / dist) * bow * side;
-
-    // Longer balls travel a touch quicker; everything still lands within the frame.
-    const duration = Math.min(durMs.value, 220 + dist * 9);
-    const ease = easing(frame.t);
-    const loft = isShot ? 0 : isCross ? 0.6 : 0.25;
-    const start = performance.now();
-
-    const step = (now: number) => {
-        const t = Math.min(1, (now - start) / duration);
-        const e = ease(t);
-        const m = 1 - e;
-        ball.value = {
-            x: m * m * p0.x + 2 * m * e * cx + e * e * p1.x,
-            y: m * m * p0.y + 2 * m * e * cy + e * e * p1.y,
-            scale: 1 + (isShot ? 0.4 * e : loft * Math.sin(Math.PI * e)),
-        };
-        raf = t < 1 ? requestAnimationFrame(step) : null;
-    };
-
-    raf = requestAnimationFrame(step);
-}
-
-watch(index, () => animateBall(cur.value), { immediate: true });
-
 const isMoving = computed(
     () =>
         !!cur.value &&
@@ -132,7 +123,7 @@ const score = computed(() => {
     let h = 0;
     let a = 0;
 
-    for (let i = 0; i <= index.value && i < props.timeline.length; i++) {
+    for (let i = 0; i <= index.value && i < count.value; i++) {
         const f = props.timeline[i];
 
         if (f.goal) {
@@ -155,9 +146,8 @@ const sideName = computed(() =>
     cur.value?.s === 1 ? props.awayName : props.homeName,
 );
 
-// The 22 living players for the current frame: each lineup's identity paired
-// with its position this frame (falling back to the resting formation spot when
-// no motion track is available), and a flag for whoever is on the ball.
+// The 22 living players, each interpolated continuously between its position at
+// the surrounding frames, so the shape drifts smoothly rather than snapping.
 interface LivePlayer {
     key: number;
     x: number;
@@ -169,30 +159,39 @@ interface LivePlayer {
     ball: boolean;
 }
 
-const players = computed<LivePlayer[]>(() => {
-    const frame = props.positions[index.value];
+const smooth = (t: number) => t * t * (3 - 2 * t);
 
-    return props.lineups.map((line, i) => {
-        const spot = frame?.p[i];
+const players = computed<LivePlayer[]>(() => {
+    const pos = props.positions;
+    const lu = props.lineups;
+
+    if (lu.length === 0) {
+        return [];
+    }
+
+    const nMax = Math.max(0, count.value - 1);
+    const seg = Math.min(Math.floor(playhead.value), nMax);
+    const t = smooth(Math.min(1, Math.max(0, playhead.value - seg)));
+    const a = pos[seg];
+    const b = pos[Math.min(seg + 1, nMax)] ?? a;
+    const carrier = a?.b ?? -1;
+
+    return lu.map((line, i) => {
+        const pa = a?.p[i];
+        const pb = b?.p[i] ?? pa;
 
         return {
             key: i,
-            x: px(spot ? spot[0] : line.x),
-            y: py(spot ? spot[1] : line.y),
+            x: pa && pb ? px(pa[0] + (pb[0] - pa[0]) * t) : px(line.x),
+            y: pa && pb ? py(pa[1] + (pb[1] - pa[1]) * t) : py(line.y),
             s: line.s,
             slot: line.slot,
             gk: line.gk,
             name: line.name,
-            ball: frame ? frame.b === i : false,
+            ball: carrier === i,
         };
     });
 });
-
-const playerTransition = computed(() =>
-    reduceMotion
-        ? 'none'
-        : `left ${durMs.value}ms ease, top ${durMs.value}ms ease`,
-);
 
 // A gentle broadcast-camera drift toward the ball: the pitch is scaled up a
 // touch and panned a few percent so the action stays roughly centred.
@@ -208,47 +207,70 @@ const camera = computed(() =>
 // The goal the scoring side is attacking, so the net ripples on the right spot.
 const goalSide = computed(() => (cur.value?.s === 1 ? 'left' : 'right'));
 
-function clear() {
-    if (timer !== null) {
-        window.clearTimeout(timer);
-        timer = null;
-    }
-}
-
-function schedule() {
-    clear();
-    timer = window.setTimeout(() => {
-        if (!playing.value) {
-            return;
-        }
-
-        if (index.value >= last.value) {
-            playing.value = false;
-
-            return;
-        }
-
-        index.value++;
-        schedule();
-    }, durMs.value);
-}
-
-function play() {
-    if (props.timeline.length === 0) {
+function loop(ts: number) {
+    if (!playing.value) {
         return;
     }
 
-    if (index.value >= last.value) {
-        index.value = 0;
+    if (lastTs === null) {
+        lastTs = ts;
+    }
+
+    // Clamp the step so returning to a backgrounded tab resumes smoothly rather
+    // than leaping forward by the whole time it was hidden.
+    const dt = Math.min(ts - lastTs, 64);
+    lastTs = ts;
+
+    // A settled ball (a tackle, a clearance, a corner) is passed through quickly
+    // so the replay lingers on movement, not on dead moments.
+    const kp = keypoints.value;
+    const seg = Math.min(
+        Math.floor(playhead.value),
+        Math.max(0, kp.length - 2),
+    );
+    const a = kp[seg];
+    const b = kp[seg + 1];
+    const still = a && b && Math.hypot(b.x - a.x, b.y - a.y) < 0.5;
+    const pace = still ? 2.4 : 1;
+
+    playhead.value = Math.min(
+        count.value,
+        playhead.value + (dt / SEG_MS) * speed.value * pace,
+    );
+
+    if (playhead.value >= count.value) {
+        playing.value = false;
+        lastTs = null;
+
+        return;
+    }
+
+    raf = requestAnimationFrame(loop);
+}
+
+function play() {
+    if (count.value === 0) {
+        return;
+    }
+
+    if (playhead.value >= count.value) {
+        playhead.value = 0;
     }
 
     playing.value = true;
-    schedule();
+    lastTs = null;
+    raf = requestAnimationFrame(loop);
 }
 
 function pause() {
     playing.value = false;
-    clear();
+
+    if (raf !== null) {
+        cancelAnimationFrame(raf);
+        raf = null;
+    }
+
+    lastTs = null;
 }
 
 function toggle() {
@@ -261,7 +283,7 @@ function toggle() {
 
 function restart() {
     pause();
-    index.value = 0;
+    playhead.value = 0;
 }
 
 function cycleSpeed() {
@@ -273,24 +295,14 @@ function cycleSpeed() {
               : speed.value === 4
                 ? 8
                 : 1;
-
-    if (playing.value) {
-        schedule();
-    }
 }
 
 function onScrub(event: Event) {
     pause();
-    index.value = Number((event.target as HTMLInputElement).value);
+    playhead.value = Number((event.target as HTMLInputElement).value);
 }
 
-onBeforeUnmount(() => {
-    clear();
-
-    if (raf !== null) {
-        cancelAnimationFrame(raf);
-    }
-});
+onBeforeUnmount(pause);
 </script>
 
 <template>
@@ -388,11 +400,7 @@ onBeforeUnmount(() => {
                     v-for="p in players"
                     :key="`pl-${p.key}`"
                     class="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-1/2"
-                    :style="{
-                        left: `${p.x}%`,
-                        top: `${p.y}%`,
-                        transition: playerTransition,
-                    }"
+                    :style="{ left: `${p.x}%`, top: `${p.y}%` }"
                 >
                     <span
                         class="flex items-center justify-center rounded-full font-semibold tabular-nums shadow-sm"
@@ -507,8 +515,9 @@ onBeforeUnmount(() => {
             <input
                 type="range"
                 min="0"
-                :max="last"
-                :value="index"
+                :max="count"
+                step="any"
+                :value="playhead"
                 aria-label="Match timeline"
                 class="h-1.5 flex-1 cursor-pointer appearance-none rounded-full bg-secondary accent-primary"
                 @input="onScrub"
