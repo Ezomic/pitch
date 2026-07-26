@@ -32,8 +32,9 @@ it('renders a match report with a scoreline, moments and a 2D timeline', functio
             ->has('report.moments')
             ->has('report.timeline')
             ->has('report.timeline.0', fn (Assert $frame) => $frame
-                ->has('m')->has('s')->has('x')->has('y')
-                ->has('t')->has('ok')->has('goal')->has('start')->has('who'),
+                ->has('m')->has('s')->has('x1')->has('y1')->has('x2')->has('y2')
+                ->has('t')->has('ok')->has('goal')->has('start')
+                ->has('actor')->has('target'),
             ),
         );
 });

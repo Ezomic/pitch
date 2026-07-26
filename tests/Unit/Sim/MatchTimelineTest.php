@@ -11,14 +11,14 @@ use App\Sim\Engine\MatchResult;
 use App\Sim\Engine\Roster;
 use App\Sim\Squad\MatchTimeline;
 
-function ev(int $minute, EventType $type, int $x, int $y, bool $success): MatchEvent
+function ev(int $minute, EventType $type, int $fromX, int $fromY, bool $success, ?int $targetId = null, ?Zone $to = null): MatchEvent
 {
-    return new MatchEvent($minute, $type, 1, null, new Zone($x, $y), null, $success, null, null);
+    return new MatchEvent($minute, $type, 1, $targetId, new Zone($fromX, $fromY), $to, $success, null, null);
 }
 
 it('places the home side left to right and mirrors the opponent', function () {
     $home = new MatchResult([ev(10, EventType::Shot, 5, 2, true)]);
-    $away = new MatchResult([ev(10, EventType::Pass, 5, 0, false)]);
+    $away = new MatchResult([ev(10, EventType::Pass, 5, 0, false, targetId: 3)]);
 
     $frames = (new MatchTimeline)->build($home, $away, [1 => 'Striker']);
 
@@ -27,18 +27,44 @@ it('places the home side left to right and mirrors the opponent', function () {
 
     // Home shot from the attacking edge sits at the far right; the mirrored
     // opponent event from their attacking edge sits at the far left.
-    expect($homeFrame['x'])->toBe(1.0)
-        ->and($awayFrame['x'])->toBe(0.0)
+    expect($homeFrame['x1'])->toBe(1.0)
+        ->and($awayFrame['x1'])->toBe(0.0)
         ->and($homeFrame['goal'])->toBeTrue()
-        ->and($homeFrame['who'])->toBe('Striker');
+        ->and($homeFrame['actor'])->toBe('Striker')
+        ->and($awayFrame['actor'])->toBe('Opposition');
+});
+
+it('carries both endpoints and the receiver for a pass', function () {
+    $home = new MatchResult([
+        ev(12, EventType::Pass, 2, 1, true, targetId: 7, to: new Zone(4, 1)),
+    ]);
+
+    $frames = (new MatchTimeline)->build($home, null, [1 => 'Smith', 7 => 'Jones']);
+    $frame = $frames[0];
+
+    expect($frame['actor'])->toBe('Smith')
+        ->and($frame['target'])->toBe('Jones')
+        ->and($frame['x1'])->toBe(round(2 / Zone::MAX_X, 3))
+        ->and($frame['x2'])->toBe(round(4 / Zone::MAX_X, 3));
+});
+
+it('sends a shot without a target zone toward the goal', function () {
+    $home = new MatchResult([ev(20, EventType::Shot, 4, 2, false)]);
+
+    $frame = (new MatchTimeline)->build($home, null, [1 => 'Striker'])[0];
+
+    // No `to` on the event, so the ball is aimed at the attacking goal mouth.
+    expect($frame['x2'])->toBe(1.0)
+        ->and($frame['y2'])->toBe(0.5)
+        ->and($frame['target'])->toBeNull();
 });
 
 it('marks a possession start after a shot or a lost duel', function () {
     $home = new MatchResult([
-        ev(5, EventType::Pass, 0, 2, true),      // opens possession
-        ev(5, EventType::Pass, 2, 2, true),      // continues
-        ev(5, EventType::Shot, 5, 2, false),     // ends possession
-        ev(6, EventType::Dribble, 0, 2, true),   // new possession
+        ev(5, EventType::Pass, 0, 2, true, targetId: 2),   // opens possession
+        ev(5, EventType::Pass, 2, 2, true, targetId: 3),   // continues
+        ev(5, EventType::Shot, 5, 2, false),               // ends possession
+        ev(6, EventType::Dribble, 0, 2, true),             // new possession
     ]);
 
     $frames = (new MatchTimeline)->build($home, null, []);
