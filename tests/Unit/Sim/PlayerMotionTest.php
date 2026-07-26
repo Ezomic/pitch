@@ -75,6 +75,29 @@ it('lets a dribbler carry on without spawning a phantom receiver', function () {
         ->and($onDestination)->toBe([]);
 });
 
+it('sends attackers into the box as a shot approaches', function () {
+    $lineups = motionLineups();
+
+    // A final-third build-up frame; identical in both runs.
+    $buildUp = motionFrame(0, 0.7, 0.5, 0.78, 0.5);
+    $buildUp['actorSlot'] = 4;
+    $buildUp['targetSlot'] = 7;
+    $shot = motionFrame(0, 0.78, 0.5, 1.0, 0.5, 'shot');
+    $shot['actorSlot'] = 7;
+
+    // With a shot on the very next frame, the build-up frame should already pull
+    // off-ball attackers goal-ward; with no shot to follow it should not.
+    $withShot = (new PlayerMotion)->build([$buildUp, $shot], $lineups)[0];
+    $control = (new PlayerMotion)->build([$buildUp], $lineups)[0];
+
+    $forwardness = fn (array $frame) => array_sum(array_map(
+        fn (int $i) => $lineups[$i]['s'] === 0 && ! $lineups[$i]['gk'] ? $frame['p'][$i][0] : 0.0,
+        array_keys($lineups),
+    ));
+
+    expect($forwardness($withShot))->toBeGreaterThan($forwardness($control));
+});
+
 it('places the ball carrier exactly on the ball', function () {
     $lineups = motionLineups();
     $frame = motionFrame(0, 0.35, 0.5, 0.7, 0.5);
