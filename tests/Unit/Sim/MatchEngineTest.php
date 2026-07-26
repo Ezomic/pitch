@@ -78,6 +78,21 @@ it('starts attacks from different players across a match', function () {
     expect(count($openers))->toBeGreaterThan(1);
 });
 
+it('credits the defence with ball-winning events when possession is lost', function () {
+    $engine = new MatchEngine;
+    $result = $engine->simulate(Roster::build(template(30)), 3);
+
+    $defensive = array_filter($result->events, fn (MatchEvent $e) => $e->type->isDefensive());
+
+    expect($defensive)->not->toBeEmpty();
+
+    foreach ($defensive as $event) {
+        expect($event->type)->toBeIn([EventType::Interception, EventType::Tackle, EventType::Clearance])
+            ->and($event->actorId)->toBe(MatchEngine::DEFENDER_ID)
+            ->and($event->success)->toBeTrue();
+    }
+});
+
 it('detects a progressive pass only when the ball advances', function () {
     $forward = new MatchEvent(1, EventType::Pass, 1, 2, new Zone(1, 1), new Zone(3, 1), true, null, null);
     $sideways = new MatchEvent(1, EventType::Pass, 1, 2, new Zone(3, 1), new Zone(3, 0), true, null, null);

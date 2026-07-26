@@ -42,6 +42,7 @@ final class Resolver
             $success ? $option->targetPlayerId : null,
             false,
             false,
+            $success ? null : $this->turnover(EventType::Pass, $ballZone),
         );
     }
 
@@ -62,7 +63,21 @@ final class Resolver
             null,
             false,
             false,
+            $success ? null : $this->turnover(EventType::Dribble, $ballZone),
         );
+    }
+
+    /**
+     * How the defence won the ball back: a clearance when the danger was in the
+     * final third, otherwise an interception of a pass or a tackle on a dribble.
+     */
+    private function turnover(EventType $attack, Zone $ballZone): EventType
+    {
+        if ($ballZone->x >= 4) {
+            return EventType::Clearance;
+        }
+
+        return $attack === EventType::Dribble ? EventType::Tackle : EventType::Interception;
     }
 
     private function resolveShot(Zone $ballZone, Attributes $actor, Defense $defense, Rng $rng, float $attackBias): ResolveOutcome

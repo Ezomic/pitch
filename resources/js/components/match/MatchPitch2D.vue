@@ -90,9 +90,16 @@ const score = computed(() => {
     return { h, a };
 });
 
+const DEFENSIVE: Record<string, string> = {
+    interception: 'Intercepted',
+    tackle: 'Tackled — ball won',
+    clearance: 'Cleared',
+};
+
 const caption = computed(() => {
     const f = cur.value;
     if (!f) return '';
+    if (f.t in DEFENSIVE) return DEFENSIVE[f.t];
     const actor = f.actor ?? 'The ball';
     if (f.goal) return `GOAL — ${actor}`;
     if (f.t === 'shot') return f.ok ? `${actor} shoots` : `${actor} shoots, saved`;

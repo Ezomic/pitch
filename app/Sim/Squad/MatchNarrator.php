@@ -60,6 +60,10 @@ final class MatchNarrator
      */
     private function moment(MatchEvent $event, array $names): ?MatchMoment
     {
+        if ($event->type->isDefensive()) {
+            return $this->defensiveMoment($event);
+        }
+
         $actor = $names[$event->actorId] ?? "Player {$event->actorId}";
         $target = $event->targetId !== null ? ($names[$event->targetId] ?? "Player {$event->targetId}") : null;
 
@@ -77,13 +81,26 @@ final class MatchNarrator
             return new MatchMoment($event->minute, 'chance', $text);
         }
 
-        if (! $event->success
-            && $event->from->x >= 3
-            && in_array($event->type, [EventType::Pass, EventType::Dribble], true)
-        ) {
-            return new MatchMoment($event->minute, 'turnover', "{$actor} is dispossessed in a dangerous area.");
+        return null;
+    }
+
+    /**
+     * A ball-winning defensive action, surfaced only when it snuffs out a threat
+     * in a dangerous area so the feed stays curated rather than listing every
+     * routine interception.
+     */
+    private function defensiveMoment(MatchEvent $event): ?MatchMoment
+    {
+        if ($event->from->x < 3) {
+            return null;
         }
 
-        return null;
+        $text = match ($event->type) {
+            EventType::Tackle => 'A crunching tackle wins it back.',
+            EventType::Clearance => 'The defence hacks the danger clear.',
+            default => 'The pass is cut out.',
+        };
+
+        return new MatchMoment($event->minute, 'turnover', $text);
     }
 }
