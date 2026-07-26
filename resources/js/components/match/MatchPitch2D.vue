@@ -94,48 +94,81 @@ const catmull = (p0: number, p1: number, p2: number, p3: number, t: number) => {
     );
 };
 
-// The ball: a spline in open play, a straight fizz for a shot, lofted by type.
-const ball = computed(() => {
+// The ball position at any point on the timeline: a spline in open play, a
+// straight fizz for a shot. Shared by the live ball and its trailing ghosts.
+function ballPointAt(ph: number): {
+    x: number;
+    y: number;
+    seg: number;
+    t: number;
+} {
     const kp = keypoints.value;
 
     if (kp.length < 2) {
-        return { x: 50, y: 50, scale: 1 };
+        return { x: 50, y: 50, seg: 0, t: 0 };
     }
 
-    const seg = Math.min(Math.floor(playhead.value), kp.length - 2);
-    const t = Math.min(1, Math.max(0, playhead.value - seg));
+    const seg = Math.min(Math.floor(ph), kp.length - 2);
+    const t = Math.min(1, Math.max(0, ph - seg));
     const a = kp[seg];
     const b = kp[seg + 1];
     const type = props.timeline[seg]?.t ?? 'pass';
+    const isShot = type === 'shot' || type === 'header';
 
-    if (reduceMotion || Math.hypot(b.x - a.x, b.y - a.y) < 0.5) {
-        return { x: b.x, y: b.y, scale: 1 };
+    if (Math.hypot(b.x - a.x, b.y - a.y) < 0.5) {
+        return { x: b.x, y: b.y, seg, t };
     }
 
-    const isShot = type === 'shot' || type === 'header';
-    const isCross = type === 'cross';
     const e = isShot ? t * t : type === 'dribble' ? t : 1 - (1 - t) * (1 - t);
-    const loft = isShot ? 0 : isCross ? 0.6 : 0.25;
-
-    let x: number;
-    let y: number;
 
     if (isShot) {
-        x = a.x + (b.x - a.x) * e;
-        y = a.y + (b.y - a.y) * e;
-    } else {
-        const p0 = kp[seg - 1] ?? a;
-        const p3 = kp[seg + 2] ?? b;
-        x = catmull(p0.x, a.x, b.x, p3.x, e);
-        y = catmull(p0.y, a.y, b.y, p3.y, e);
+        return { x: a.x + (b.x - a.x) * e, y: a.y + (b.y - a.y) * e, seg, t };
     }
 
+    const p0 = kp[seg - 1] ?? a;
+    const p3 = kp[seg + 2] ?? b;
+
     return {
-        x,
-        y,
+        x: catmull(p0.x, a.x, b.x, p3.x, e),
+        y: catmull(p0.y, a.y, b.y, p3.y, e),
+        seg,
+        t,
+    };
+}
+
+// The live ball, lofted and scaled by the kind of ball it is.
+const ball = computed(() => {
+    const p = ballPointAt(playhead.value);
+    const type = props.timeline[p.seg]?.t ?? 'pass';
+    const isShot = type === 'shot' || type === 'header';
+
+    if (reduceMotion) {
+        return { x: p.x, y: p.y, scale: 1 };
+    }
+
+    const isCross = type === 'cross';
+    const loft = isShot ? 0 : isCross ? 0.6 : 0.25;
+    const e = isShot
+        ? p.t * p.t
+        : type === 'dribble'
+          ? p.t
+          : 1 - (1 - p.t) * (1 - p.t);
+
+    return {
+        x: p.x,
+        y: p.y,
         scale: 1 + (isShot ? 0.4 * e : loft * Math.sin(Math.PI * e)),
     };
 });
+
+// A short fading trail behind the ball to sell its speed and direction.
+const trail = computed(() =>
+    reduceMotion
+        ? []
+        : [0.05, 0.11, 0.18].map((d) =>
+              ballPointAt(Math.max(0, playhead.value - d)),
+          ),
+);
 
 const from = computed(() =>
     cur.value ? { x: px(cur.value.x1), y: py(cur.value.y1) } : { x: 50, y: 50 },
@@ -189,6 +222,7 @@ interface LivePlayer {
     gk: boolean;
     name: string | null;
     ball: boolean;
+    target: boolean;
 }
 
 const smooth = (t: number) => t * t * (3 - 2 * t);
@@ -221,6 +255,7 @@ const players = computed<LivePlayer[]>(() => {
             gk: line.gk,
             name: line.name,
             ball: carrier === i,
+            target: false,
         };
     });
 
@@ -240,21 +275,40 @@ const players = computed<LivePlayer[]>(() => {
     if (!isShot && out[receiver] && kp[seg + 1]) {
         out[receiver].x = kp[seg + 1].x;
         out[receiver].y = kp[seg + 1].y;
+        out[receiver].target = true;
+    }
+
+    // The keeper dives across to meet a shot he saves.
+    if (frame?.t === 'save' && kp[seg]) {
+        const gk = out.find((p) => p.gk && p.s === frame.s);
+
+        if (gk) {
+            gk.x += (kp[seg].x - gk.x) * 0.6;
+            gk.y += (kp[seg].y - gk.y) * 0.6;
+        }
     }
 
     return out;
 });
 
-// A gentle broadcast-camera drift toward the ball: the pitch is scaled up a
-// touch and panned a few percent so the action stays roughly centred.
-const clampDrift = (v: number) => Math.max(-2.6, Math.min(2.6, v));
-const camera = computed(() =>
-    reduceMotion
-        ? 'none'
-        : `translate(${clampDrift((50 - ball.value.x) * 0.06)}%, ${clampDrift(
-              (50 - ball.value.y) * 0.06,
-          )}%) scale(1.06)`,
-);
+// A broadcast-camera drift toward the ball; it zooms in and tracks harder on a
+// shot or a goal so the big moments land.
+const camera = computed(() => {
+    if (reduceMotion) {
+        return 'none';
+    }
+
+    const f = cur.value;
+    const punch = !!f && (f.t === 'shot' || f.t === 'header' || f.goal);
+    const zoom = punch ? 1.18 : 1.06;
+    const k = punch ? 0.09 : 0.06;
+    const cap = punch ? 4 : 2.6;
+    const clampDrift = (v: number) => Math.max(-cap, Math.min(cap, v));
+
+    return `translate(${clampDrift((50 - ball.value.x) * k)}%, ${clampDrift(
+        (50 - ball.value.y) * k,
+    )}%) scale(${zoom})`;
+});
 
 // The goal the scoring side is attacking, so the net ripples on the right spot.
 const goalSide = computed(() => (cur.value?.s === 1 ? 'left' : 'right'));
@@ -283,7 +337,9 @@ function loop(ts: number) {
     const a = kp[seg];
     const b = kp[seg + 1];
     const still = a && b && Math.hypot(b.x - a.x, b.y - a.y) < 0.5;
-    const pace = still ? 2.4 : 1;
+    const type = props.timeline[seg]?.t;
+    const slow = type === 'shot' || type === 'header' ? 0.45 : 1; // savour the strike
+    const pace = still ? 2.4 : slow;
 
     playhead.value = Math.min(
         count.value,
@@ -377,7 +433,12 @@ onBeforeUnmount(pause);
             <!-- Camera: the pitch, players and ball drift gently toward the ball -->
             <div
                 class="absolute inset-0 origin-center will-change-transform"
-                :style="{ transform: camera }"
+                :style="{
+                    transform: camera,
+                    transition: reduceMotion
+                        ? 'none'
+                        : 'transform 320ms ease-out',
+                }"
             >
                 <!-- Mowing stripes -->
                 <div
@@ -473,11 +534,28 @@ onBeforeUnmount(pause);
                         >{{ p.gk ? '' : p.slot }}</span
                     >
                     <span
-                        v-if="p.ball && p.name"
-                        class="absolute top-5 left-1/2 -translate-x-1/2 rounded bg-black/55 px-1 py-px text-[10px] leading-tight font-medium whitespace-nowrap text-white"
+                        v-if="(p.ball || p.target) && p.name"
+                        class="absolute top-5 left-1/2 -translate-x-1/2 rounded px-1 py-px text-[10px] leading-tight font-medium whitespace-nowrap"
+                        :class="
+                            p.ball
+                                ? 'bg-black/55 text-white'
+                                : 'bg-black/40 text-white/80'
+                        "
                         >{{ p.name }}</span
                     >
                 </div>
+
+                <!-- Fading ball trail -->
+                <div
+                    v-for="(g, i) in trail"
+                    :key="`tr-${i}`"
+                    class="pointer-events-none absolute z-[15] size-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white"
+                    :style="{
+                        left: `${g.x}%`,
+                        top: `${g.y}%`,
+                        opacity: 0.28 - i * 0.08,
+                    }"
+                ></div>
 
                 <!-- Ball -->
                 <div
