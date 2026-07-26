@@ -5,14 +5,17 @@ declare(strict_types=1);
 namespace App\Sim\Squad;
 
 use App\Sim\Domain\EventType;
+use App\Sim\Domain\MatchEvent;
 use App\Sim\Domain\Zone;
 use App\Sim\Engine\MatchResult;
 
 /**
  * Fold the two simulated legs into an ordered stream of ball-position frames for
- * a 2D replay. The home side attacks left to right; the opponent's leg is
- * mirrored so it attacks the other way. Derived straight from the deterministic
- * event log, so the same seed always yields the same replay.
+ * a 2D replay. Each frame carries where the ball starts (the player on it) and
+ * where it goes (the receiver or the goal), plus both players' names, so the
+ * replay can show who passed to whom. The home side attacks left to right; the
+ * opponent's leg is mirrored so it attacks the other way. Derived straight from
+ * the deterministic event log, so the same seed always yields the same replay.
  */
 final class MatchTimeline
 {
@@ -49,24 +52,26 @@ final class MatchTimeline
         $startsPossession = true;
 
         foreach ($result->events as $event) {
-            $x = $event->from->x / Zone::MAX_X;
-            if ($mirror) {
-                $x = 1 - $x;
-            }
-
             $isShot = $event->type === EventType::Shot;
-            $scored = $isShot && $event->success;
+
+            [$x1, $y1] = $this->point($event->from->x / Zone::MAX_X, $event->from->y / Zone::MAX_Y, $mirror);
+            [$x2, $y2] = $this->destination($event, $isShot, $mirror);
 
             $frames[] = [
                 'm' => $event->minute,
                 's' => $side,
-                'x' => round($x, 3),
-                'y' => round($event->from->y / Zone::MAX_Y, 3),
+                'x1' => $x1,
+                'y1' => $y1,
+                'x2' => $x2,
+                'y2' => $y2,
                 't' => $event->type->value,
                 'ok' => $event->success,
-                'goal' => $scored,
+                'goal' => $isShot && $event->success,
                 'start' => $startsPossession,
-                'who' => $isShot ? ($side === 0 ? ($names[$event->actorId] ?? null) : 'Opposition') : null,
+                'actor' => $this->name($event->actorId, $side, $names),
+                // The opponent has no named players, so a receiver name would just
+                // read "Opposition → Opposition"; only name the home receiver.
+                'target' => (! $isShot && $side === 0) ? $this->name($event->targetId, 0, $names) : null,
             ];
 
             $startsPossession = $isShot
@@ -74,5 +79,52 @@ final class MatchTimeline
         }
 
         return $frames;
+    }
+
+    /**
+     * Where the ball travels: the event's own target zone, or the attacking goal
+     * for a shot, or the origin when nothing else is known.
+     *
+     * @return array{float, float}
+     */
+    private function destination(MatchEvent $event, bool $isShot, bool $mirror): array
+    {
+        if ($event->to !== null) {
+            return $this->point($event->to->x / Zone::MAX_X, $event->to->y / Zone::MAX_Y, $mirror);
+        }
+
+        if ($isShot) {
+            return $this->point(1.0, 0.5, $mirror);
+        }
+
+        return $this->point($event->from->x / Zone::MAX_X, $event->from->y / Zone::MAX_Y, $mirror);
+    }
+
+    /**
+     * @return array{float, float}
+     */
+    private function point(float $x, float $y, bool $mirror): array
+    {
+        if ($mirror) {
+            $x = 1 - $x;
+        }
+
+        return [round($x, 3), round($y, 3)];
+    }
+
+    /**
+     * @param  array<int, string>  $names
+     */
+    private function name(?int $slot, int $side, array $names): ?string
+    {
+        if ($slot === null) {
+            return null;
+        }
+
+        if ($side === 1) {
+            return 'Opposition';
+        }
+
+        return $names[$slot] ?? "Player {$slot}";
     }
 }

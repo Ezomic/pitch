@@ -7,13 +7,16 @@ export interface MatchMoment {
 export interface TimelineFrame {
     m: number; // minute
     s: 0 | 1; // side: 0 home, 1 away
-    x: number; // 0..1, left to right
-    y: number; // 0..1, top to bottom
+    x1: number; // ball origin, 0..1 left to right
+    y1: number; // ball origin, 0..1 top to bottom
+    x2: number; // ball destination (receiver or goal)
+    y2: number;
     t: string; // 'pass' | 'dribble' | 'shot'
     ok: boolean;
     goal: boolean;
     start: boolean;
-    who: string | null;
+    actor: string | null; // player on the ball
+    target: string | null; // receiver, or null for a shot
 }
 
 export interface MatchReport {

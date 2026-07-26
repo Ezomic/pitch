@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Pause, Play, RotateCcw } from '@lucide/vue';
-import { computed, onBeforeUnmount, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue';
 import type { TimelineFrame } from '@/types/match';
 
 const props = defineProps<{
@@ -9,9 +9,9 @@ const props = defineProps<{
     awayName: string;
 }>();
 
-const PAD_X = 4; // keep the ball inside the touchlines / behind the goals
-const PAD_Y = 8;
-const BASE_MS = 150;
+const PAD_X = 5; // keep markers inside the touchlines / behind the goals
+const PAD_Y = 10;
+const BASE_MS = 900; // per-event dwell at 1×; the ball travels the pass in this time
 
 const reduceMotion =
     typeof window !== 'undefined' &&
@@ -19,8 +19,9 @@ const reduceMotion =
 
 const index = ref(0);
 const playing = ref(false);
-const speed = ref(1);
+const speed = ref(2);
 let timer: number | null = null;
+let raf: number | null = null;
 
 const durMs = computed(() => BASE_MS / speed.value);
 const last = computed(() => Math.max(0, props.timeline.length - 1));
@@ -28,14 +29,53 @@ const cur = computed<TimelineFrame | null>(
     () => props.timeline[index.value] ?? null,
 );
 
-const left = computed(() =>
-    cur.value ? PAD_X + cur.value.x * (100 - 2 * PAD_X) : 50,
+// Normalised (0..1) pitch coords → percentage inside the padded playing area.
+const px = (n: number) => PAD_X + n * (100 - 2 * PAD_X);
+const py = (n: number) => PAD_Y + n * (100 - 2 * PAD_Y);
+
+const from = computed(() =>
+    cur.value
+        ? { x: px(cur.value.x1), y: py(cur.value.y1) }
+        : { x: 50, y: 50 },
 );
-const top = computed(() =>
-    cur.value ? PAD_Y + cur.value.y * (100 - 2 * PAD_Y) : 50,
+const to = computed(() =>
+    cur.value
+        ? { x: px(cur.value.x2), y: py(cur.value.y2) }
+        : { x: 50, y: 50 },
 );
-const ballTransition = computed(() =>
-    reduceMotion || !cur.value || cur.value.start ? '0ms' : `${durMs.value}ms`,
+
+// The ball is animated from `from` to `to` on every frame so a pass is visibly
+// travelling from the player on the ball to the receiver.
+const ball = ref({ x: 50, y: 50 });
+const ballAnim = ref(false);
+
+function place(frame: TimelineFrame | null) {
+    if (raf !== null) {
+        cancelAnimationFrame(raf);
+        raf = null;
+    }
+    if (!frame) return;
+
+    if (reduceMotion) {
+        ball.value = { x: to.value.x, y: to.value.y };
+        ballAnim.value = false;
+        return;
+    }
+
+    ballAnim.value = false;
+    ball.value = { x: from.value.x, y: from.value.y };
+    raf = requestAnimationFrame(() => {
+        raf = requestAnimationFrame(() => {
+            ballAnim.value = true;
+            ball.value = { x: to.value.x, y: to.value.y };
+        });
+    });
+}
+
+watch(index, () => place(cur.value), { immediate: true });
+
+const isMoving = computed(
+    () => !!cur.value && (cur.value.x1 !== cur.value.x2 || cur.value.y1 !== cur.value.y2),
 );
 
 const minute = computed(() => cur.value?.m ?? 0);
@@ -53,13 +93,23 @@ const score = computed(() => {
 const caption = computed(() => {
     const f = cur.value;
     if (!f) return '';
-    if (f.goal) return `GOAL${f.who ? ` — ${f.who}` : ''}`;
-    if (f.t === 'shot') return `Shot${f.who ? ` — ${f.who}` : ''}`;
-    return f.t.charAt(0).toUpperCase() + f.t.slice(1);
+    const actor = f.actor ?? 'The ball';
+    if (f.goal) return `GOAL — ${actor}`;
+    if (f.t === 'shot') return f.ok ? `${actor} shoots` : `${actor} shoots, saved`;
+    if (f.t === 'dribble')
+        return f.ok ? `${actor} drives forward` : `${actor} is dispossessed`;
+    // pass
+    if (!f.ok) return f.target ? `${actor} → ${f.target}, cut out` : `${actor} loses it`;
+    return f.target ? `${actor} → ${f.target}` : `${actor} passes`;
 });
 
 const sideName = computed(() =>
     cur.value?.s === 1 ? props.awayName : props.homeName,
+);
+
+// Show the receiver marker only for a completed pass to a named team-mate.
+const showTarget = computed(
+    () => !!cur.value && cur.value.t !== 'shot' && isMoving.value,
 );
 
 function clear() {
@@ -104,7 +154,9 @@ function restart() {
 }
 
 function cycleSpeed() {
-    speed.value = speed.value === 1 ? 2 : speed.value === 2 ? 4 : 1;
+    speed.value =
+        speed.value === 1 ? 2 : speed.value === 2 ? 4 : speed.value === 4 ? 8 : 1;
+    if (playing.value) schedule();
 }
 
 function onScrub(event: Event) {
@@ -112,7 +164,10 @@ function onScrub(event: Event) {
     index.value = Number((event.target as HTMLInputElement).value);
 }
 
-onBeforeUnmount(clear);
+onBeforeUnmount(() => {
+    clear();
+    if (raf !== null) cancelAnimationFrame(raf);
+});
 </script>
 
 <template>
@@ -156,26 +211,84 @@ onBeforeUnmount(clear);
                 ></div>
             </div>
 
+            <!-- Pass line: passer → receiver / goal -->
+            <svg
+                v-if="cur && isMoving"
+                class="pointer-events-none absolute inset-0 h-full w-full"
+                viewBox="0 0 100 100"
+                preserveAspectRatio="none"
+            >
+                <line
+                    :x1="from.x"
+                    :y1="from.y"
+                    :x2="to.x"
+                    :y2="to.y"
+                    :class="cur.s === 1 ? 'stroke-amber-300/60' : 'stroke-white/60'"
+                    stroke-width="0.5"
+                    stroke-dasharray="1.5 1.5"
+                    stroke-linecap="round"
+                />
+            </svg>
+
+            <!-- Passer marker + name -->
+            <div
+                v-if="cur"
+                class="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-1/2"
+                :style="{ left: `${from.x}%`, top: `${from.y}%` }"
+            >
+                <span
+                    class="block size-2.5 rounded-full ring-2 ring-black/20"
+                    :class="cur.s === 0 ? 'bg-white' : 'bg-amber-400'"
+                ></span>
+                <span
+                    v-if="cur.actor"
+                    class="absolute top-3.5 left-1/2 -translate-x-1/2 rounded bg-black/55 px-1 py-px text-[10px] leading-tight font-medium whitespace-nowrap text-white"
+                    >{{ cur.actor }}</span
+                >
+            </div>
+
+            <!-- Receiver marker + name -->
+            <div
+                v-if="showTarget"
+                class="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-1/2"
+                :style="{ left: `${to.x}%`, top: `${to.y}%` }"
+            >
+                <span
+                    class="block size-2.5 rounded-full border-2 bg-transparent"
+                    :class="
+                        cur && cur.s === 0
+                            ? 'border-white/80'
+                            : 'border-amber-300/80'
+                    "
+                ></span>
+                <span
+                    v-if="cur?.target"
+                    class="absolute top-3.5 left-1/2 -translate-x-1/2 rounded bg-black/40 px-1 py-px text-[10px] leading-tight whitespace-nowrap text-white/90"
+                    >{{ cur.target }}</span
+                >
+            </div>
+
             <!-- Ball -->
             <div
                 v-if="cur"
-                class="absolute z-10 -translate-x-1/2 -translate-y-1/2"
+                class="absolute z-20 -translate-x-1/2 -translate-y-1/2"
                 :style="{
-                    left: `${left}%`,
-                    top: `${top}%`,
-                    transition: `left ${ballTransition} linear, top ${ballTransition} linear`,
+                    left: `${ball.x}%`,
+                    top: `${ball.y}%`,
+                    transition: ballAnim
+                        ? `left ${durMs}ms linear, top ${durMs}ms linear`
+                        : 'none',
                 }"
             >
                 <span
-                    class="block rounded-full shadow"
-                    :class="[
-                        cur.s === 0 ? 'bg-white' : 'bg-amber-400',
+                    class="block rounded-full bg-white shadow ring-1 ring-black/30"
+                    :class="
                         cur.goal
-                            ? 'h-4 w-4 ring-4 ring-white/50'
+                            ? 'size-3.5 ring-4 ring-white/50'
                             : cur.t === 'shot'
-                              ? 'h-3.5 w-3.5 ring-2 ring-white/40'
-                              : 'h-2.5 w-2.5',
-                    ]"
+                              ? 'size-3'
+                              : 'size-2'
+                    "
                 ></span>
             </div>
 
@@ -190,14 +303,15 @@ onBeforeUnmount(clear);
                 >
             </div>
 
-            <!-- Clock + caption -->
+            <!-- Clock -->
             <div
                 class="absolute top-2 left-2 rounded-md bg-black/45 px-2 py-0.5 font-mono text-xs text-white tabular-nums"
             >
                 {{ minute }}'
             </div>
+            <!-- Caption -->
             <div
-                class="absolute right-2 bottom-2 max-w-[70%] truncate rounded-md bg-black/45 px-2 py-0.5 text-right font-mono text-xs text-white"
+                class="absolute right-2 bottom-2 max-w-[75%] truncate rounded-md bg-black/45 px-2 py-0.5 text-right font-mono text-xs text-white"
             >
                 <span
                     :class="
