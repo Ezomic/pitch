@@ -28,6 +28,18 @@ final class PlayerMotion
 
     private const float PRESS = 0.6;
 
+    /** How much the team in possession fans out wide. */
+    private const float SPREAD = 0.12;
+
+    /** How much the team out of possession squeezes toward the middle. */
+    private const float COMPACT = 0.18;
+
+    /** How hard a forward runs in behind as the ball advances. */
+    private const float RUN = 0.4;
+
+    /** How strongly a defender tucks toward the nearest attacker to mark. */
+    private const float MARK = 0.25;
+
     private const float MIN = 0.03;
 
     private const float MAX = 0.97;
@@ -67,6 +79,10 @@ final class PlayerMotion
         foreach ($lineups as $line) {
             $players[] = $this->drift($line, $possessing, $ballX, $ballY);
         }
+
+        // Defenders tuck toward the man they are marking, so the back line reacts
+        // to the attackers rather than only to the ball.
+        $players = $this->mark($players, $possessing);
 
         // The nearest team-mate to where the ball started carries it.
         $carrier = $this->nearest($players, $possessing, $originX, $originY, skip: -1);
@@ -119,21 +135,67 @@ final class PlayerMotion
             ];
         }
 
-        $follow = $line['s'] === $possessing ? self::FOLLOW_ATTACK : self::FOLLOW_DEFEND;
+        $attacking = $line['s'] === $possessing;
+        $goalX = $line['s'] === 0 ? 1.0 : 0.0; // the goal this player attacks
+        $ownGoalX = 1.0 - $goalX;
+
         // A stable per-player nudge off the formation anchor so the lines don't
         // sit on a perfect lattice. Constant per player, so it staggers the shape
         // without adding any frame-to-frame jitter.
         $ax = $line['x'] + $this->offset($line['slot'], $line['s'], 0);
         $ay = $line['y'] + $this->offset($line['slot'], $line['s'], 1);
 
+        $follow = $attacking ? self::FOLLOW_ATTACK : self::FOLLOW_DEFEND;
+        $nx = $ax + $follow * ($ballX - $ax);
+        $ny = $ay + self::BALL_SIDE * ($ballY - $ay);
+
+        if ($attacking) {
+            // Fan out wide in possession.
+            $ny += self::SPREAD * ($ay - 0.5);
+
+            // A forward makes a run in behind as the ball climbs toward the goal.
+            if (abs($ax - $ownGoalX) > 0.55) {
+                $nx += self::RUN * ($goalX - $nx) * abs($ballX - $ownGoalX);
+            }
+        } else {
+            // Squeeze toward the middle out of possession.
+            $ny += self::COMPACT * (0.5 - $ay);
+        }
+
         return [
             's' => $line['s'],
             'slot' => $line['slot'],
-            'x' => round($this->clamp($ax + $follow * ($ballX - $ax)), 3),
-            'y' => round($this->clamp($ay + self::BALL_SIDE * ($ballY - $ay)), 3),
+            'x' => round($this->clamp($nx), 3),
+            'y' => round($this->clamp($ny), 3),
             'gk' => false,
             'hasBall' => false,
         ];
+    }
+
+    /**
+     * Nudge each defender toward the nearest attacker it is marking.
+     *
+     * @param  list<array{s: int, slot: int, x: float, y: float, gk: bool, hasBall: bool}>  $players
+     * @return list<array{s: int, slot: int, x: float, y: float, gk: bool, hasBall: bool}>
+     */
+    private function mark(array $players, int $possessing): array
+    {
+        foreach ($players as $i => $defender) {
+            if ($defender['gk'] || $defender['s'] === $possessing) {
+                continue;
+            }
+
+            $man = $this->nearest($players, $possessing, $defender['x'], $defender['y'], skip: -1);
+            if (isset($players[$man])) {
+                $players[$i] = [
+                    ...$defender,
+                    'x' => $this->clamp($defender['x'] + self::MARK * ($players[$man]['x'] - $defender['x'])),
+                    'y' => $this->clamp($defender['y'] + self::MARK * ($players[$man]['y'] - $defender['y'])),
+                ];
+            }
+        }
+
+        return $players;
     }
 
     /** A deterministic sub-zone offset (±0.03) for a player, stable across the match. */
