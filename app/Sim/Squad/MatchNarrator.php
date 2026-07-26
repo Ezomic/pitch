@@ -10,13 +10,18 @@ use App\Sim\Engine\MatchResult;
 
 final class MatchNarrator
 {
+    public function __construct(
+        private readonly MatchTimeline $timeline = new MatchTimeline,
+    ) {}
+
     /**
      * Turn one attacking match into a readable report: a scoreline plus a curated,
-     * minute-ordered highlights feed rather than every pass.
+     * minute-ordered highlights feed rather than every pass. When the opponent's
+     * leg is supplied, a 2D-replay timeline is folded in from both legs.
      *
      * @param  array<int, string>  $names  slot id => player name
      */
-    public function narrate(MatchResult $attack, int $opponentGoals, array $names): MatchReport
+    public function narrate(MatchResult $attack, int $opponentGoals, array $names, ?MatchResult $defence = null): MatchReport
     {
         return new MatchReport(
             homeGoals: $attack->goals,
@@ -25,6 +30,7 @@ final class MatchNarrator
             passesCompleted: $attack->passesCompleted,
             progressivePasses: $attack->progressivePasses,
             moments: $this->feed($attack, $names),
+            timeline: $defence !== null ? $this->timeline->build($attack, $defence, $names) : [],
         );
     }
 

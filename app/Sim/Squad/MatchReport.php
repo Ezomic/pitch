@@ -8,6 +8,7 @@ final readonly class MatchReport
 {
     /**
      * @param  list<MatchMoment>  $moments
+     * @param  list<array<string, mixed>>  $timeline  ordered ball-position frames for the 2D replay
      */
     public function __construct(
         public int $homeGoals,
@@ -16,6 +17,7 @@ final readonly class MatchReport
         public int $passesCompleted,
         public int $progressivePasses,
         public array $moments,
+        public array $timeline = [],
     ) {}
 
     /**
@@ -30,6 +32,7 @@ final readonly class MatchReport
             'passesCompleted' => $this->passesCompleted,
             'progressivePasses' => $this->progressivePasses,
             'moments' => array_map(fn (MatchMoment $moment) => $moment->toArray(), $this->moments),
+            'timeline' => $this->timeline,
         ];
     }
 }
