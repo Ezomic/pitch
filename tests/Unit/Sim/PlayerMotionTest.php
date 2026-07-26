@@ -51,6 +51,23 @@ it('pushes the team in possession up toward an advanced ball', function () {
     expect($liveAvg)->toBeGreaterThan($restAvg);
 });
 
+it('sends a forward on a run in behind as the ball reaches the final third', function () {
+    $lineups = motionLineups();
+    // Home attacks left to right; a ball deep in the final third should pull at
+    // least one forward beyond the ball, running in behind.
+    $positions = (new PlayerMotion)->build([motionFrame(0, 0.7, 0.5, 0.88, 0.5)], $lineups)[0];
+
+    $beyond = false;
+    foreach ($lineups as $i => $line) {
+        if ($line['s'] === 0 && ! $line['gk'] && $positions['p'][$i][0] > 0.88) {
+            $beyond = true;
+            break;
+        }
+    }
+
+    expect($beyond)->toBeTrue();
+});
+
 it('keeps every coordinate on the pitch', function () {
     $engine = new MatchEngine;
     $players = Roster::build(new Attributes(72, 72, 72, 72, 72, 72));
