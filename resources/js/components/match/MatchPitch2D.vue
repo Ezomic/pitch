@@ -163,6 +163,7 @@ interface LivePlayer {
     x: number;
     y: number;
     s: 0 | 1;
+    slot: number;
     gk: boolean;
     name: string | null;
     ball: boolean;
@@ -179,6 +180,7 @@ const players = computed<LivePlayer[]>(() => {
             x: px(spot ? spot[0] : line.x),
             y: py(spot ? spot[1] : line.y),
             s: line.s,
+            slot: line.slot,
             gk: line.gk,
             name: line.name,
             ball: frame ? frame.b === i : false,
@@ -191,6 +193,20 @@ const playerTransition = computed(() =>
         ? 'none'
         : `left ${durMs.value}ms ease, top ${durMs.value}ms ease`,
 );
+
+// A gentle broadcast-camera drift toward the ball: the pitch is scaled up a
+// touch and panned a few percent so the action stays roughly centred.
+const clampDrift = (v: number) => Math.max(-2.6, Math.min(2.6, v));
+const camera = computed(() =>
+    reduceMotion
+        ? 'none'
+        : `translate(${clampDrift((50 - ball.value.x) * 0.06)}%, ${clampDrift(
+              (50 - ball.value.y) * 0.06,
+          )}%) scale(1.06)`,
+);
+
+// The goal the scoring side is attacking, so the net ripples on the right spot.
+const goalSide = computed(() => (cur.value?.s === 1 ? 'left' : 'right'));
 
 function clear() {
     if (timer !== null) {
@@ -294,115 +310,157 @@ onBeforeUnmount(() => {
         <div
             class="relative aspect-[3/2] w-full overflow-hidden rounded-xl border border-emerald-900/40 bg-emerald-700 select-none dark:bg-emerald-800"
         >
-            <div class="pointer-events-none absolute inset-0">
-                <!-- halfway line + centre circle -->
-                <div
-                    class="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 bg-white/25"
-                ></div>
-                <div
-                    class="absolute top-1/2 left-1/2 aspect-square h-1/4 -translate-x-1/2 -translate-y-1/2 rounded-full border border-white/25"
-                ></div>
-                <!-- penalty boxes -->
-                <div
-                    class="absolute inset-y-[26%] left-0 w-[12%] border-y border-r border-white/25"
-                ></div>
-                <div
-                    class="absolute inset-y-[26%] right-0 w-[12%] border-y border-l border-white/25"
-                ></div>
-                <!-- goals -->
-                <div
-                    class="absolute inset-y-[42%] left-0 w-[2%] border-y border-r border-white/40 bg-white/10"
-                ></div>
-                <div
-                    class="absolute inset-y-[42%] right-0 w-[2%] border-y border-l border-white/40 bg-white/10"
-                ></div>
-            </div>
-
-            <!-- Pass line: from the ball carrier to the receiver / goal -->
-            <svg
-                v-if="cur && isMoving"
-                class="pointer-events-none absolute inset-0 h-full w-full"
-                viewBox="0 0 100 100"
-                preserveAspectRatio="none"
+            <!-- Camera: the pitch, players and ball drift gently toward the ball -->
+            <div
+                class="absolute inset-0 origin-center will-change-transform"
+                :style="{ transform: camera }"
             >
-                <line
-                    :x1="from.x"
-                    :y1="from.y"
-                    :x2="to.x"
-                    :y2="to.y"
-                    :class="
-                        cur.s === 1 ? 'stroke-amber-300/50' : 'stroke-white/50'
+                <!-- Mowing stripes -->
+                <div
+                    class="pointer-events-none absolute inset-0"
+                    style="
+                        background: repeating-linear-gradient(
+                            90deg,
+                            rgba(255, 255, 255, 0.05) 0 8.3333%,
+                            transparent 8.3333% 16.6666%
+                        );
                     "
+                ></div>
+
+                <!-- Pitch markings -->
+                <svg
+                    class="pointer-events-none absolute inset-0 h-full w-full"
+                    viewBox="0 0 150 100"
+                    preserveAspectRatio="none"
+                    fill="none"
+                    stroke="rgba(255,255,255,0.25)"
                     stroke-width="0.4"
-                    stroke-dasharray="1.5 1.5"
-                    stroke-linecap="round"
-                />
-            </svg>
-
-            <!-- The 22 living players, each easing to its position each frame -->
-            <div
-                v-for="p in players"
-                :key="`pl-${p.key}`"
-                class="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-1/2"
-                :style="{
-                    left: `${p.x}%`,
-                    top: `${p.y}%`,
-                    transition: playerTransition,
-                }"
-            >
-                <span
-                    class="block rounded-full"
-                    :class="[
-                        p.gk
-                            ? 'size-2 ring-2 ring-black/40'
-                            : p.ball
-                              ? 'size-3 ring-2 ring-black/40'
-                              : 'size-2.5 ring-1 ring-black/25',
-                        p.s === 0
-                            ? p.ball
-                                ? 'bg-white'
-                                : 'bg-white/70'
-                            : p.ball
-                              ? 'bg-amber-400'
-                              : 'bg-amber-400/70',
-                    ]"
-                ></span>
-                <span
-                    v-if="p.ball && p.name"
-                    class="absolute top-3.5 left-1/2 -translate-x-1/2 rounded bg-black/55 px-1 py-px text-[10px] leading-tight font-medium whitespace-nowrap text-white"
-                    >{{ p.name }}</span
                 >
-            </div>
+                    <rect x="0.5" y="0.5" width="149" height="99" />
+                    <line x1="75" y1="0" x2="75" y2="100" />
+                    <circle cx="75" cy="50" r="13" />
+                    <rect x="0" y="26" width="18" height="48" />
+                    <rect x="132" y="26" width="18" height="48" />
+                    <rect x="0" y="38" width="7" height="24" />
+                    <rect x="143" y="38" width="7" height="24" />
+                    <path d="M18 39 A13 13 0 0 1 18 61" />
+                    <path d="M132 39 A13 13 0 0 0 132 61" />
+                    <path d="M2 0 A2 2 0 0 1 0 2" />
+                    <path d="M148 0 A2 2 0 0 0 150 2" />
+                    <path d="M0 98 A2 2 0 0 1 2 100" />
+                    <path d="M150 98 A2 2 0 0 0 148 100" />
+                    <g fill="rgba(255,255,255,0.4)" stroke="none">
+                        <circle cx="75" cy="50" r="0.8" />
+                        <circle cx="12" cy="50" r="0.6" />
+                        <circle cx="138" cy="50" r="0.6" />
+                    </g>
+                    <g stroke="rgba(255,255,255,0.5)" stroke-width="1.2">
+                        <line x1="0" y1="42" x2="0" y2="58" />
+                        <line x1="150" y1="42" x2="150" y2="58" />
+                    </g>
+                </svg>
 
-            <!-- Ball -->
-            <div
-                v-if="cur"
-                class="absolute z-20 -translate-x-1/2 -translate-y-1/2"
-                :style="{ left: `${ball.x}%`, top: `${ball.y}%` }"
-            >
-                <span
-                    class="block rounded-full bg-white ring-1 ring-black/30"
-                    :class="
-                        cur.goal
-                            ? 'size-3.5 ring-4 ring-white/50'
-                            : cur.t === 'shot' || cur.t === 'header'
-                              ? 'size-3'
-                              : 'size-2'
-                    "
+                <!-- Pass line: from the ball carrier to the receiver / goal -->
+                <svg
+                    v-if="cur && isMoving"
+                    class="pointer-events-none absolute inset-0 h-full w-full"
+                    viewBox="0 0 100 100"
+                    preserveAspectRatio="none"
+                >
+                    <line
+                        :x1="from.x"
+                        :y1="from.y"
+                        :x2="to.x"
+                        :y2="to.y"
+                        :class="
+                            cur.s === 1
+                                ? 'stroke-amber-300/50'
+                                : 'stroke-white/50'
+                        "
+                        stroke-width="0.4"
+                        stroke-dasharray="1.5 1.5"
+                        stroke-linecap="round"
+                    />
+                </svg>
+
+                <!-- The 22 living players, in kit and numbered -->
+                <div
+                    v-for="p in players"
+                    :key="`pl-${p.key}`"
+                    class="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-1/2"
                     :style="{
-                        transform: `scale(${ball.scale})`,
-                        filter: `drop-shadow(0 ${ball.scale}px ${ball.scale}px rgba(0,0,0,0.45))`,
+                        left: `${p.x}%`,
+                        top: `${p.y}%`,
+                        transition: playerTransition,
                     }"
-                ></span>
+                >
+                    <span
+                        class="flex items-center justify-center rounded-full font-semibold tabular-nums shadow-sm"
+                        :class="[
+                            p.gk
+                                ? 'size-3 text-[6px]'
+                                : p.ball
+                                  ? 'size-5 text-[9px] ring-2 ring-black/50'
+                                  : 'size-4 text-[7px] ring-1 ring-black/30',
+                            p.s === 0
+                                ? p.gk
+                                    ? 'bg-lime-300 text-lime-950'
+                                    : 'bg-white text-slate-900'
+                                : p.gk
+                                  ? 'bg-rose-300 text-rose-950'
+                                  : 'bg-amber-400 text-amber-950',
+                        ]"
+                        >{{ p.gk ? '' : p.slot }}</span
+                    >
+                    <span
+                        v-if="p.ball && p.name"
+                        class="absolute top-5 left-1/2 -translate-x-1/2 rounded bg-black/55 px-1 py-px text-[10px] leading-tight font-medium whitespace-nowrap text-white"
+                        >{{ p.name }}</span
+                    >
+                </div>
+
+                <!-- Ball -->
+                <div
+                    v-if="cur"
+                    class="absolute z-20 -translate-x-1/2 -translate-y-1/2"
+                    :style="{ left: `${ball.x}%`, top: `${ball.y}%` }"
+                >
+                    <span
+                        class="block rounded-full bg-white ring-1 ring-black/30"
+                        :class="
+                            cur.goal
+                                ? 'size-3.5 ring-4 ring-white/50'
+                                : cur.t === 'shot' || cur.t === 'header'
+                                  ? 'size-3'
+                                  : 'size-2'
+                        "
+                        :style="{
+                            transform: `scale(${ball.scale})`,
+                            filter: `drop-shadow(0 ${ball.scale}px ${ball.scale}px rgba(0,0,0,0.45))`,
+                        }"
+                    ></span>
+                </div>
+
+                <!-- Net ripple at the scoring goal -->
+                <div
+                    v-if="cur?.goal"
+                    class="pointer-events-none absolute top-1/2 -translate-y-1/2"
+                    :class="goalSide === 'right' ? 'right-0' : 'left-0'"
+                >
+                    <span
+                        class="goal-ripple block size-4 rounded-full bg-white/50"
+                    ></span>
+                </div>
             </div>
 
-            <!-- Goal flash -->
+            <!-- Goal celebration (fixed to the frame, no camera drift) -->
             <div
                 v-if="cur?.goal"
-                class="pointer-events-none absolute inset-0 flex items-center justify-center"
+                class="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden"
             >
+                <span class="goal-flash absolute inset-0 bg-white/25"></span>
                 <span
-                    class="rounded-md bg-black/55 px-4 py-1.5 font-mono text-xl font-bold tracking-wide text-white"
+                    class="goal-pop rounded-md bg-black/60 px-4 py-1.5 font-mono text-xl font-bold tracking-wide text-white"
                     >GOAL</span
                 >
             </div>
@@ -466,3 +524,53 @@ onBeforeUnmount(() => {
         </div>
     </div>
 </template>
+
+<style scoped>
+@keyframes goalFlash {
+    from {
+        opacity: 0.6;
+    }
+    to {
+        opacity: 0;
+    }
+}
+@keyframes goalPop {
+    0% {
+        transform: scale(0.6);
+        opacity: 0;
+    }
+    40% {
+        transform: scale(1.12);
+        opacity: 1;
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+@keyframes goalRipple {
+    0% {
+        transform: scale(0.4);
+        opacity: 0.8;
+    }
+    100% {
+        transform: scale(3.4);
+        opacity: 0;
+    }
+}
+.goal-flash {
+    animation: goalFlash 700ms ease-out forwards;
+}
+.goal-pop {
+    animation: goalPop 450ms ease-out;
+}
+.goal-ripple {
+    animation: goalRipple 750ms ease-out forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+    .goal-flash,
+    .goal-pop,
+    .goal-ripple {
+        animation: none;
+    }
+}
+</style>
