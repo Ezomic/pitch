@@ -20,7 +20,7 @@ const props = withDefaults(
 
 const PAD_X = 5; // keep markers inside the touchlines / behind the goals
 const PAD_Y = 10;
-const SEG_MS = 620; // base time per event at 1×; the clock runs continuously
+const SEG_MS = 850; // base time per event at 1×; the clock runs continuously
 
 const reduceMotion =
     typeof window !== 'undefined' &&
@@ -53,7 +53,7 @@ const cur = computed<TimelineFrame | null>(
 const jitter = (i: number, axis: number) => {
     const h = Math.sin(i * 12.9898 + axis * 78.233) * 43758.5453;
 
-    return (h - Math.floor(h) - 0.5) * 5; // ±2.5% of the pitch
+    return (h - Math.floor(h) - 0.5) * 2.4; // ±1.2% of the pitch
 };
 const clampPct = (v: number, pad: number) =>
     Math.max(pad, Math.min(100 - pad, v));
@@ -226,7 +226,7 @@ interface LivePlayer {
     target: boolean;
 }
 
-const smooth = (t: number) => t * t * (3 - 2 * t);
+const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
 
 const players = computed<LivePlayer[]>(() => {
     const pos = props.positions;
@@ -238,48 +238,58 @@ const players = computed<LivePlayer[]>(() => {
 
     const nMax = Math.max(0, count.value - 1);
     const seg = Math.min(Math.floor(playhead.value), nMax);
-    const t = smooth(Math.min(1, Math.max(0, playhead.value - seg)));
-    const a = pos[seg];
-    const b = pos[Math.min(seg + 1, nMax)] ?? a;
-    const carrier = a?.b ?? -1;
+    // Linear parameter: constant speed within a segment, so players never brake
+    // to a stop at an event boundary the way an eased curve would.
+    const t = Math.min(1, Math.max(0, playhead.value - seg));
+
+    const s0 = pos[Math.max(0, seg - 1)];
+    const s1 = pos[seg];
+    const s2 = pos[Math.min(seg + 1, nMax)];
+    const s3 = pos[Math.min(seg + 2, nMax)];
+    const carrier = s1?.b ?? -1;
+    const receiver = s2?.b ?? -1;
+    const frame = props.timeline[seg];
+    const isShot = frame?.t === 'shot' || frame?.t === 'header';
 
     const out = lu.map((line, i) => {
-        const pa = a?.p[i];
-        const pb = b?.p[i] ?? pa;
+        const p1 = s1?.p[i];
+        const p2 = s2?.p[i];
+
+        if (!p1 || !p2) {
+            return {
+                key: i,
+                x: px(line.x),
+                y: py(line.y),
+                s: line.s,
+                slot: line.slot,
+                gk: line.gk,
+                name: line.name,
+                ball: carrier === i,
+                target: !isShot && receiver === i,
+            };
+        }
+
+        // A Catmull-Rom spline through the player's per-event samples, so it
+        // glides through them on a smooth continuous path instead of snapping.
+        const p0 = s0?.p[i] ?? p1;
+        const p3 = s3?.p[i] ?? p2;
 
         return {
             key: i,
-            x: pa && pb ? px(pa[0] + (pb[0] - pa[0]) * t) : px(line.x),
-            y: pa && pb ? py(pa[1] + (pb[1] - pa[1]) * t) : py(line.y),
+            x: px(clamp01(catmull(p0[0], p1[0], p2[0], p3[0], t))),
+            y: py(clamp01(catmull(p0[1], p1[1], p2[1], p3[1], t))),
             s: line.s,
             slot: line.slot,
             gk: line.gk,
             name: line.name,
             ball: carrier === i,
-            target: false,
+            target: !isShot && receiver === i,
         };
     });
 
-    // Pin the two players involved in this event onto the ball's path, so the
-    // ball leaves the real carrier and arrives at the real receiver.
-    const kp = keypoints.value;
-    const frame = props.timeline[seg];
-    const isShot = frame && (frame.t === 'shot' || frame.t === 'header');
-
-    if (out[carrier] && kp[seg]) {
-        out[carrier].x = kp[seg].x;
-        out[carrier].y = kp[seg].y;
-    }
-
-    const receiver = b?.b ?? -1;
-
-    if (!isShot && out[receiver] && kp[seg + 1]) {
-        out[receiver].x = kp[seg + 1].x;
-        out[receiver].y = kp[seg + 1].y;
-        out[receiver].target = true;
-    }
-
     // The keeper dives across to meet a shot he saves.
+    const kp = keypoints.value;
+
     if (frame?.t === 'save' && kp[seg]) {
         const gk = out.find((p) => p.gk && p.s === frame.s);
 
@@ -368,11 +378,11 @@ function loop(ts: number) {
     if (highlights.value && !highlightSegs.value.has(seg)) {
         pace = 9; // blitz through the routine stuff between chances
     } else if (frame?.goal) {
-        pace = 0.5; // linger on the goal and the celebration
+        pace = 0.6; // linger on the goal and the celebration
     } else if (isShot) {
-        pace = 0.65; // savour the strike
+        pace = 0.7; // savour the strike
     } else if (still) {
-        pace = 1.6; // gently skim a settled ball
+        pace = 1.25; // gently skim a settled ball
     } else {
         pace = 1;
     }
