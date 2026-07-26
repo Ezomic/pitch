@@ -11,6 +11,7 @@ final class MatchNarrator
     public function __construct(
         private readonly MatchCommentary $commentary = new MatchCommentary,
         private readonly MatchTimeline $timeline = new MatchTimeline,
+        private readonly PlayerMotion $motion = new PlayerMotion,
     ) {}
 
     /**
@@ -19,10 +20,13 @@ final class MatchNarrator
      * leg is supplied, a 2D-replay timeline is folded in from both legs.
      *
      * @param  array<int, string>  $names  slot id => player name
-     * @param  list<array<string, mixed>>  $lineups  both teams' formation positions
+     * @param  list<array{s: int, slot: int, name: string|null, x: float, y: float, gk: bool}>  $lineups  both teams' formation positions
      */
     public function narrate(MatchResult $attack, int $opponentGoals, array $names, ?MatchResult $defence = null, array $lineups = []): MatchReport
     {
+        $timeline = $defence !== null ? $this->timeline->build($attack, $defence, $names) : [];
+        $positions = $timeline !== [] && $lineups !== [] ? $this->motion->build($timeline, $lineups) : [];
+
         return new MatchReport(
             homeGoals: $attack->goals,
             awayGoals: $opponentGoals,
@@ -30,8 +34,9 @@ final class MatchNarrator
             passesCompleted: $attack->passesCompleted,
             progressivePasses: $attack->progressivePasses,
             moments: $this->feed($attack, $names),
-            timeline: $defence !== null ? $this->timeline->build($attack, $defence, $names) : [],
+            timeline: $timeline,
             lineups: $defence !== null ? $lineups : [],
+            positions: $positions,
         );
     }
 
