@@ -27,9 +27,10 @@ final class MatchTimeline
 
     /**
      * @param  array<int, string>  $homeNames  slot id => player name
+     * @param  list<array{s: int, slot: int, name: ?string, x: float, y: float, gk: bool}>  $lineups
      * @return list<array<string, mixed>>
      */
-    public function build(MatchResult $home, ?MatchResult $away, array $homeNames): array
+    public function build(MatchResult $home, ?MatchResult $away, array $homeNames, array $lineups = []): array
     {
         $frames = $this->leg($home, side: 0, mirror: false, names: $homeNames);
 
@@ -43,7 +44,88 @@ final class MatchTimeline
         // intact and home ties fall before away ties, giving a coherent to-and-fro.
         usort($frames, fn (array $a, array $b): int => $a['m'] <=> $b['m']);
 
-        return $this->threadBall($this->withKickoffs($frames));
+        return $this->collectNearest(
+            $this->threadBall($this->withKickoffs($frames)),
+            $lineups,
+            $homeNames,
+        );
+    }
+
+    /**
+     * At a possession start the engine picks the carrier by formation band, not by
+     * who is nearest the ball, so once the ball is threaded that player can be on
+     * the far side sprinting across for a ball a team-mate was standing on.
+     * Reassign each non-shot possession-start touch to the formation player nearest
+     * to where the ball now is, so the closest man collects it and the caption,
+     * dot and motion stay in step. Shots keep their real shooter.
+     *
+     * @param  list<array<string, mixed>>  $frames
+     * @param  list<array{s: int, slot: int, name: ?string, x: float, y: float, gk: bool}>  $lineups
+     * @param  array<int, string>  $homeNames
+     * @return list<array<string, mixed>>
+     */
+    private function collectNearest(array $frames, array $lineups, array $homeNames): array
+    {
+        if ($lineups === []) {
+            return $frames;
+        }
+
+        foreach ($frames as $i => $frame) {
+            if ($frame['start'] !== true
+                || in_array($frame['t'], ['kickoff', 'shot', 'header'], true)) {
+                continue;
+            }
+
+            $side = (int) $frame['s'];
+            $slot = $this->nearestAnchor($lineups, $side, (float) $frame['x1'], (float) $frame['y1']);
+
+            if ($slot === null) {
+                continue;
+            }
+
+            $actor = $this->name($slot, $side, $homeNames);
+            $key = $this->commentary->keyFor((int) $frame['m'], $slot, $i);
+            $type = EventType::from((string) $frame['t']);
+
+            $frames[$i]['actorSlot'] = $slot;
+            $frames[$i]['actor'] = $actor;
+            $frames[$i]['label'] = $this->commentary->label(
+                $type,
+                (bool) $frame['ok'],
+                (bool) $frame['goal'],
+                $actor,
+                is_string($frame['target']) ? $frame['target'] : null,
+                $key,
+            );
+        }
+
+        return $frames;
+    }
+
+    /**
+     * The outfield slot on a side whose formation anchor is nearest a point.
+     *
+     * @param  list<array{s: int, slot: int, name: ?string, x: float, y: float, gk: bool}>  $lineups
+     */
+    private function nearestAnchor(array $lineups, int $side, float $x, float $y): ?int
+    {
+        $best = null;
+        $bestDist = INF;
+
+        foreach ($lineups as $line) {
+            if ($line['s'] !== $side || $line['gk']) {
+                continue;
+            }
+
+            $dist = ($line['x'] - $x) ** 2 + ($line['y'] - $y) ** 2;
+
+            if ($dist < $bestDist) {
+                $bestDist = $dist;
+                $best = $line['slot'];
+            }
+        }
+
+        return $best;
     }
 
     /**
