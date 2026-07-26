@@ -6,6 +6,7 @@ namespace App\Actions\Squad;
 
 use App\Models\Squad;
 use App\Sim\Engine\MatchEngine;
+use App\Sim\Squad\MatchLineups;
 use App\Sim\Squad\MatchNarrator;
 use App\Sim\Squad\MatchReport;
 use App\Sim\Squad\TeamSetup;
@@ -15,6 +16,7 @@ class SimulateMatch
     public function __construct(
         private readonly MatchEngine $engine = new MatchEngine,
         private readonly MatchNarrator $narrator = new MatchNarrator,
+        private readonly MatchLineups $lineups = new MatchLineups,
     ) {}
 
     public function handle(Squad $squad, int $seed, ?TeamSetup $opponent = null): MatchReport
@@ -46,6 +48,8 @@ class SimulateMatch
             $opponent->attackBias(),
         );
 
-        return $this->narrator->narrate($attack, $defence->goals, $names, $defence);
+        $lineups = $this->lineups->build($user->formation, $opponent->formation, $names);
+
+        return $this->narrator->narrate($attack, $defence->goals, $names, $defence, $lineups);
     }
 }
