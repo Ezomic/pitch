@@ -24,7 +24,7 @@ final class MatchNarrator
      */
     public function narrate(MatchResult $attack, int $opponentGoals, array $names, ?MatchResult $defence = null, array $lineups = []): MatchReport
     {
-        $timeline = $defence !== null ? $this->timeline->build($attack, $defence, $names) : [];
+        $timeline = $defence !== null ? $this->timeline->build($attack, $defence, $names, $lineups) : [];
         $positions = $timeline !== [] && $lineups !== [] ? $this->motion->build($timeline, $lineups) : [];
 
         return new MatchReport(

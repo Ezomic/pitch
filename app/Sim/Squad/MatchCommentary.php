@@ -136,7 +136,12 @@ final class MatchCommentary
 
     public function key(MatchEvent $event, int $index): int
     {
-        return ($event->minute * 131 + $event->actorId * 17 + $index * 7) & 0x7FFFFFFF;
+        return $this->keyFor($event->minute, $event->actorId, $index);
+    }
+
+    public function keyFor(int $minute, int $actorId, int $index): int
+    {
+        return ($minute * 131 + $actorId * 17 + $index * 7) & 0x7FFFFFFF;
     }
 
     /** @var list<string> */
