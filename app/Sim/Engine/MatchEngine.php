@@ -16,6 +16,9 @@ final class MatchEngine
 
     private const int MATCH_MINUTES = 90;
 
+    /** Actor id for a ball-winning defensive event: the (unnamed) defending side. */
+    public const int DEFENDER_ID = 0;
+
     public function __construct(
         private readonly OptionBuilder $optionBuilder = new OptionBuilder,
         private readonly DecisionMaker $decisionMaker = new DecisionMaker,
@@ -66,6 +69,20 @@ final class MatchEngine
                 );
 
                 if ($outcome->possessionEnds) {
+                    if ($outcome->turnover !== null) {
+                        $events[] = new MatchEvent(
+                            $state->minute,
+                            $outcome->turnover,
+                            self::DEFENDER_ID,
+                            null,
+                            $state->ballZone,
+                            null,
+                            true,
+                            null,
+                            null,
+                        );
+                    }
+
                     break;
                 }
 

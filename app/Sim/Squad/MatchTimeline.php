@@ -49,9 +49,17 @@ final class MatchTimeline
         $frames = [];
         // The first event of the leg opens a possession; thereafter a shot or a
         // lost pass/dribble ends one, so the next event starts a fresh possession.
+        // Defensive events are interleaved but do not carry the attacking flow, so
+        // they are shown as a frame without touching this state.
         $startsPossession = true;
 
         foreach ($result->events as $event) {
+            if ($event->type->isDefensive()) {
+                $frames[] = $this->defensiveFrame($event, $side, $mirror);
+
+                continue;
+            }
+
             $isShot = $event->type === EventType::Shot;
 
             [$x1, $y1] = $this->point($event->from->x / Zone::MAX_X, $event->from->y / Zone::MAX_Y, $mirror);
@@ -79,6 +87,32 @@ final class MatchTimeline
         }
 
         return $frames;
+    }
+
+    /**
+     * A defensive event is the defending side winning the ball at a spot: shown
+     * on the opposite side (flipped colour), a stationary marker with no pass.
+     *
+     * @return array<string, mixed>
+     */
+    private function defensiveFrame(MatchEvent $event, int $side, bool $mirror): array
+    {
+        [$x, $y] = $this->point($event->from->x / Zone::MAX_X, $event->from->y / Zone::MAX_Y, $mirror);
+
+        return [
+            'm' => $event->minute,
+            's' => $side === 0 ? 1 : 0,
+            'x1' => $x,
+            'y1' => $y,
+            'x2' => $x,
+            'y2' => $y,
+            't' => $event->type->value,
+            'ok' => true,
+            'goal' => false,
+            'start' => false,
+            'actor' => null,
+            'target' => null,
+        ];
     }
 
     /**

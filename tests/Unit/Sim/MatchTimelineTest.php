@@ -59,6 +59,22 @@ it('sends a shot without a target zone toward the goal', function () {
         ->and($frame['target'])->toBeNull();
 });
 
+it('shows a home-leg defensive event on the opposition side without a pass', function () {
+    $home = new MatchResult([
+        ev(30, EventType::Clearance, 4, 2, true),
+    ]);
+
+    $frame = (new MatchTimeline)->build($home, null, [])[0];
+
+    // The clearance happens during the home attack but is the opposition winning
+    // the ball, so it renders as the away side, stationary, with no players named.
+    expect($frame['s'])->toBe(1)
+        ->and($frame['x1'])->toBe($frame['x2'])
+        ->and($frame['y1'])->toBe($frame['y2'])
+        ->and($frame['actor'])->toBeNull()
+        ->and($frame['goal'])->toBeFalse();
+});
+
 it('marks a possession start after a shot or a lost duel', function () {
     $home = new MatchResult([
         ev(5, EventType::Pass, 0, 2, true, targetId: 2),   // opens possession
