@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Pause, Play, RotateCcw } from '@lucide/vue';
+import { Pause, Play, RotateCcw, Zap } from '@lucide/vue';
 import { computed, onBeforeUnmount, ref } from 'vue';
 import type {
     LineupPlayer,
@@ -32,6 +32,7 @@ const reduceMotion =
 const playhead = ref(0);
 const playing = ref(false);
 const speed = ref(2);
+const highlights = ref(false);
 let raf: number | null = null;
 let lastTs: number | null = null;
 
@@ -313,6 +314,28 @@ const camera = computed(() => {
 // The goal the scoring side is attacking, so the net ripples on the right spot.
 const goalSide = computed(() => (cur.value?.s === 1 ? 'left' : 'right'));
 
+// The celebration fires only once the ball has actually hit the net, not the
+// moment the strike leaves the boot.
+const goalHit = computed(
+    () =>
+        !!cur.value?.goal && playhead.value - Math.floor(playhead.value) > 0.55,
+);
+
+// The chances and goals, plus a little run-up and follow-through, that
+// highlights mode plays while it skims everything in between.
+const highlightSegs = computed(() => {
+    const set = new Set<number>();
+    props.timeline.forEach((f, i) => {
+        if (f.goal || f.t === 'shot' || f.t === 'header') {
+            for (let d = -3; d <= 1; d++) {
+                set.add(i + d);
+            }
+        }
+    });
+
+    return set;
+});
+
 function loop(ts: number) {
     if (!playing.value) {
         return;
@@ -336,10 +359,23 @@ function loop(ts: number) {
     );
     const a = kp[seg];
     const b = kp[seg + 1];
+    const frame = props.timeline[seg];
     const still = a && b && Math.hypot(b.x - a.x, b.y - a.y) < 0.5;
-    const type = props.timeline[seg]?.t;
-    const slow = type === 'shot' || type === 'header' ? 0.45 : 1; // savour the strike
-    const pace = still ? 2.4 : slow;
+    const isShot = frame?.t === 'shot' || frame?.t === 'header';
+
+    let pace: number;
+
+    if (highlights.value && !highlightSegs.value.has(seg)) {
+        pace = 9; // blitz through the routine stuff between chances
+    } else if (frame?.goal) {
+        pace = 0.3; // linger on the goal and the celebration
+    } else if (isShot) {
+        pace = 0.45; // savour the strike
+    } else if (still) {
+        pace = 2.4; // skim a settled ball
+    } else {
+        pace = 1;
+    }
 
     playhead.value = Math.min(
         count.value,
@@ -581,7 +617,7 @@ onBeforeUnmount(pause);
 
                 <!-- Net ripple at the scoring goal -->
                 <div
-                    v-if="cur?.goal"
+                    v-if="goalHit"
                     class="pointer-events-none absolute top-1/2 -translate-y-1/2"
                     :class="goalSide === 'right' ? 'right-0' : 'left-0'"
                 >
@@ -593,7 +629,7 @@ onBeforeUnmount(pause);
 
             <!-- Goal celebration (fixed to the frame, no camera drift) -->
             <div
-                v-if="cur?.goal"
+                v-if="goalHit"
                 class="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden"
             >
                 <span class="goal-flash absolute inset-0 bg-white/25"></span>
@@ -652,6 +688,22 @@ onBeforeUnmount(pause);
                 class="h-1.5 flex-1 cursor-pointer appearance-none rounded-full bg-secondary accent-primary"
                 @input="onScrub"
             />
+            <button
+                type="button"
+                class="flex size-9 shrink-0 items-center justify-center rounded-full border transition-colors"
+                :class="
+                    highlights
+                        ? 'border-primary bg-primary/15 text-primary'
+                        : 'border-border text-muted-foreground hover:text-foreground'
+                "
+                :aria-label="
+                    highlights ? 'Play the full match' : 'Play highlights only'
+                "
+                :aria-pressed="highlights"
+                @click="highlights = !highlights"
+            >
+                <Zap class="size-4" />
+            </button>
             <button
                 type="button"
                 class="w-12 shrink-0 rounded-md border border-border py-1.5 font-mono text-xs tabular-nums transition-colors hover:border-primary hover:text-primary"
