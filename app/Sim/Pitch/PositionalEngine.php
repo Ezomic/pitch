@@ -141,7 +141,8 @@ final class PositionalEngine
     private function anchor(int $side, float $advance, float $width): Vec2
     {
         // Home attacks toward x=1, so a more advanced zone sits further right; the
-        // away side is mirrored. Both teams start compressed into their own half.
+        // away side is mirrored. Deep players stay home; the forward line sits
+        // higher so attacks have bodies near the opponent box to build onto.
         $x = $side === 0 ? 0.06 + $advance * 0.5 : 0.94 - $advance * 0.5;
 
         return new Vec2($x, 0.08 + $width * 0.84);
@@ -224,6 +225,10 @@ final class PositionalEngine
                 continue;
             }
 
+            // Hold a compact block goal-side of the ball. A meaningfully higher line
+            // needs timed off-ball runs to exploit the space it concedes, which the
+            // engine does not model yet, so stepping it up here only strangles the
+            // build-up; that is deferred to the off-ball-runs stage.
             $ownGoalX = $player->side === 0 ? 0.0 : 1.0;
             $blockX = $ballX + ($ownGoalX - $ballX) * 0.45;
             $base = new Vec2(
@@ -342,25 +347,43 @@ final class PositionalEngine
         $goal = $this->goalOf($carrier->side);
         $distToGoal = $carrier->pos->distanceTo($goal);
 
-        // In range: have a go, unless a much better-placed team-mate is free.
+        // In range: shoot a genuine chance (central, close, a clear sight of goal),
+        // otherwise work a better ball. Speculative shots from tight angles or a
+        // blocked lane are what turn a match into a shooting gallery, so only take
+        // them when pressed with nothing on.
         if ($distToGoal < self::SHOOT_RANGE) {
-            $inBox = $this->bestPassTarget($state, $carrier, $goal, $distToGoal, minProgress: 0.06);
-            if ($inBox === null || $rng->next() < 0.6) {
+            $quality = $this->shotQuality($state, $carrier, $goal, $distToGoal);
+            $inBox = $this->bestPassTarget($state, $carrier, $goal, $distToGoal, minProgress: 0.02);
+
+            if ($quality > 0.5 && ($inBox === null || $rng->next() < 0.7)) {
                 $this->shoot($state, $events, $rng, $minute, $carrier, $goal, $distToGoal);
 
                 return;
             }
 
-            $this->pass($state, $events, $rng, $minute, $carrier, $inBox);
+            if ($inBox !== null && $rng->next() < 0.8) {
+                $this->pass($state, $events, $rng, $minute, $carrier, $inBox);
 
+                return;
+            }
+
+            if ($this->pressed($state)) {
+                // Forced: get the shot away rather than lose it in the box.
+                $this->shoot($state, $events, $rng, $minute, $carrier, $goal, $distToGoal);
+
+                return;
+            }
+
+            // Hold and work a better angle next tick.
             return;
         }
 
         // A through-ball into the space ahead of a runner in behind, the pass that
-        // beats the block and makes a chance.
-        if ($distToGoal < 0.55) {
+        // beats a high line and makes a chance. Played readily, because the space
+        // behind a stepped-up defence is exactly what it is there to punish.
+        if ($distToGoal < 0.6) {
             $runner = $this->bestRunner($state, $carrier, $goal, $distToGoal);
-            if ($runner !== null && $rng->next() < 0.25) {
+            if ($runner !== null && $rng->next() < 0.45) {
                 $this->pass($state, $events, $rng, $minute, $carrier, $runner, $this->spaceAheadOf($runner, $goal));
 
                 return;
@@ -551,15 +574,29 @@ final class PositionalEngine
     }
 
     /**
+     * How good a chance this is, 0..1: central angle, close range and a clear
+     * sight of goal (no defender sitting in the shot lane). Drives both whether
+     * to shoot and how likely it is to go in, so the two agree.
+     */
+    private function shotQuality(PitchState $state, PlayerState $carrier, Vec2 $goal, float $distToGoal): float
+    {
+        $angle = 1.0 - abs($carrier->pos->y - 0.5) * 1.2;   // central shots are far better
+        $range = 1.0 - min(1.0, $distToGoal / self::SHOOT_RANGE);
+        [$blocker, $laneDist] = $this->nearestOpponentToSegment($state, $carrier->pos, $goal, $carrier->side);
+        $clear = $blocker !== null && $laneDist < 0.05 ? $laneDist / 0.05 : 1.0;
+
+        return max(0.0, $angle) * $range * $clear;
+    }
+
+    /**
      * @param  list<MatchEvent>  $events
      */
     private function shoot(PitchState $state, array &$events, Rng $rng, int $minute, PlayerState $carrier, Vec2 $goal, float $distToGoal): void
     {
         $keeper = $state->players[PlayerState::id(1 - $carrier->side, 0)] ?? null;
-        $angle = 1.0 - abs($carrier->pos->y - 0.5) * 0.8;      // central shots are better
-        $range = 1.0 - min(1.0, $distToGoal / self::SHOOT_RANGE) * 0.6;
-        $keeperSave = $keeper !== null ? $keeper->attributes->tackling / 100 * 0.35 : 0.0;
-        $threshold = max(0.03, min(0.7, $carrier->attributes->finishing / 100 * $angle * $range - $keeperSave));
+        $quality = $this->shotQuality($state, $carrier, $goal, $distToGoal);
+        $keeperSave = $keeper !== null ? $keeper->attributes->tackling / 100 * 0.33 : 0.0;
+        $threshold = max(0.02, min(0.5, $carrier->attributes->finishing / 100 * $quality * 1.1 - $keeperSave));
         $goalScored = $rng->next() <= $threshold;
 
         $events[] = $this->event($minute, EventType::Shot, $carrier, null, $carrier->pos, null, $goalScored);
