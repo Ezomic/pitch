@@ -201,8 +201,8 @@ final class PositionalEngine
             }
 
             if ($player->side === $state->possessing) {
-                // Slide the whole attacking block up-field as the ball advances, so
-                // there are always options ahead and forwards reach the box.
+                // Slide the attacking block up-field as the ball advances so there
+                // are options ahead and forwards reach the box.
                 $ballAdvance = $player->side === 0 ? $ballX : 1.0 - $ballX;
                 $lift = max(0.0, ($ballAdvance - 0.25) * 0.55);
                 $dir = $player->side === 0 ? 1.0 : -1.0;
@@ -356,6 +356,17 @@ final class PositionalEngine
             return;
         }
 
+        // A through-ball into the space ahead of a runner in behind, the pass that
+        // beats the block and makes a chance.
+        if ($distToGoal < 0.55) {
+            $runner = $this->bestRunner($state, $carrier, $goal, $distToGoal);
+            if ($runner !== null && $rng->next() < 0.25) {
+                $this->pass($state, $events, $rng, $minute, $carrier, $runner, $this->spaceAheadOf($runner, $goal));
+
+                return;
+            }
+        }
+
         // Play forward when a progressive pass is on; otherwise carry into space,
         // and only recycle sideways when the way forward is blocked.
         $forward = $this->bestPassTarget($state, $carrier, $goal, $distToGoal, minProgress: 0.03);
@@ -436,36 +447,107 @@ final class PositionalEngine
     /**
      * @param  list<MatchEvent>  $events
      */
-    private function pass(PitchState $state, array &$events, Rng $rng, int $minute, PlayerState $carrier, PlayerState $target): void
+    private function pass(PitchState $state, array &$events, Rng $rng, int $minute, PlayerState $carrier, PlayerState $target, ?Vec2 $into = null): void
     {
-        // Around 85% base completion for a competent passer in space, dropping
-        // under pressure and when a defender is sitting in the passing lane, so
-        // possessions string together into build-up but a screened pass is cut out.
+        // $into is the space a through-ball is played into; a normal pass goes to
+        // the receiver's feet. Around 85% base completion for a competent passer
+        // in space, dropping under pressure and when a defender sits in the lane.
+        $dest = $into ?? $target->pos;
         $pressure = $this->pressure($state, $carrier);
-        [$laneDefender, $laneDist] = $this->nearestOpponentToSegment($state, $carrier->pos, $target->pos, $carrier->side);
+        [$laneDefender, $laneDist] = $this->nearestOpponentToSegment($state, $carrier->pos, $dest, $carrier->side);
         $laneRisk = $laneDefender !== null && $laneDist < self::LANE_RADIUS
             ? (self::LANE_RADIUS - $laneDist) / self::LANE_RADIUS * self::LANE_WEIGHT
             : 0.0;
         $threshold = max(0.1, min(0.97, 0.55 + $carrier->attributes->passing / 100 * 0.38 - $pressure - $laneRisk));
         $success = $rng->next() <= $threshold;
 
-        $interceptor = $success ? null : ($laneDefender ?? $this->nearestOpponent($state, $target->pos, $target->side));
+        $interceptor = $success ? null : ($laneDefender ?? $this->nearestOpponent($state, $dest, $target->side));
 
-        $events[] = $this->event($minute, EventType::Pass, $carrier, $target->id, $carrier->pos, $target->pos, $success);
+        $events[] = $this->event($minute, EventType::Pass, $carrier, $target->id, $carrier->pos, $dest, $success);
 
         if (! $success && $interceptor !== null) {
             $type = $carrier->pos->distanceTo($this->goalOf($interceptor->side)) < 0.35
                 ? EventType::Clearance
                 : EventType::Interception;
-            $events[] = $this->event($minute, $type, $interceptor, null, $target->pos, null, true);
+            $events[] = $this->event($minute, $type, $interceptor, null, $dest, null, true);
         }
 
-        $winner = $success ? $target : ($interceptor ?? $target);
         $state->carrierId = PitchState::NO_CARRIER;
         $state->ballKind = 'pass';
         $state->ballSpeed = self::PASS_SPEED;
-        $state->ballTarget = $winner->pos;
-        $state->ballTo = $winner->id;
+
+        if ($success) {
+            // The receiver runs onto the ball (their feet, or the space in behind).
+            $state->ballTarget = $dest;
+            $state->ballTo = $target->id;
+        } elseif ($interceptor !== null) {
+            $state->ballTarget = $interceptor->pos;
+            $state->ballTo = $interceptor->id;
+        } else {
+            $state->ballTarget = $dest;
+            $state->ballTo = $target->id;
+        }
+    }
+
+    /**
+     * The best runner to slip in behind: a team-mate ahead of the ball with clear
+     * space between him and the goal, so a through-ball can find him.
+     */
+    private function bestRunner(PitchState $state, PlayerState $carrier, Vec2 $goal, float $distToGoal): ?PlayerState
+    {
+        $best = null;
+        $bestScore = 0.05;
+
+        // The offside line: the deepest defending outfielder. A runner beyond it is
+        // offside, so a through-ball to him would not stand.
+        $lastLine = INF;
+        foreach ($state->players as $defender) {
+            if ($defender->side === $carrier->side || $defender->isGoalkeeper()) {
+                continue;
+            }
+            $lastLine = min($lastLine, $defender->pos->distanceTo($goal));
+        }
+
+        foreach ($state->players as $mate) {
+            if ($mate->side !== $carrier->side || $mate->id === $carrier->id || $mate->isGoalkeeper()) {
+                continue;
+            }
+
+            $reach = $carrier->pos->distanceTo($mate->pos);
+            if ($reach > self::MAX_PASS || $reach < 0.05) {
+                continue;
+            }
+
+            $mateToGoal = $mate->pos->distanceTo($goal);
+            if ($mateToGoal >= $distToGoal - 0.03) {
+                continue; // must be ahead of the ball
+            }
+
+            if ($mateToGoal < $lastLine - 0.02) {
+                continue; // offside, beyond the last defender
+            }
+
+            $space = $this->spaceAheadOf($mate, $goal);
+            $cover = $this->nearestOpponent($state, $space, $mate->side);
+            $openness = $cover === null ? 0.12 : min(0.12, $space->distanceTo($cover->pos));
+            if ($openness < 0.04) {
+                continue; // the space in behind is covered
+            }
+
+            $score = ($distToGoal - $mateToGoal) + $openness * 1.5 - $reach * 0.15;
+            if ($score > $bestScore) {
+                $bestScore = $score;
+                $best = $mate;
+            }
+        }
+
+        return $best;
+    }
+
+    /** A point a short way ahead of a runner, toward the goal, to play him in. */
+    private function spaceAheadOf(PlayerState $runner, Vec2 $goal): Vec2
+    {
+        return $runner->pos->moveToward($goal, 0.1);
     }
 
     /**
