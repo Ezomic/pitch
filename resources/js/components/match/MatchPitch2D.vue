@@ -20,7 +20,7 @@ const props = withDefaults(
 
 const PAD_X = 5; // keep markers inside the touchlines / behind the goals
 const PAD_Y = 10;
-const SEG_MS = 460; // base time per event at 1×; the clock runs continuously
+const SEG_MS = 620; // base time per event at 1×; the clock runs continuously
 
 const reduceMotion =
     typeof window !== 'undefined' &&
@@ -31,7 +31,7 @@ const reduceMotion =
 // each. `index` is just the frame the playhead currently sits in.
 const playhead = ref(0);
 const playing = ref(false);
-const speed = ref(2);
+const speed = ref(1);
 const highlights = ref(false);
 let raf: number | null = null;
 let lastTs: number | null = null;
@@ -368,11 +368,11 @@ function loop(ts: number) {
     if (highlights.value && !highlightSegs.value.has(seg)) {
         pace = 9; // blitz through the routine stuff between chances
     } else if (frame?.goal) {
-        pace = 0.3; // linger on the goal and the celebration
+        pace = 0.5; // linger on the goal and the celebration
     } else if (isShot) {
-        pace = 0.45; // savour the strike
+        pace = 0.65; // savour the strike
     } else if (still) {
-        pace = 2.4; // skim a settled ball
+        pace = 1.6; // gently skim a settled ball
     } else {
         pace = 1;
     }
