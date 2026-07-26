@@ -82,6 +82,8 @@ final class PlayerMotion
         $ballY = (float) $frame['y2'];
         $isShot = in_array($frame['t'], ['shot', 'header'], true);
         $moving = $originX !== $ballX || $originY !== $ballY;
+        $actorSlot = isset($frame['actorSlot']) ? (int) $frame['actorSlot'] : null;
+        $targetSlot = isset($frame['targetSlot']) ? (int) $frame['targetSlot'] : null;
 
         $players = [];
         foreach ($lineups as $line) {
@@ -92,15 +94,21 @@ final class PlayerMotion
         // to the attackers rather than only to the ball.
         $players = $this->mark($players, $possessing);
 
-        // The nearest team-mate to where the ball started carries it.
-        $carrier = $this->nearest($players, $possessing, $originX, $originY, skip: -1);
+        // The player the engine actually put on the ball carries it, so the dot on
+        // the ball is the same one the caption names. Only fall back to the nearest
+        // team-mate when there is no real actor (a defensive win, a kick-off).
+        $carrier = $this->slotIndex($lineups, $possessing, $actorSlot)
+            ?? $this->nearest($players, $possessing, $originX, $originY, skip: -1);
         if (isset($players[$carrier])) {
             $players[$carrier] = [...$players[$carrier], 'x' => $originX, 'y' => $originY, 'hasBall' => true];
         }
 
-        // On a pass or carry, the receiver runs onto the destination.
-        if ($moving && ! $isShot) {
-            $receiver = $this->nearest($players, $possessing, $ballX, $ballY, skip: $carrier);
+        // On a pass or cross, the engine's actual target receives it at their spot;
+        // a dribble has no target, so the carrier travels on with the ball instead
+        // of a phantom receiver appearing on the destination.
+        if ($moving && ! $isShot && $targetSlot !== null) {
+            $receiver = $this->slotIndex($lineups, $possessing, $targetSlot)
+                ?? $this->nearest($players, $possessing, $ballX, $ballY, skip: $carrier);
             if (isset($players[$receiver])) {
                 $players[$receiver] = [...$players[$receiver], 'x' => $ballX, 'y' => $ballY];
             }
@@ -219,6 +227,27 @@ final class PlayerMotion
         $h = ($slot * 73856093) ^ ($side * 19349663) ^ ($axis * 83492791);
 
         return ((($h % 1000) + 1000) % 1000 / 1000 - 0.5) * 0.06;
+    }
+
+    /**
+     * The lineup index of a given side's slot, or null when there is no such slot
+     * (an unknown or absent engine actor).
+     *
+     * @param  list<array{s: int, slot: int, name: ?string, x: float, y: float, gk: bool}>  $lineups
+     */
+    private function slotIndex(array $lineups, int $side, ?int $slot): ?int
+    {
+        if ($slot === null) {
+            return null;
+        }
+
+        foreach ($lineups as $i => $line) {
+            if ($line['s'] === $side && $line['slot'] === $slot) {
+                return $i;
+            }
+        }
+
+        return null;
     }
 
     /**

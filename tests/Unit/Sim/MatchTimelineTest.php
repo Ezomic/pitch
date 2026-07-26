@@ -55,6 +55,8 @@ it('carries both endpoints and the receiver for a pass', function () {
 
     expect($frame['actor'])->toBe('Smith')
         ->and($frame['target'])->toBe('Jones')
+        ->and($frame['actorSlot'])->toBe(1)
+        ->and($frame['targetSlot'])->toBe(7)
         ->and($frame['x1'])->toBe(round(2 / Zone::MAX_X, 3))
         ->and($frame['x2'])->toBe(round(4 / Zone::MAX_X, 3));
 });
@@ -67,7 +69,9 @@ it('sends a shot without a target zone toward the goal', function () {
     // No `to` on the event, so the ball is aimed at the attacking goal mouth.
     expect($frame['x2'])->toBe(1.0)
         ->and($frame['y2'])->toBe(0.5)
-        ->and($frame['target'])->toBeNull();
+        ->and($frame['target'])->toBeNull()
+        ->and($frame['actorSlot'])->toBe(1)
+        ->and($frame['targetSlot'])->toBeNull();
 });
 
 it('shows a home-leg defensive event on the opposition side without a pass', function () {

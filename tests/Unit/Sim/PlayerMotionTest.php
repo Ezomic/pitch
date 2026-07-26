@@ -25,6 +25,56 @@ function motionFrame(int $side, float $x1, float $y1, float $x2, float $y2, stri
     return ['m' => 10, 's' => $side, 'x1' => $x1, 'y1' => $y1, 'x2' => $x2, 'y2' => $y2, 't' => $type];
 }
 
+function slotIndex(array $lineups, int $side, int $slot): int
+{
+    foreach ($lineups as $i => $line) {
+        if ($line['s'] === $side && $line['slot'] === $slot) {
+            return $i;
+        }
+    }
+
+    return -1;
+}
+
+it('puts the engine actor and target on the ball, not the nearest dot', function () {
+    $lineups = motionLineups();
+    $frame = motionFrame(0, 0.35, 0.5, 0.7, 0.5);
+    $frame['actorSlot'] = 5;
+    $frame['targetSlot'] = 9;
+
+    $positions = (new PlayerMotion)->build([$frame], $lineups)[0];
+
+    $carrier = slotIndex($lineups, 0, 5);
+    $receiver = slotIndex($lineups, 0, 9);
+
+    // The carrier index the replay marks is the engine's real actor (slot 5),
+    // sitting exactly on the ball origin.
+    expect($positions['b'])->toBe($carrier)
+        ->and($positions['p'][$carrier])->toBe([0.35, 0.5])
+        // ...and the engine's real target (slot 9) is on the destination.
+        ->and($positions['p'][$receiver])->toBe([0.7, 0.5]);
+});
+
+it('lets a dribbler carry on without spawning a phantom receiver', function () {
+    $lineups = motionLineups();
+    // A dribble: same carrier, ball advances, no pass target.
+    $frame = motionFrame(0, 0.5, 0.5, 0.68, 0.5, 'dribble');
+    $frame['actorSlot'] = 6;
+    $frame['targetSlot'] = null;
+
+    $positions = (new PlayerMotion)->build([$frame], $lineups)[0];
+
+    // No team-mate is pinned to the ball's destination; only the carrier holds it.
+    $onDestination = array_filter(
+        $positions['p'],
+        fn ($xy, $i) => $xy === [0.68, 0.5] && $i !== $positions['b'],
+        ARRAY_FILTER_USE_BOTH,
+    );
+
+    expect($positions['b'])->toBe(slotIndex($lineups, 0, 6))
+        ->and($onDestination)->toBe([]);
+});
+
 it('places the ball carrier exactly on the ball', function () {
     $lineups = motionLineups();
     $frame = motionFrame(0, 0.35, 0.5, 0.7, 0.5);

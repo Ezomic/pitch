@@ -17,6 +17,8 @@ export interface TimelineFrame {
     start: boolean;
     actor: string | null; // player on the ball
     target: string | null; // receiver, or null for a shot
+    actorSlot: number | null; // engine slot of the player on the ball
+    targetSlot: number | null; // engine slot of the pass target, or null
     label: string; // server-authored caption for this frame
 }
 
