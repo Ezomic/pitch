@@ -11,6 +11,7 @@ final readonly class MatchReport
      * @param  list<array<string, mixed>>  $timeline  ordered ball-position frames for the 2D replay
      * @param  list<array<string, mixed>>  $lineups  both teams' formation positions for the 2D replay
      * @param  list<array{b: int, p: list<array{float, float}>}>  $positions  per-frame player positions for the 2D replay
+     * @param  array<string, mixed>  $stream  positional engine replay stream (players + per-frame positions)
      */
     public function __construct(
         public int $homeGoals,
@@ -22,6 +23,7 @@ final readonly class MatchReport
         public array $timeline = [],
         public array $lineups = [],
         public array $positions = [],
+        public array $stream = [],
     ) {}
 
     /**
@@ -39,6 +41,7 @@ final readonly class MatchReport
             'timeline' => $this->timeline,
             'lineups' => $this->lineups,
             'positions' => $this->positions,
+            'stream' => $this->stream,
         ];
     }
 }

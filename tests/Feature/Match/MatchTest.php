@@ -18,7 +18,7 @@ beforeEach(function () {
     Player::factory()->count(4)->create([...$strong, 'position' => Position::Forward]);
 });
 
-it('renders a match report with a scoreline, moments and a 2D timeline', function () {
+it('renders a match report with a scoreline, moments and a positional replay stream', function () {
     $user = User::factory()->create();
 
     $this->actingAs($user)
@@ -30,14 +30,14 @@ it('renders a match report with a scoreline, moments and a 2D timeline', functio
             ->has('report.homeGoals')
             ->has('report.awayGoals')
             ->has('report.moments')
-            ->has('report.timeline')
-            ->has('report.positions')
-            ->has('report.timeline.0', fn (Assert $frame) => $frame
-                ->has('m')->has('s')->has('x1')->has('y1')->has('x2')->has('y2')
-                ->has('t')->has('ok')->has('goal')->has('start')
-                ->has('actor')->has('target')->has('actorSlot')->has('targetSlot')
-                ->has('label'),
-            ),
+            // The watched match is simulated positionally: 22 players and a
+            // per-frame position stream the replay plays back directly.
+            ->has('report.stream.players', 22)
+            ->has('report.stream.frames')
+            ->has('report.stream.frames.0', fn (Assert $frame) => $frame
+                ->has('m')->has('b')->has('c')->has('s')->has('p')->has('cap'))
+            ->has('report.stream.players.0', fn (Assert $meta) => $meta
+                ->has('s')->has('slot')->has('name')->has('gk')),
         );
 });
 

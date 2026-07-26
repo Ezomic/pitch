@@ -2,6 +2,7 @@
 import { Head, router } from '@inertiajs/vue3';
 import { RefreshCw } from '@lucide/vue';
 import MatchPitch2D from '@/components/match/MatchPitch2D.vue';
+import MatchPitchLive from '@/components/match/MatchPitchLive.vue';
 import { Button } from '@/components/ui/button';
 import { show } from '@/routes/match';
 import type { MatchReport } from '@/types/match';
@@ -92,13 +93,26 @@ const stats = [
         </div>
 
         <div
-            v-if="props.report.timeline.length > 0"
+            v-if="
+                (props.report.stream &&
+                    props.report.stream.frames.length > 0) ||
+                props.report.timeline.length > 0
+            "
             class="rounded-xl border border-sidebar-border/70 p-4 dark:border-sidebar-border"
         >
             <h2 class="mb-3 text-sm font-medium text-muted-foreground">
                 Match replay
             </h2>
+            <MatchPitchLive
+                v-if="
+                    props.report.stream && props.report.stream.frames.length > 0
+                "
+                :stream="props.report.stream"
+                home-name="Your squad"
+                :away-name="props.opponentName"
+            />
             <MatchPitch2D
+                v-else
                 :timeline="props.report.timeline"
                 :lineups="props.report.lineups"
                 :positions="props.report.positions"
