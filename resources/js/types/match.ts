@@ -17,6 +17,7 @@ export interface TimelineFrame {
     start: boolean;
     actor: string | null; // player on the ball
     target: string | null; // receiver, or null for a shot
+    label: string; // server-authored caption for this frame
 }
 
 export interface LineupPlayer {

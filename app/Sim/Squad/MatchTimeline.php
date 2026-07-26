@@ -19,6 +19,10 @@ use App\Sim\Engine\MatchResult;
  */
 final class MatchTimeline
 {
+    public function __construct(
+        private readonly MatchCommentary $commentary = new MatchCommentary,
+    ) {}
+
     /**
      * @param  array<int, string>  $homeNames  slot id => player name
      * @return list<array<string, mixed>>
@@ -53,23 +57,31 @@ final class MatchTimeline
         // they are shown as a frame without touching this state.
         $startsPossession = true;
 
-        foreach ($result->events as $event) {
+        foreach ($result->events as $index => $event) {
+            $key = $this->commentary->key($event, $index);
+
             if ($event->type->isDefensive()) {
-                $frames[] = $this->defensiveFrame($event, $side, $mirror);
+                $frames[] = $this->defensiveFrame($event, $side, $mirror, $key);
 
                 continue;
             }
 
             if (in_array($event->type, [EventType::Foul, EventType::Corner], true)) {
-                $frames[] = $this->flavourFrame($event, $side, $mirror, $names);
+                $frames[] = $this->flavourFrame($event, $side, $mirror, $names, $key);
 
                 continue;
             }
 
             $isShot = $event->type->isShot();
+            $goal = $isShot && $event->success;
 
             [$x1, $y1] = $this->point($event->from->x / Zone::MAX_X, $event->from->y / Zone::MAX_Y, $mirror);
             [$x2, $y2] = $this->destination($event, $isShot, $mirror);
+
+            $actor = $this->name($event->actorId, $side, $names);
+            // The opponent has no named players, so a receiver name would just
+            // read "Opposition → Opposition"; only name the home receiver.
+            $target = (! $isShot && $side === 0) ? $this->name($event->targetId, 0, $names) : null;
 
             $frames[] = [
                 'm' => $event->minute,
@@ -80,12 +92,11 @@ final class MatchTimeline
                 'y2' => $y2,
                 't' => $event->type->value,
                 'ok' => $event->success,
-                'goal' => $isShot && $event->success,
+                'goal' => $goal,
                 'start' => $startsPossession,
-                'actor' => $this->name($event->actorId, $side, $names),
-                // The opponent has no named players, so a receiver name would just
-                // read "Opposition → Opposition"; only name the home receiver.
-                'target' => (! $isShot && $side === 0) ? $this->name($event->targetId, 0, $names) : null,
+                'actor' => $actor,
+                'target' => $target,
+                'label' => $this->commentary->label($event->type, $event->success, $goal, $actor, $target, $key),
             ];
 
             $startsPossession = $isShot
@@ -101,7 +112,7 @@ final class MatchTimeline
      *
      * @return array<string, mixed>
      */
-    private function defensiveFrame(MatchEvent $event, int $side, bool $mirror): array
+    private function defensiveFrame(MatchEvent $event, int $side, bool $mirror, int $key): array
     {
         [$x, $y] = $this->point($event->from->x / Zone::MAX_X, $event->from->y / Zone::MAX_Y, $mirror);
 
@@ -118,6 +129,7 @@ final class MatchTimeline
             'start' => false,
             'actor' => null,
             'target' => null,
+            'label' => $this->commentary->label($event->type, true, false, null, null, $key),
         ];
     }
 
@@ -128,9 +140,10 @@ final class MatchTimeline
      * @param  array<int, string>  $names
      * @return array<string, mixed>
      */
-    private function flavourFrame(MatchEvent $event, int $side, bool $mirror, array $names): array
+    private function flavourFrame(MatchEvent $event, int $side, bool $mirror, array $names, int $key): array
     {
         [$x, $y] = $this->point($event->from->x / Zone::MAX_X, $event->from->y / Zone::MAX_Y, $mirror);
+        $actor = $this->name($event->actorId, $side, $names);
 
         return [
             'm' => $event->minute,
@@ -143,8 +156,9 @@ final class MatchTimeline
             'ok' => true,
             'goal' => false,
             'start' => false,
-            'actor' => $this->name($event->actorId, $side, $names),
+            'actor' => $actor,
             'target' => null,
+            'label' => $this->commentary->label($event->type, true, false, $actor, null, $key),
         ];
     }
 
