@@ -69,8 +69,13 @@ const pointAt = (nx: number, ny: number) => ({
 // This is the same origin PlayerMotion sits the carrier on and the same
 // destination it sends the receiver to, so the ball is always on a player and
 // only ever cuts when possession genuinely restarts somewhere else.
-const framePts = computed<{ a: { x: number; y: number }; b: { x: number; y: number } }[]>(
-    () => props.timeline.map((f) => ({ a: pointAt(f.x1, f.y1), b: pointAt(f.x2, f.y2) })),
+const framePts = computed<
+    { a: { x: number; y: number }; b: { x: number; y: number } }[]
+>(() =>
+    props.timeline.map((f) => ({
+        a: pointAt(f.x1, f.y1),
+        b: pointAt(f.x2, f.y2),
+    })),
 );
 
 // A Catmull-Rom pass so the ball weaves smoothly through consecutive touches
