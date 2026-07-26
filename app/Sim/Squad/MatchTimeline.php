@@ -102,6 +102,8 @@ final class MatchTimeline
             'start' => true,
             'actor' => null,
             'target' => null,
+            'actorSlot' => null,
+            'targetSlot' => null,
             'label' => 'Kick-off',
         ];
     }
@@ -158,6 +160,11 @@ final class MatchTimeline
                 'start' => $startsPossession,
                 'actor' => $actor,
                 'target' => $target,
+                // The engine's real actor and pass target (formation slots), so the
+                // replay can put the exact players the engine chose on the ball
+                // rather than whichever dot happens to be nearest.
+                'actorSlot' => $event->actorId,
+                'targetSlot' => $isShot ? null : $event->targetId,
                 'label' => $this->commentary->label($event->type, $event->success, $goal, $actor, $target, $key),
             ];
 
@@ -191,6 +198,8 @@ final class MatchTimeline
             'start' => false,
             'actor' => null,
             'target' => null,
+            'actorSlot' => null,
+            'targetSlot' => null,
             'label' => $this->commentary->label($event->type, true, false, null, null, $key),
         ];
     }
@@ -220,6 +229,8 @@ final class MatchTimeline
             'start' => false,
             'actor' => $actor,
             'target' => null,
+            'actorSlot' => $event->actorId,
+            'targetSlot' => null,
             'label' => $this->commentary->label($event->type, true, false, $actor, null, $key),
         ];
     }
