@@ -125,12 +125,16 @@ it('defends with a block goal-side of the ball', function () {
     expect($goalSide / $total)->toBeGreaterThan(0.85);
 });
 
-it('produces goals across a run of seeds', function () {
+it('produces realistic scorelines across seeds', function () {
+    $seeds = [7, 21, 11, 42, 5, 1, 2, 3, 8, 13];
     $goals = 0;
-    foreach ([7, 21, 11, 42, 5, 1, 2, 3, 8, 13] as $seed) {
+    foreach ($seeds as $seed) {
         $result = pitchMatch($seed);
         $goals += $result->homeGoals + $result->awayGoals;
     }
 
-    expect($goals)->toBeGreaterThan(0);
+    // Neither a shutout every week nor a cricket score: through-balls create
+    // chances but the block and keeper keep goals in a sane band.
+    $average = $goals / count($seeds);
+    expect($average)->toBeGreaterThan(0.5)->toBeLessThan(6.0);
 });
