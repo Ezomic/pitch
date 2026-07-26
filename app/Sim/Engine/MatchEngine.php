@@ -34,8 +34,7 @@ final class MatchEngine
     {
         $defense ??= Defense::none();
         $formation ??= Formation::balanced();
-        $kickoffZone = $formation->kickoffZone();
-        $kickoffSlot = $formation->kickoffSlot;
+        $bands = $this->startBands($players);
         $rng = new Rng($seed);
         $events = [];
 
@@ -44,7 +43,8 @@ final class MatchEngine
 
         for ($possession = 0; $possession < $possessions; $possession++) {
             $minute = $fromMinute + intdiv($possession * $window, $possessions);
-            $state = new MatchState($kickoffZone, $kickoffSlot, $minute);
+            $starter = $this->startCarrier($players, $bands, $rng);
+            $state = new MatchState($players[$starter]->zone, $starter, $minute);
 
             for ($tick = 0; $tick < self::MAX_TICKS_PER_POSSESSION; $tick++) {
                 $options = $this->optionBuilder->build($state, $players);
@@ -80,5 +80,56 @@ final class MatchEngine
         }
 
         return new MatchResult($events);
+    }
+
+    /**
+     * Bucket the outfielders by pitch band so possessions can begin from
+     * different areas. Ids are sorted within a band for stable, deterministic
+     * indexing off the rng.
+     *
+     * @param  array<int, Player>  $players
+     * @return array{deep: list<int>, mid: list<int>, adv: list<int>}
+     */
+    private function startBands(array $players): array
+    {
+        $bands = ['deep' => [], 'mid' => [], 'adv' => []];
+
+        foreach ($players as $player) {
+            $band = match (true) {
+                $player->zone->x <= 1 => 'deep',
+                $player->zone->x <= 3 => 'mid',
+                default => 'adv',
+            };
+            $bands[$band][] = $player->id;
+        }
+
+        foreach ($bands as &$ids) {
+            sort($ids);
+        }
+
+        return $bands;
+    }
+
+    /**
+     * Pick where an attack starts: mostly a build-up from the back, often a
+     * midfield regain, occasionally a win high up the pitch. Falls back through
+     * the bands so a shape with an empty band still yields a carrier.
+     *
+     * @param  array<int, Player>  $players
+     * @param  array{deep: list<int>, mid: list<int>, adv: list<int>}  $bands
+     */
+    private function startCarrier(array $players, array $bands, Rng $rng): int
+    {
+        $roll = $rng->next();
+        $order = $roll < 0.6 ? ['deep', 'mid', 'adv']
+            : ($roll < 0.95 ? ['mid', 'deep', 'adv'] : ['adv', 'mid', 'deep']);
+
+        foreach ($order as $band) {
+            if ($bands[$band] !== []) {
+                return $bands[$band][$rng->below(count($bands[$band]))];
+            }
+        }
+
+        return array_key_first($players) ?? 1;
     }
 }
