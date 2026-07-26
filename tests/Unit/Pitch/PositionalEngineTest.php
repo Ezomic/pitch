@@ -97,6 +97,34 @@ it('keeps the ball continuous in open play', function () {
     expect($big)->toBeLessThanOrEqual($result->homeGoals + $result->awayGoals + 1);
 });
 
+it('defends with a block goal-side of the ball', function () {
+    $frames = pitchMatch(7)->frames;
+
+    // While the home side attacks (possessing 0), the away outfielders (stream
+    // indices 12..21; index 11 is their keeper) should hold a block between the
+    // ball and the goal they defend at x=1, i.e. their average x is ahead of the
+    // ball. This is a real defensive shape, not players chasing the ball.
+    $goalSide = 0;
+    $total = 0;
+    foreach ($frames as $frame) {
+        if ($frame['s'] !== 0) {
+            continue;
+        }
+
+        $sum = 0.0;
+        for ($i = 12; $i < 22; $i++) {
+            $sum += $frame['p'][$i][0];
+        }
+
+        if ($sum / 10 > $frame['b'][0]) {
+            $goalSide++;
+        }
+        $total++;
+    }
+
+    expect($goalSide / $total)->toBeGreaterThan(0.85);
+});
+
 it('produces goals across a run of seeds', function () {
     $goals = 0;
     foreach ([7, 21, 11, 42, 5, 1, 2, 3, 8, 13] as $seed) {

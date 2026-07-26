@@ -41,7 +41,7 @@ final class PositionalEngine
 
     private const float SHOT_SPEED = 0.55;
 
-    private const float SHOOT_RANGE = 0.24;       // distance to goal a shot is viable from
+    private const float SHOOT_RANGE = 0.26;       // distance to goal a shot is viable from
 
     private const float MAX_PASS = 0.55;          // longest pass a player attempts
 
@@ -50,6 +50,12 @@ final class PositionalEngine
     private const float TACKLE_RADIUS = 0.028;    // a defender this close contests the ball
 
     private const float MARK_RADIUS = 0.05;       // an opponent this close counts as marking
+
+    private const float MARK = 0.15;              // how hard a defender shades onto its man
+
+    private const float LANE_RADIUS = 0.04;       // a defender this near a pass lane can cut it
+
+    private const float LANE_WEIGHT = 0.2;        // how much a covered lane suppresses a pass
 
     /**
      * @param  array<int, Player>  $home  slot id => player (ten outfielders)
@@ -208,8 +214,9 @@ final class PositionalEngine
                 continue;
             }
 
-            // Out of possession: the nearest man presses the ball, the rest drop
-            // into a block goal-side of it.
+            // Out of possession: the nearest man presses the carrier; the rest
+            // hold a compact block goal-side of the ball, each shading onto the
+            // runner it is responsible for so the pass into him is screened.
             $carrier = $state->carrier();
             if ($carrier !== null && $this->isNearestDefender($state, $player, $carrier->pos)) {
                 $player->target = $carrier->pos;
@@ -219,10 +226,22 @@ final class PositionalEngine
 
             $ownGoalX = $player->side === 0 ? 0.0 : 1.0;
             $blockX = $ballX + ($ownGoalX - $ballX) * 0.45;
-            $player->target = (new Vec2(
+            $base = new Vec2(
                 $player->anchor->x + ($blockX - $player->anchor->x) * 0.5,
                 $player->anchor->y + ($state->ball->y - 0.5) * 0.3,
-            ))->clampToPitch();
+            );
+
+            $man = $this->markAssignment($state, $player);
+            if ($man !== null) {
+                $dir = $player->side === 0 ? -1.0 : 1.0; // toward own goal
+                $goalSide = new Vec2($man->pos->x + $dir * 0.03, $man->pos->y);
+                $base = new Vec2(
+                    $base->x + ($goalSide->x - $base->x) * self::MARK,
+                    $base->y + ($goalSide->y - $base->y) * self::MARK,
+                );
+            }
+
+            $player->target = $base->clampToPitch();
         }
     }
 
@@ -420,12 +439,17 @@ final class PositionalEngine
     private function pass(PitchState $state, array &$events, Rng $rng, int $minute, PlayerState $carrier, PlayerState $target): void
     {
         // Around 85% base completion for a competent passer in space, dropping
-        // under pressure, so possessions string together into build-up.
+        // under pressure and when a defender is sitting in the passing lane, so
+        // possessions string together into build-up but a screened pass is cut out.
         $pressure = $this->pressure($state, $carrier);
-        $threshold = max(0.1, min(0.97, 0.55 + $carrier->attributes->passing / 100 * 0.38 - $pressure));
+        [$laneDefender, $laneDist] = $this->nearestOpponentToSegment($state, $carrier->pos, $target->pos, $carrier->side);
+        $laneRisk = $laneDefender !== null && $laneDist < self::LANE_RADIUS
+            ? (self::LANE_RADIUS - $laneDist) / self::LANE_RADIUS * self::LANE_WEIGHT
+            : 0.0;
+        $threshold = max(0.1, min(0.97, 0.55 + $carrier->attributes->passing / 100 * 0.38 - $pressure - $laneRisk));
         $success = $rng->next() <= $threshold;
 
-        $interceptor = $success ? null : $this->nearestOpponent($state, $target->pos, $target->side);
+        $interceptor = $success ? null : ($laneDefender ?? $this->nearestOpponent($state, $target->pos, $target->side));
 
         $events[] = $this->event($minute, EventType::Pass, $carrier, $target->id, $carrier->pos, $target->pos, $success);
 
@@ -505,6 +529,42 @@ final class PositionalEngine
         return $dist >= self::MARK_RADIUS ? 0.0 : (self::MARK_RADIUS - $dist) / self::MARK_RADIUS * 0.35;
     }
 
+    /**
+     * The single attacker this defender is responsible for: its nearest man, but
+     * only when it is the closest available defender to him (the presser is busy
+     * on the carrier), so each runner is picked up once instead of the whole line
+     * collapsing onto the ball.
+     */
+    private function markAssignment(PitchState $state, PlayerState $defender): ?PlayerState
+    {
+        $man = $this->nearestOpponent($state, $defender->pos, $defender->side);
+        if ($man === null || $defender->pos->distanceTo($man->pos) > 0.25) {
+            return null;
+        }
+
+        $carrier = $state->carrier();
+        $owner = null;
+        $ownerDist = INF;
+
+        foreach ($state->players as $other) {
+            if ($other->side !== $defender->side || $other->isGoalkeeper()) {
+                continue;
+            }
+
+            if ($carrier !== null && $this->isNearestDefender($state, $other, $carrier->pos)) {
+                continue; // the presser is committed to the carrier
+            }
+
+            $dist = $other->pos->distanceTo($man->pos);
+            if ($dist < $ownerDist) {
+                $ownerDist = $dist;
+                $owner = $other;
+            }
+        }
+
+        return $owner !== null && $owner->id === $defender->id ? $man : null;
+    }
+
     private function isNearestDefender(PitchState $state, PlayerState $defender, Vec2 $point): bool
     {
         $nearest = $this->nearestOpponent($state, $point, 1 - $defender->side);
@@ -530,6 +590,47 @@ final class PositionalEngine
         }
 
         return $best;
+    }
+
+    /**
+     * The opponent best placed to intercept a pass along the segment a→b, and its
+     * distance to that lane.
+     *
+     * @return array{PlayerState|null, float}
+     */
+    private function nearestOpponentToSegment(PitchState $state, Vec2 $a, Vec2 $b, int $side): array
+    {
+        $best = null;
+        $bestDist = INF;
+
+        foreach ($state->players as $player) {
+            if ($player->side === $side || $player->isGoalkeeper()) {
+                continue;
+            }
+
+            $dist = $this->segmentDistance($player->pos, $a, $b);
+            if ($dist < $bestDist) {
+                $bestDist = $dist;
+                $best = $player;
+            }
+        }
+
+        return [$best, $bestDist];
+    }
+
+    private function segmentDistance(Vec2 $point, Vec2 $a, Vec2 $b): float
+    {
+        $ab = $b->sub($a);
+        $lengthSq = $ab->x * $ab->x + $ab->y * $ab->y;
+
+        if ($lengthSq <= 0.0) {
+            return $point->distanceTo($a);
+        }
+
+        $t = (($point->x - $a->x) * $ab->x + ($point->y - $a->y) * $ab->y) / $lengthSq;
+        $t = max(0.0, min(1.0, $t));
+
+        return $point->distanceTo($a->add($ab->scale($t)));
     }
 
     private function centralOutfielder(PitchState $state, int $side): ?PlayerState
