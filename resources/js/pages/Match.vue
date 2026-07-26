@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { Head, router } from '@inertiajs/vue3';
 import { RefreshCw } from '@lucide/vue';
+import MatchPitch2D from '@/components/match/MatchPitch2D.vue';
 import { Button } from '@/components/ui/button';
 import { show } from '@/routes/match';
 import type { MatchReport } from '@/types/match';
@@ -88,6 +89,20 @@ const stats = [
                 <RefreshCw class="h-4 w-4" />
                 Watch another match
             </Button>
+        </div>
+
+        <div
+            v-if="props.report.timeline.length > 0"
+            class="rounded-xl border border-sidebar-border/70 p-4 dark:border-sidebar-border"
+        >
+            <h2 class="mb-3 text-sm font-medium text-muted-foreground">
+                Match replay
+            </h2>
+            <MatchPitch2D
+                :timeline="props.report.timeline"
+                home-name="Your squad"
+                :away-name="props.opponentName"
+            />
         </div>
 
         <div

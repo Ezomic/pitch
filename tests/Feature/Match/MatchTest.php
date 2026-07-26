@@ -18,7 +18,7 @@ beforeEach(function () {
     Player::factory()->count(4)->create([...$strong, 'position' => Position::Forward]);
 });
 
-it('renders a match report with a scoreline and moments', function () {
+it('renders a match report with a scoreline, moments and a 2D timeline', function () {
     $user = User::factory()->create();
 
     $this->actingAs($user)
@@ -29,7 +29,12 @@ it('renders a match report with a scoreline and moments', function () {
             ->where('seed', 3)
             ->has('report.homeGoals')
             ->has('report.awayGoals')
-            ->has('report.moments'),
+            ->has('report.moments')
+            ->has('report.timeline')
+            ->has('report.timeline.0', fn (Assert $frame) => $frame
+                ->has('m')->has('s')->has('x')->has('y')
+                ->has('t')->has('ok')->has('goal')->has('start')->has('who'),
+            ),
         );
 });
 

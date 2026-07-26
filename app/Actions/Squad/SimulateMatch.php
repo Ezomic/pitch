@@ -46,6 +46,6 @@ class SimulateMatch
             $opponent->attackBias(),
         );
 
-        return $this->narrator->narrate($attack, $defence->goals, $names);
+        return $this->narrator->narrate($attack, $defence->goals, $names, $defence);
     }
 }
