@@ -117,6 +117,17 @@ it('produces set pieces: fouls, throw-ins, corners and goal kicks', function () 
         ->and($counts[EventType::GoalKick->value] ?? 0)->toBeGreaterThan(0);
 });
 
+it('attacks down the wings and crosses into the box', function () {
+    $crosses = 0;
+    foreach (pitchMatch(7)->events as $event) {
+        if ($event->type === EventType::Cross) {
+            $crosses++;
+        }
+    }
+
+    expect($crosses)->toBeGreaterThan(0);
+});
+
 it('awards the occasional penalty for a foul in the box', function () {
     // Penalties are rare (~0.25 a match), so sample a spread of seeds.
     $penalties = 0;

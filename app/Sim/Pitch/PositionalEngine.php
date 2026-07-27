@@ -195,9 +195,20 @@ final class PositionalEngine
             }
 
             if ($player->id === $state->carrierId) {
-                // Drive at goal, but veer wide of a closing defender rather than
-                // running straight into the tackle.
                 $goal = $this->goalOf($player->side);
+
+                // A wide player in the attacking third attacks the byline to cross,
+                // rather than cutting inside into the crowded centre.
+                if (abs($player->pos->y - 0.5) > 0.22 && $player->pos->distanceTo($goal) < 0.5) {
+                    $bylineX = $player->side === 0 ? 0.95 : 0.05;
+                    $wideY = $player->pos->y < 0.5 ? 0.12 : 0.88;
+                    $player->target = new Vec2($bylineX, $wideY);
+
+                    continue;
+                }
+
+                // Otherwise drive at goal, veering wide of a closing defender rather
+                // than running straight into the tackle.
                 $defender = $this->nearestOpponent($state, $player->pos, $player->side);
                 if ($defender !== null && $player->pos->distanceTo($defender->pos) < 0.11) {
                     $away = $player->pos->y >= $defender->pos->y ? 1.0 : -1.0;
@@ -419,6 +430,28 @@ final class PositionalEngine
 
         $goal = $this->goalOf($carrier->side);
         $distToGoal = $carrier->pos->distanceTo($goal);
+
+        // Wide and advanced: whip a cross into the box instead of cutting inside.
+        // Wing play is a real route to goal, not just a way back into the middle.
+        if ($distToGoal < 0.5 && abs($carrier->pos->y - 0.5) > 0.24) {
+            $target = $this->crossTarget($state, $carrier, $goal);
+            if ($target !== null && $rng->next() < 0.65) {
+                $this->cross($state, $events, $rng, $minute, $carrier, $target);
+
+                return;
+            }
+        }
+
+        // Central and advanced: switch it out to a winger in space to attack down
+        // the flank, so play is not funnelled through a crowded middle.
+        if ($distToGoal < 0.72 && abs($carrier->pos->y - 0.5) < 0.3) {
+            $wide = $this->wideOutlet($state, $carrier, $goal, $distToGoal);
+            if ($wide !== null && $rng->next() < 0.6) {
+                $this->pass($state, $events, $rng, $minute, $carrier, $wide);
+
+                return;
+            }
+        }
 
         // In range: shoot a genuine chance (central, close, a clear sight of goal),
         // otherwise work a better ball. Speculative shots from tight angles or a
@@ -753,6 +786,120 @@ final class PositionalEngine
     private function spaceAheadOf(PlayerState $runner, Vec2 $goal): Vec2
     {
         return $runner->pos->moveToward($goal, 0.1);
+    }
+
+    /**
+     * The best team-mate to cross to: a runner arriving centrally in the box, the
+     * more open and the closer to goal the better.
+     */
+    private function crossTarget(PitchState $state, PlayerState $carrier, Vec2 $goal): ?PlayerState
+    {
+        $best = null;
+        $bestScore = -INF;
+
+        foreach ($state->players as $mate) {
+            if ($mate->side !== $carrier->side || $mate->id === $carrier->id || $mate->isGoalkeeper()) {
+                continue;
+            }
+
+            if ($mate->pos->distanceTo($goal) > 0.24 || abs($mate->pos->y - 0.5) > 0.3) {
+                continue; // must be central and in or near the box
+            }
+
+            $reach = $carrier->pos->distanceTo($mate->pos);
+            if ($reach > self::MAX_PASS || $reach < 0.08) {
+                continue;
+            }
+
+            $marker = $this->nearestOpponent($state, $mate->pos, $mate->side);
+            $openness = $marker === null ? 0.12 : min(0.12, $mate->pos->distanceTo($marker->pos));
+            $score = $openness - $mate->pos->distanceTo($goal);
+            if ($score > $bestScore) {
+                $bestScore = $score;
+                $best = $mate;
+            }
+        }
+
+        return $best;
+    }
+
+    /**
+     * An open winger in an advanced wide position to switch play to, so a central
+     * carrier can spread the ball to the flank rather than force it through the
+     * middle. Must be wide, not much behind the ball, and in space.
+     */
+    private function wideOutlet(PitchState $state, PlayerState $carrier, Vec2 $goal, float $distToGoal): ?PlayerState
+    {
+        $best = null;
+        $bestScore = -INF;
+
+        foreach ($state->players as $mate) {
+            if ($mate->side !== $carrier->side || $mate->id === $carrier->id || $mate->isGoalkeeper()) {
+                continue;
+            }
+
+            if (abs($mate->pos->y - 0.5) < 0.28) {
+                continue; // not wide enough to be a flank outlet
+            }
+
+            if ($mate->pos->distanceTo($goal) > $distToGoal + 0.16) {
+                continue; // too far behind the ball
+            }
+
+            $reach = $carrier->pos->distanceTo($mate->pos);
+            if ($reach > self::MAX_PASS || $reach < 0.1) {
+                continue;
+            }
+
+            $marker = $this->nearestOpponent($state, $mate->pos, $mate->side);
+            $openness = $marker === null ? 0.15 : min(0.15, $mate->pos->distanceTo($marker->pos));
+            if ($openness < 0.04) {
+                continue; // marked, no point switching into him
+            }
+
+            $score = $openness - $reach * 0.15;
+            if ($score > $bestScore) {
+                $bestScore = $score;
+                $best = $mate;
+            }
+        }
+
+        return $best;
+    }
+
+    /**
+     * Whip a cross into the box. Crosses are hit-or-miss: they find their target
+     * less often than a normal pass, and a defender heads clear when they miss.
+     *
+     * @param  list<MatchEvent>  $events
+     */
+    private function cross(PitchState $state, array &$events, Rng $rng, int $minute, PlayerState $carrier, PlayerState $target): void
+    {
+        $success = $rng->next() < 0.45;
+        $events[] = $this->event($minute, EventType::Cross, $carrier, $target->id, $carrier->pos, $target->pos, $success);
+
+        $state->carrierId = PitchState::NO_CARRIER;
+        $state->ballKind = 'pass';
+        $state->ballSpeed = self::PASS_SPEED;
+
+        if ($success) {
+            $state->ballTarget = $target->pos;
+            $state->ballTo = $target->id;
+
+            return;
+        }
+
+        $defender = $this->nearestOpponent($state, $target->pos, $target->side);
+        if ($defender !== null) {
+            $events[] = $this->event($minute, EventType::Clearance, $defender, null, $target->pos, null, true);
+            $state->ballTarget = $defender->pos;
+            $state->ballTo = $defender->id;
+
+            return;
+        }
+
+        $state->ballTarget = $target->pos;
+        $state->ballTo = $target->id;
     }
 
     /**
