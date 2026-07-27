@@ -41,7 +41,7 @@ final class PositionalEngine
 
     private const float SHOT_SPEED = 0.55;
 
-    private const float SHOOT_RANGE = 0.21;       // distance to goal a shot is viable from
+    private const float SHOOT_RANGE = 0.23;       // distance to goal a shot is viable from
 
     private const float MAX_PASS = 0.55;          // longest pass a player attempts
 
@@ -374,7 +374,7 @@ final class PositionalEngine
             $quality = $this->shotQuality($state, $carrier, $goal, $distToGoal);
             $inBox = $this->bestPassTarget($state, $carrier, $goal, $distToGoal, minProgress: 0.02);
 
-            if ($quality > 0.64 && ($inBox === null || $rng->next() < 0.6)) {
+            if ($quality > 0.58 && ($inBox === null || $rng->next() < 0.6)) {
                 $this->shoot($state, $events, $rng, $minute, $carrier, $goal, $distToGoal);
 
                 return;
@@ -425,9 +425,9 @@ final class PositionalEngine
         // what real build-up is, and it pulls the whole team into the game instead
         // of the forwards knocking it among themselves.
         $pressed = $this->pressed($state);
-        $forward = $this->bestPassTarget($state, $carrier, $goal, $distToGoal, minProgress: 0.05);
+        $forward = $this->bestPassTarget($state, $carrier, $goal, $distToGoal, minProgress: 0.03);
 
-        if ($forward !== null && $rng->next() < ($pressed ? 0.55 : 0.75)) {
+        if ($forward !== null && $rng->next() < ($pressed ? 0.62 : 0.88)) {
             $this->pass($state, $events, $rng, $minute, $carrier, $forward);
 
             return;
@@ -520,7 +520,7 @@ final class PositionalEngine
             }
 
             $retreat = max(0.0, $mate->pos->distanceTo($goal) - $carrierToGoal);
-            $score = $openness - $retreat * 0.35 - $reach * 0.1;
+            $score = $openness - $retreat * 1.2 - $reach * 0.1;
             if ($score > $bestScore) {
                 $bestScore = $score;
                 $best = $mate;
@@ -679,7 +679,7 @@ final class PositionalEngine
         $keeper = $state->players[PlayerState::id(1 - $carrier->side, 0)] ?? null;
         $quality = $this->shotQuality($state, $carrier, $goal, $distToGoal);
         $keeperSave = $keeper !== null ? $keeper->attributes->tackling / 100 * 0.33 : 0.0;
-        $threshold = max(0.02, min(0.5, $carrier->attributes->finishing / 100 * $quality * 1.1 - $keeperSave));
+        $threshold = max(0.02, min(0.5, $carrier->attributes->finishing / 100 * $quality * 0.95 - $keeperSave));
         $goalScored = $rng->next() <= $threshold;
 
         $events[] = $this->event($minute, EventType::Shot, $carrier, null, $carrier->pos, null, $goalScored);
