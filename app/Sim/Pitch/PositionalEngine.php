@@ -41,7 +41,7 @@ final class PositionalEngine
 
     private const float SHOT_SPEED = 0.55;
 
-    private const float SHOOT_RANGE = 0.26;       // distance to goal a shot is viable from
+    private const float SHOOT_RANGE = 0.21;       // distance to goal a shot is viable from
 
     private const float MAX_PASS = 0.55;          // longest pass a player attempts
 
@@ -202,13 +202,32 @@ final class PositionalEngine
             }
 
             if ($player->side === $state->possessing) {
-                // Slide the attacking block up-field as the ball advances so there
-                // are options ahead and forwards reach the box.
+                // In possession the whole block steps up the pitch as the team
+                // builds: the back line and midfield push up toward the halfway
+                // line, while the forwards play high on the shoulder of the
+                // opponent's last defender, ready to receive around their defence.
                 $ballAdvance = $player->side === 0 ? $ballX : 1.0 - $ballX;
-                $lift = max(0.0, ($ballAdvance - 0.25) * 0.55);
+                $push = max(0.0, $ballAdvance - 0.15);
                 $dir = $player->side === 0 ? 1.0 : -1.0;
+
+                if ($player->position === Position::Forward) {
+                    $lineX = $this->opponentLastLineX($state, $player->side);
+                    $shoulderX = $lineX - $dir * 0.10; // sit off the last man, not glued on
+                    $anchorPushX = $player->anchor->x + $dir * $push * 0.45;
+                    $targetX = $dir > 0 ? max($anchorPushX, $shoulderX) : min($anchorPushX, $shoulderX);
+                } else {
+                    $lift = $push * ($player->position === Position::Midfielder ? 0.85 : 0.6);
+                    $targetX = $player->anchor->x + $dir * $lift;
+
+                    if ($player->position === Position::Defender) {
+                        // Hold a back line no higher than around the halfway line so
+                        // the team is not caught square on the turnover.
+                        $targetX = $dir > 0 ? min($targetX, 0.52) : max($targetX, 0.48);
+                    }
+                }
+
                 $player->target = (new Vec2(
-                    $player->anchor->x + $dir * $lift,
+                    $targetX,
                     $player->anchor->y + ($state->ball->y - 0.5) * 0.2,
                 ))->clampToPitch();
 
@@ -355,7 +374,7 @@ final class PositionalEngine
             $quality = $this->shotQuality($state, $carrier, $goal, $distToGoal);
             $inBox = $this->bestPassTarget($state, $carrier, $goal, $distToGoal, minProgress: 0.02);
 
-            if ($quality > 0.58 && ($inBox === null || $rng->next() < 0.65)) {
+            if ($quality > 0.64 && ($inBox === null || $rng->next() < 0.6)) {
                 $this->shoot($state, $events, $rng, $minute, $carrier, $goal, $distToGoal);
 
                 return;
@@ -753,6 +772,28 @@ final class PositionalEngine
         $nearest = $this->nearestOpponent($state, $point, 1 - $defender->side);
 
         return $nearest !== null && $nearest->id === $defender->id;
+    }
+
+    /**
+     * The x of the opponent's deepest outfielder, the last line an attacking side
+     * plays off. For side 0 (attacking toward x=1) that is the largest opponent x;
+     * for side 1 the smallest.
+     */
+    private function opponentLastLineX(PitchState $state, int $attackingSide): float
+    {
+        $line = null;
+
+        foreach ($state->players as $player) {
+            if ($player->side === $attackingSide || $player->isGoalkeeper()) {
+                continue;
+            }
+
+            $line = $line === null
+                ? $player->pos->x
+                : ($attackingSide === 0 ? max($line, $player->pos->x) : min($line, $player->pos->x));
+        }
+
+        return $line ?? ($attackingSide === 0 ? 0.9 : 0.1);
     }
 
     private function nearestOpponent(PitchState $state, Vec2 $point, int $side): ?PlayerState

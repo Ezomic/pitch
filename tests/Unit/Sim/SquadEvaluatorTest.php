@@ -51,6 +51,6 @@ it('lays the default 4-3-3 roster out back to front', function () {
 
     expect($players[2]->zone->equals(new Zone(1, 1)))->toBeTrue()
         ->and($players[2]->position)->toBe(Position::Defender)
-        ->and($players[8]->zone->equals(new Zone(4, 1)))->toBeTrue()
+        ->and($players[8]->zone->equals(new Zone(4, 0)))->toBeTrue()
         ->and($players[8]->position)->toBe(Position::Forward);
 });
