@@ -63,6 +63,10 @@ final class PositionalEngine
 
     private const float THROW_CHANCE = 0.2;       // an errant pass that runs out for a throw
 
+    private const float FREE_KICK_RANGE = 0.32;   // a foul this close to goal is a direct free kick
+
+    private const float PENALTY_CONVERSION = 0.78;
+
     /**
      * @param  array<int, Player>  $home  slot id => player (ten outfielders)
      * @param  array<int, Player>  $away  slot id => player (ten outfielders)
@@ -378,10 +382,11 @@ final class PositionalEngine
         // carrier, so a possession has time to breathe and pass out of pressure.
         $win = $rng->next() < 0.05 + max(0.0, $defender->attributes->tackling - $carrier->attributes->dribbling) / 400;
         if (! $win) {
-            // A mistimed challenge is sometimes a foul: a free kick to the carrier's
-            // side, taken from where the ball is.
+            // A mistimed challenge is sometimes a foul. Where it happens decides the
+            // restart: a penalty in the box, a direct free kick just outside it, or
+            // a possession free kick anywhere else.
             if ($rng->next() < self::FOUL_CHANCE) {
-                $this->awardRestart($state, $events, $minute, EventType::Foul, $carrier->side, $carrier->pos, $defender);
+                $this->foul($state, $events, $rng, $minute, $carrier, $defender);
 
                 return true;
             }
@@ -927,6 +932,127 @@ final class PositionalEngine
     private function goalKickSpot(int $defendingSide): Vec2
     {
         return new Vec2($defendingSide === 0 ? 0.08 : 0.92, 0.5);
+    }
+
+    /**
+     * Resolve a foul by where it happened: a penalty inside the box, a direct free
+     * kick within range of goal, or a possession free kick anywhere else.
+     *
+     * @param  list<MatchEvent>  $events
+     */
+    private function foul(PitchState $state, array &$events, Rng $rng, int $minute, PlayerState $carrier, PlayerState $defender): void
+    {
+        $goal = $this->goalOf($carrier->side);
+
+        if ($this->inPenaltyBox($carrier->pos, $carrier->side)) {
+            $this->penalty($state, $events, $rng, $minute, $carrier);
+
+            return;
+        }
+
+        if ($carrier->pos->distanceTo($goal) < self::FREE_KICK_RANGE) {
+            $events[] = $this->event($minute, EventType::Foul, $defender, null, $carrier->pos, null, true);
+            $this->freeKickShot($state, $events, $rng, $minute, $carrier, $goal);
+
+            return;
+        }
+
+        $this->awardRestart($state, $events, $minute, EventType::Foul, $carrier->side, $carrier->pos, $defender);
+    }
+
+    /**
+     * A penalty: taken from the spot, converted at a high fixed rate, saved by the
+     * keeper otherwise.
+     *
+     * @param  list<MatchEvent>  $events
+     */
+    private function penalty(PitchState $state, array &$events, Rng $rng, int $minute, PlayerState $winner): void
+    {
+        $side = $winner->side;
+        $spot = $this->penaltySpot($side);
+        $taker = $this->nearestTeammateTo($state, $side, $spot) ?? $winner;
+        $goal = $this->goalOf($side);
+        $keeper = $state->players[PlayerState::id(1 - $side, 0)] ?? null;
+
+        $events[] = $this->event($minute, EventType::Penalty, $taker, null, $spot, null, true);
+
+        $scored = $rng->next() < self::PENALTY_CONVERSION;
+        $events[] = $this->event($minute, EventType::Shot, $taker, null, $spot, null, $scored);
+
+        $taker->pos = $spot;
+        $state->carrierId = PitchState::NO_CARRIER;
+        $state->possessing = $side;
+        $state->ball = $spot;
+        $state->ballKind = 'shot';
+        $state->ballSpeed = self::SHOT_SPEED;
+        $state->ballGoal = $scored;
+
+        if ($scored || $keeper === null) {
+            $state->ballTarget = $goal;
+            $state->ballTo = PitchState::NO_CARRIER;
+
+            return;
+        }
+
+        $events[] = $this->event($minute, EventType::Save, $keeper, null, $goal, null, true);
+        $state->ballTarget = $keeper->pos;
+        $state->ballTo = $keeper->id;
+    }
+
+    /**
+     * A direct free kick at goal: hard to score past a set keeper and a wall, and
+     * a miss becomes a save or a goal kick.
+     *
+     * @param  list<MatchEvent>  $events
+     */
+    private function freeKickShot(PitchState $state, array &$events, Rng $rng, int $minute, PlayerState $winner, Vec2 $goal): void
+    {
+        $side = $winner->side;
+        $spot = $winner->pos;
+        $keeper = $state->players[PlayerState::id(1 - $side, 0)] ?? null;
+
+        $scored = $rng->next() < max(0.03, $winner->attributes->finishing / 100 * 0.12);
+        $events[] = $this->event($minute, EventType::Shot, $winner, null, $spot, null, $scored);
+
+        $state->carrierId = PitchState::NO_CARRIER;
+        $state->possessing = $side;
+        $state->ball = $spot;
+        $state->ballKind = 'shot';
+        $state->ballSpeed = self::SHOT_SPEED;
+        $state->ballGoal = $scored;
+
+        if ($scored) {
+            $state->ballTarget = $goal;
+            $state->ballTo = PitchState::NO_CARRIER;
+
+            return;
+        }
+
+        if ($rng->next() < 0.5 && $keeper !== null) {
+            $events[] = $this->event($minute, EventType::Save, $keeper, null, $goal, null, true);
+            $state->ballTarget = $keeper->pos;
+            $state->ballTo = $keeper->id;
+
+            return;
+        }
+
+        $state->pendingType = EventType::GoalKick;
+        $state->pendingSide = 1 - $side;
+        $state->pendingSpot = $this->goalKickSpot(1 - $side);
+        $state->ballTarget = $goal;
+        $state->ballTo = PitchState::NO_CARRIER;
+    }
+
+    private function inPenaltyBox(Vec2 $pos, int $attackingSide): bool
+    {
+        $inX = $attackingSide === 0 ? $pos->x > 0.83 : $pos->x < 0.17;
+
+        return $inX && $pos->y > 0.21 && $pos->y < 0.79;
+    }
+
+    private function penaltySpot(int $attackingSide): Vec2
+    {
+        return new Vec2($attackingSide === 0 ? 0.88 : 0.12, 0.5);
     }
 
     private function nearestOpponent(PitchState $state, Vec2 $point, int $side): ?PlayerState

@@ -36,6 +36,7 @@ final class MatchCommentary
             EventType::Block => new MatchMoment($event->minute, 'save', $this->pick(self::BLOCKS, $key)),
             EventType::Foul => new MatchMoment($event->minute, 'setpiece', $this->pick(self::FOULS, $key)),
             EventType::Corner => new MatchMoment($event->minute, 'setpiece', $this->pick(self::CORNERS, $key)),
+            EventType::Penalty => new MatchMoment($event->minute, 'setpiece', 'Penalty awarded!'),
             EventType::Cross => $event->success
                 ? new MatchMoment($event->minute, 'chance', $this->fill(self::CROSSES, $actor, $target, $key))
                 : null,
@@ -66,6 +67,7 @@ final class MatchCommentary
             EventType::Corner => 'Corner',
             EventType::ThrowIn => 'Throw-in',
             EventType::GoalKick => 'Goal kick',
+            EventType::Penalty => 'Penalty!',
             EventType::Cross => $target !== null ? "{$who} crosses to {$target}" : "{$who} crosses",
             EventType::Dribble => $ok ? "{$who} drives forward" : "{$who} dispossessed",
             default => $target !== null
