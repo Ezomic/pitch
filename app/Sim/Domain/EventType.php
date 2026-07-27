@@ -24,6 +24,8 @@ enum EventType: string
     case Header = 'header';
     case Foul = 'foul';
     case Corner = 'corner';
+    case ThrowIn = 'throw_in';
+    case GoalKick = 'goal_kick';
 
     /** Whether this is a defending action, shown on the defending side. */
     public function isDefensive(): bool
