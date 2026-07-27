@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Sim\Pitch;
 
+use App\Sim\Domain\EventType;
+
 /**
  * The live state of a positional match: every player, the ball, who has it, and
  * the ball's flight when it is travelling (a pass or a shot in the air). Mutable;
@@ -34,6 +36,17 @@ final class PitchState
 
     /** Ticks the current carrier has held the ball, so decisions pace out. */
     public int $holdTicks = 0;
+
+    /** Ticks left of a dead-ball pause after a set piece is awarded. */
+    public int $deadBall = 0;
+
+    // A set piece the current shot resolves into once it reaches goal: a corner or
+    // a goal kick. Null when the shot is saved and held in open play.
+    public ?EventType $pendingType = null;
+
+    public int $pendingSide = 0;
+
+    public ?Vec2 $pendingSpot = null;
 
     /**
      * @param  array<int, PlayerState>  $players  keyed by player id

@@ -64,6 +64,8 @@ final class MatchCommentary
             EventType::Clearance => 'Cleared',
             EventType::Foul => 'Free-kick won',
             EventType::Corner => 'Corner',
+            EventType::ThrowIn => 'Throw-in',
+            EventType::GoalKick => 'Goal kick',
             EventType::Cross => $target !== null ? "{$who} crosses to {$target}" : "{$who} crosses",
             EventType::Dribble => $ok ? "{$who} drives forward" : "{$who} dispossessed",
             default => $target !== null

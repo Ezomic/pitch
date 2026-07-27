@@ -82,9 +82,17 @@ it('keeps the ball continuous in open play', function () {
     $frames = $result->frames;
 
     // Every step is a small glide (a carry ~0.01, a pass or shot in flight
-    // ~0.07-0.11); the only real jumps are kick-offs resetting the ball to the
-    // centre after a goal. So big jumps should number no more than the goals plus
-    // the opening kick-off. No teleporting mid-play, unlike the derived layer.
+    // ~0.07-0.11). The only legitimate jumps are dead-ball repositions: a kick-off
+    // after a goal, and set pieces where the ball is placed at a throw, corner or
+    // goal-kick spot. So big jumps should number no more than those restarts. No
+    // teleporting mid-play, unlike the derived layer.
+    $restarts = $result->homeGoals + $result->awayGoals + 1; // goals + opening kick-off
+    foreach ($result->events as $event) {
+        if (in_array($event->type, [EventType::ThrowIn, EventType::Corner, EventType::GoalKick], true)) {
+            $restarts++;
+        }
+    }
+
     $big = 0;
     for ($i = 1; $i < count($frames); $i++) {
         $a = $frames[$i - 1]['b'];
@@ -94,7 +102,19 @@ it('keeps the ball continuous in open play', function () {
         }
     }
 
-    expect($big)->toBeLessThanOrEqual($result->homeGoals + $result->awayGoals + 1);
+    expect($big)->toBeLessThanOrEqual($restarts);
+});
+
+it('produces set pieces: fouls, throw-ins, corners and goal kicks', function () {
+    $counts = [];
+    foreach (pitchMatch(7)->events as $event) {
+        $counts[$event->type->value] = ($counts[$event->type->value] ?? 0) + 1;
+    }
+
+    expect($counts[EventType::Foul->value] ?? 0)->toBeGreaterThan(0)
+        ->and($counts[EventType::ThrowIn->value] ?? 0)->toBeGreaterThan(0)
+        ->and($counts[EventType::Corner->value] ?? 0)->toBeGreaterThan(0)
+        ->and($counts[EventType::GoalKick->value] ?? 0)->toBeGreaterThan(0);
 });
 
 it('defends with a block goal-side of the ball while forwards stay high', function () {

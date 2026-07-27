@@ -57,6 +57,12 @@ final class PositionalEngine
 
     private const float LANE_WEIGHT = 0.2;        // how much a covered lane suppresses a pass
 
+    private const int DEADBALL_TICKS = 7;         // pause while a set piece is taken
+
+    private const float FOUL_CHANCE = 0.035;      // a mistimed tackle is sometimes a foul
+
+    private const float THROW_CHANCE = 0.2;       // an errant pass that runs out for a throw
+
     /**
      * @param  array<int, Player>  $home  slot id => player (ten outfielders)
      * @param  array<int, Player>  $away  slot id => player (ten outfielders)
@@ -89,7 +95,12 @@ final class PositionalEngine
             } else {
                 $carrier = $state->carrier();
 
-                if ($carrier !== null) {
+                if ($carrier !== null && $state->deadBall > 0) {
+                    // A set piece is being taken: the ball sits at the taker's feet
+                    // for a beat before play resumes, uncontested.
+                    $state->deadBall--;
+                    $state->ball = $carrier->pos;
+                } elseif ($carrier !== null) {
                     $state->ball = $carrier->pos;
                     $state->holdTicks++;
 
@@ -318,6 +329,19 @@ final class PositionalEngine
             return $state->possessing;
         }
 
+        // A missed shot that has reached goal turns into its set piece: a corner or
+        // a goal kick, taken after the ball is repositioned.
+        if ($state->pendingType !== null && $state->pendingSpot !== null) {
+            $type = $state->pendingType;
+            $side = $state->pendingSide;
+            $spot = $state->pendingSpot;
+            $state->pendingType = null;
+            $state->pendingSpot = null;
+            $this->awardRestart($state, $events, $minute, $type, $side, $spot);
+
+            return -1;
+        }
+
         $receiver = $state->players[$state->ballTo] ?? null;
         if ($receiver !== null) {
             $state->carrierId = $receiver->id;
@@ -354,6 +378,14 @@ final class PositionalEngine
         // carrier, so a possession has time to breathe and pass out of pressure.
         $win = $rng->next() < 0.05 + max(0.0, $defender->attributes->tackling - $carrier->attributes->dribbling) / 400;
         if (! $win) {
+            // A mistimed challenge is sometimes a foul: a free kick to the carrier's
+            // side, taken from where the ball is.
+            if ($rng->next() < self::FOUL_CHANCE) {
+                $this->awardRestart($state, $events, $minute, EventType::Foul, $carrier->side, $carrier->pos, $defender);
+
+                return true;
+            }
+
             return false;
         }
 
@@ -584,9 +616,17 @@ final class PositionalEngine
         $threshold = max(0.1, min(0.97, 0.55 + $carrier->attributes->passing / 100 * 0.38 - $pressure - $laneRisk));
         $success = $rng->next() <= $threshold;
 
-        $interceptor = $success ? null : ($laneDefender ?? $this->nearestOpponent($state, $dest, $target->side));
-
         $events[] = $this->event($minute, EventType::Pass, $carrier, $target->id, $carrier->pos, $dest, $success);
+
+        // An errant ball sometimes runs out of play for a throw-in to the other side.
+        if (! $success && $rng->next() < self::THROW_CHANCE) {
+            $spot = new Vec2(min(0.97, max(0.03, $dest->x)), $dest->y < 0.5 ? 0.02 : 0.98);
+            $this->awardRestart($state, $events, $minute, EventType::ThrowIn, 1 - $carrier->side, $spot);
+
+            return;
+        }
+
+        $interceptor = $success ? null : ($laneDefender ?? $this->nearestOpponent($state, $dest, $target->side));
 
         if (! $success && $interceptor !== null) {
             $type = $carrier->pos->distanceTo($this->goalOf($interceptor->side)) < 0.35
@@ -713,14 +753,26 @@ final class PositionalEngine
             return;
         }
 
-        // Saved or off target: the keeper (or nearest defender) claims it.
-        $claim = $keeper ?? $this->nearestOpponent($state, $goal, $carrier->side);
-        if ($claim !== null) {
-            $events[] = $this->event($minute, EventType::Save, $claim, null, $goal, null, true);
-            $state->ballTo = $claim->id;
-            $state->ballTarget = $claim->pos;
+        // A miss resolves once the ball reaches goal: the keeper saves and holds,
+        // it deflects behind for a corner, or it is off target for a goal kick.
+        $roll = $rng->next();
+        if ($roll < 0.4 && $keeper !== null) {
+            // Saved and held: the keeper claims it and plays on.
+            $events[] = $this->event($minute, EventType::Save, $keeper, null, $goal, null, true);
+            $state->ballTo = $keeper->id;
+            $state->ballTarget = $keeper->pos;
+        } elseif ($roll < 0.65) {
+            // Deflected behind for a corner to the attacking side.
+            $state->pendingType = EventType::Corner;
+            $state->pendingSide = $carrier->side;
+            $state->pendingSpot = $this->cornerSpot($carrier->side, $carrier->pos->y);
+            $state->ballTo = PitchState::NO_CARRIER;
         } else {
-            $state->ballTo = $carrier->id;
+            // Off target: a goal kick to the defending side.
+            $state->pendingType = EventType::GoalKick;
+            $state->pendingSide = 1 - $carrier->side;
+            $state->pendingSpot = $this->goalKickSpot(1 - $carrier->side);
+            $state->ballTo = PitchState::NO_CARRIER;
         }
     }
 
@@ -811,6 +863,70 @@ final class PositionalEngine
         }
 
         return $line ?? ($attackingSide === 0 ? 0.9 : 0.1);
+    }
+
+    /**
+     * Award a set piece: emit its event, place the ball at the restart spot with a
+     * taker of the awarded side on it, and hold play for a beat so it reads as a
+     * dead ball. A goal kick is taken by the keeper, everything else by the nearest
+     * team-mate to the spot.
+     *
+     * @param  list<MatchEvent>  $events
+     */
+    private function awardRestart(PitchState $state, array &$events, int $minute, EventType $type, int $side, Vec2 $spot, ?PlayerState $creditActor = null): void
+    {
+        $taker = $type === EventType::GoalKick
+            ? ($state->players[PlayerState::id($side, 0)] ?? null)
+            : $this->nearestTeammateTo($state, $side, $spot);
+
+        if ($taker === null) {
+            return;
+        }
+
+        $events[] = $this->event($minute, $type, $creditActor ?? $taker, null, $spot, null, true);
+
+        $taker->pos = $spot;
+        $state->carrierId = $taker->id;
+        $state->possessing = $side;
+        $state->ball = $spot;
+        $state->ballTarget = null;
+        $state->ballTo = PitchState::NO_CARRIER;
+        $state->ballKind = 'idle';
+        $state->ballGoal = false;
+        $state->holdTicks = 0;
+        $state->deadBall = self::DEADBALL_TICKS;
+    }
+
+    private function nearestTeammateTo(PitchState $state, int $side, Vec2 $spot): ?PlayerState
+    {
+        $best = null;
+        $bestDist = INF;
+
+        foreach ($state->players as $player) {
+            if ($player->side !== $side || $player->isGoalkeeper()) {
+                continue;
+            }
+
+            $dist = $player->pos->distanceTo($spot);
+            if ($dist < $bestDist) {
+                $bestDist = $dist;
+                $best = $player;
+            }
+        }
+
+        return $best;
+    }
+
+    /** The corner flag on the attacking side, on the near touchline to the shot. */
+    private function cornerSpot(int $attackingSide, float $y): Vec2
+    {
+        return new Vec2($attackingSide === 0 ? 0.99 : 0.01, $y < 0.5 ? 0.02 : 0.98);
+    }
+
+    /** In front of the defending side's own goal, where its keeper restarts. */
+    private function goalKickSpot(int $defendingSide): Vec2
+    {
+        return new Vec2($defendingSide === 0 ? 0.08 : 0.92, 0.5);
     }
 
     private function nearestOpponent(PitchState $state, Vec2 $point, int $side): ?PlayerState
