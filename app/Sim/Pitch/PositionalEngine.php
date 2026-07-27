@@ -51,7 +51,7 @@ final class PositionalEngine
 
     private const float MARK_RADIUS = 0.05;       // an opponent this close counts as marking
 
-    private const float MARK = 0.15;              // how hard a defender shades onto its man
+    private const float MARK = 0.45;              // how hard a defender shades onto its man
 
     private const float LANE_RADIUS = 0.04;       // a defender this near a pass lane can cut it
 
@@ -428,27 +428,33 @@ final class PositionalEngine
             $quality = $this->shotQuality($state, $carrier, $goal, $distToGoal);
             $inBox = $this->bestPassTarget($state, $carrier, $goal, $distToGoal, minProgress: 0.02);
 
-            if ($quality > 0.58 && ($inBox === null || $rng->next() < 0.6)) {
+            // A decent chance, or a clear sight of goal: shoot. A player in range
+            // never turns back, so it drives at goal for a better angle instead of
+            // recycling the ball away from the chance.
+            $clean = $this->clearRunToGoal($state, $carrier, $goal);
+
+            if (($quality > 0.58 || $clean) && ($inBox === null || $rng->next() < 0.6)) {
                 $this->shoot($state, $events, $rng, $minute, $carrier, $goal, $distToGoal);
 
                 return;
             }
 
-            if ($inBox !== null && $rng->next() < 0.7) {
+            if (! $clean && $inBox !== null && $rng->next() < 0.7) {
                 $this->pass($state, $events, $rng, $minute, $carrier, $inBox);
 
                 return;
             }
 
-            if ($this->pressed($state)) {
-                // Forced: get the shot away rather than lose it in the box.
+            if ($this->pressed($state) || $clean) {
+                // Forced, or clean through: get the shot away rather than turn back.
                 $this->shoot($state, $events, $rng, $minute, $carrier, $goal, $distToGoal);
 
                 return;
             }
 
-            // Not pressed, no clear shot or square ball: work it back out and rebuild
-            // rather than forcing a half-chance.
+            // Blocked in the box with no shot: work it back out and rebuild, rather
+            // than force a half-chance. A genuine run at goal was already taken above,
+            // so this never turns down an open shot.
             $outlet = $this->safestOutlet($state, $carrier);
             if ($outlet !== null) {
                 $this->pass($state, $events, $rng, $minute, $carrier, $outlet);
@@ -456,7 +462,6 @@ final class PositionalEngine
                 return;
             }
 
-            // Hold and work a better angle next tick.
             return;
         }
 
@@ -484,6 +489,12 @@ final class PositionalEngine
         if ($forward !== null && $rng->next() < ($pressed ? 0.62 : 0.88)) {
             $this->pass($state, $events, $rng, $minute, $carrier, $forward);
 
+            return;
+        }
+
+        // A clear run at goal: carry it in rather than turning back. A player bearing
+        // down on goal should run at it, not recycle to a defender.
+        if ($this->clearRunToGoal($state, $carrier, $goal)) {
             return;
         }
 
@@ -582,6 +593,32 @@ final class PositionalEngine
         }
 
         return $best;
+    }
+
+    /**
+     * True when the carrier has beaten the defensive line: no outfield opponent is
+     * meaningfully closer to goal than it is, only the keeper to beat. A genuine
+     * clean-through, where it must drive and shoot rather than turn back. Kept
+     * strict so it fires only on a real chance, not merely an open passing lane.
+     */
+    private function clearRunToGoal(PitchState $state, PlayerState $carrier, Vec2 $goal): bool
+    {
+        $carrierToGoal = $carrier->pos->distanceTo($goal);
+        if ($carrierToGoal > 0.5) {
+            return false; // too far out to be through on goal
+        }
+
+        foreach ($state->players as $opponent) {
+            if ($opponent->side === $carrier->side || $opponent->isGoalkeeper()) {
+                continue;
+            }
+
+            if ($opponent->pos->distanceTo($goal) < $carrierToGoal + 0.05) {
+                return false; // an outfielder is level with or goal-side of the carrier
+            }
+        }
+
+        return true;
     }
 
     /** True when no opponent is close and goal-side of the carrier, so it can drive on. */
@@ -741,7 +778,7 @@ final class PositionalEngine
         $keeper = $state->players[PlayerState::id(1 - $carrier->side, 0)] ?? null;
         $quality = $this->shotQuality($state, $carrier, $goal, $distToGoal);
         $keeperSave = $keeper !== null ? $keeper->attributes->tackling / 100 * 0.33 : 0.0;
-        $threshold = max(0.02, min(0.5, $carrier->attributes->finishing / 100 * $quality * 0.95 - $keeperSave));
+        $threshold = max(0.02, min(0.5, $carrier->attributes->finishing / 100 * $quality * 0.78 - $keeperSave));
         $goalScored = $rng->next() <= $threshold;
 
         $events[] = $this->event($minute, EventType::Shot, $carrier, null, $carrier->pos, null, $goalScored);
@@ -814,7 +851,7 @@ final class PositionalEngine
     private function markAssignment(PitchState $state, PlayerState $defender): ?PlayerState
     {
         $man = $this->nearestOpponent($state, $defender->pos, $defender->side);
-        if ($man === null || $defender->pos->distanceTo($man->pos) > 0.25) {
+        if ($man === null || $defender->pos->distanceTo($man->pos) > 0.35) {
             return null;
         }
 
