@@ -192,7 +192,7 @@ final readonly class Formation
         return match ($count) {
             1 => [2],
             2 => [1, 3],
-            3 => [1, 2, 3],
+            3 => [0, 2, 4],
             4 => [0, 1, 3, 4],
             5 => [0, 1, 2, 3, 4],
             default => throw new \InvalidArgumentException("Unsupported line size: {$count}"),
