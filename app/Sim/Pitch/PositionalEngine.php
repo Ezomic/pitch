@@ -355,13 +355,13 @@ final class PositionalEngine
             $quality = $this->shotQuality($state, $carrier, $goal, $distToGoal);
             $inBox = $this->bestPassTarget($state, $carrier, $goal, $distToGoal, minProgress: 0.02);
 
-            if ($quality > 0.5 && ($inBox === null || $rng->next() < 0.7)) {
+            if ($quality > 0.58 && ($inBox === null || $rng->next() < 0.65)) {
                 $this->shoot($state, $events, $rng, $minute, $carrier, $goal, $distToGoal);
 
                 return;
             }
 
-            if ($inBox !== null && $rng->next() < 0.8) {
+            if ($inBox !== null && $rng->next() < 0.7) {
                 $this->pass($state, $events, $rng, $minute, $carrier, $inBox);
 
                 return;
@@ -370,6 +370,15 @@ final class PositionalEngine
             if ($this->pressed($state)) {
                 // Forced: get the shot away rather than lose it in the box.
                 $this->shoot($state, $events, $rng, $minute, $carrier, $goal, $distToGoal);
+
+                return;
+            }
+
+            // Not pressed, no clear shot or square ball: work it back out and rebuild
+            // rather than forcing a half-chance.
+            $outlet = $this->safestOutlet($state, $carrier);
+            if ($outlet !== null) {
+                $this->pass($state, $events, $rng, $minute, $carrier, $outlet);
 
                 return;
             }
@@ -383,32 +392,40 @@ final class PositionalEngine
         // behind a stepped-up defence is exactly what it is there to punish.
         if ($distToGoal < 0.6) {
             $runner = $this->bestRunner($state, $carrier, $goal, $distToGoal);
-            if ($runner !== null && $rng->next() < 0.45) {
+            if ($runner !== null && $rng->next() < 0.28) {
                 $this->pass($state, $events, $rng, $minute, $carrier, $runner, $this->spaceAheadOf($runner, $goal));
 
                 return;
             }
         }
 
-        // Play forward when a progressive pass is on; otherwise carry into space,
-        // and only recycle sideways when the way forward is blocked.
-        $forward = $this->bestPassTarget($state, $carrier, $goal, $distToGoal, minProgress: 0.03);
-        if ($forward !== null && $rng->next() < 0.85) {
+        // Build-up. Progress when a genuinely open forward option is on, but do not
+        // force it: keeping the ball is usually better than a hopeful ball into
+        // traffic. With nothing forward, recycle to the safest open team-mate in
+        // any direction, a defender or the keeper included. That circulation is
+        // what real build-up is, and it pulls the whole team into the game instead
+        // of the forwards knocking it among themselves.
+        $pressed = $this->pressed($state);
+        $forward = $this->bestPassTarget($state, $carrier, $goal, $distToGoal, minProgress: 0.05);
+
+        if ($forward !== null && $rng->next() < ($pressed ? 0.55 : 0.75)) {
             $this->pass($state, $events, $rng, $minute, $carrier, $forward);
 
             return;
         }
 
-        if ($this->spaceAhead($state, $carrier)) {
-            return; // dribble on, no event
+        if (! $pressed && $this->spaceAhead($state, $carrier)) {
+            return; // drive into the space ahead
         }
 
-        $safe = $this->bestPassTarget($state, $carrier, $goal, $distToGoal, minProgress: -1.0);
-        if ($safe !== null) {
-            $this->pass($state, $events, $rng, $minute, $carrier, $safe);
+        $outlet = $this->safestOutlet($state, $carrier);
+        if ($outlet !== null) {
+            $this->pass($state, $events, $rng, $minute, $carrier, $outlet);
+
+            return;
         }
 
-        // Nothing on: keep the ball and dribble next tick.
+        // Nothing on at all: hold and dribble next tick.
     }
 
     private function bestPassTarget(PitchState $state, PlayerState $carrier, Vec2 $goal, float $distToGoal, float $minProgress): ?PlayerState
@@ -438,6 +455,53 @@ final class PositionalEngine
             }
 
             $score = $progress * 1.2 + $openness * 0.6 - $reach * 0.2;
+            if ($score > $bestScore) {
+                $bestScore = $score;
+                $best = $mate;
+            }
+        }
+
+        return $best;
+    }
+
+    /**
+     * The safest team-mate to keep the ball with, in any direction: the most open
+     * man with a clear lane, mildly preferring not to retreat too far toward the
+     * own goal and not to over-hit it. Unlike a progressive pass this includes the
+     * deeper players and the keeper, so a pressed carrier can recycle possession
+     * rather than lose it forcing the ball forward.
+     */
+    private function safestOutlet(PitchState $state, PlayerState $carrier): ?PlayerState
+    {
+        $goal = $this->goalOf($carrier->side);
+        $carrierToGoal = $carrier->pos->distanceTo($goal);
+
+        $best = null;
+        $bestScore = -INF;
+
+        foreach ($state->players as $mate) {
+            if ($mate->side !== $carrier->side || $mate->id === $carrier->id) {
+                continue;
+            }
+
+            $reach = $carrier->pos->distanceTo($mate->pos);
+            if ($reach > self::MAX_PASS || $reach < 0.04) {
+                continue;
+            }
+
+            $opponent = $this->nearestOpponent($state, $mate->pos, $mate->side);
+            $openness = $opponent === null ? 0.2 : min(0.2, $mate->pos->distanceTo($opponent->pos));
+            if ($openness < 0.03) {
+                continue; // too tightly marked to be a safe outlet
+            }
+
+            [$laneDefender, $laneDist] = $this->nearestOpponentToSegment($state, $carrier->pos, $mate->pos, $carrier->side);
+            if ($laneDefender !== null && $laneDist < 0.022) {
+                continue; // the ball would be cut out
+            }
+
+            $retreat = max(0.0, $mate->pos->distanceTo($goal) - $carrierToGoal);
+            $score = $openness - $retreat * 0.35 - $reach * 0.1;
             if ($score > $bestScore) {
                 $bestScore = $score;
                 $best = $mate;
