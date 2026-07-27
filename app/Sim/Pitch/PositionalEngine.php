@@ -244,6 +244,23 @@ final class PositionalEngine
                 continue;
             }
 
+            // Leave the forwards high as a counter outlet. Rather than tracking back
+            // into the block, they hold up the pitch between the opponent's midfield
+            // and defensive lines, so winning the ball springs an immediate attack
+            // with a target already in behind instead of building from deep.
+            if ($player->position === Position::Forward) {
+                $line = $this->opponentLastLineX($state, $player->side);
+                $holdX = $player->side === 0
+                    ? min(max($line - 0.08, 0.52), 0.66)
+                    : max(min($line + 0.08, 0.48), 0.34);
+                $player->target = (new Vec2(
+                    $holdX,
+                    $player->anchor->y + ($state->ball->y - 0.5) * 0.1,
+                ))->clampToPitch();
+
+                continue;
+            }
+
             // Hold a compact block goal-side of the ball. A meaningfully higher line
             // needs timed off-ball runs to exploit the space it concedes, which the
             // engine does not model yet, so stepping it up here only strangles the

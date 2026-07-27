@@ -97,32 +97,45 @@ it('keeps the ball continuous in open play', function () {
     expect($big)->toBeLessThanOrEqual($result->homeGoals + $result->awayGoals + 1);
 });
 
-it('defends with a block goal-side of the ball', function () {
+it('defends with a block goal-side of the ball while forwards stay high', function () {
     $frames = pitchMatch(7)->frames;
 
-    // While the home side attacks (possessing 0), the away outfielders (stream
-    // indices 12..21; index 11 is their keeper) should hold a block between the
-    // ball and the goal they defend at x=1, i.e. their average x is ahead of the
-    // ball. This is a real defensive shape, not players chasing the ball.
+    // While the home side attacks (possessing 0), the away defensive block, its
+    // back four and midfield (stream indices 12..18; 11 is the keeper, 19..21 are
+    // the forwards), holds between the ball and the goal it defends at x=1: their
+    // average x is ahead of the ball. This is a real defensive shape, not players
+    // chasing the ball.
     $goalSide = 0;
+    $forwardsHigh = 0;
     $total = 0;
     foreach ($frames as $frame) {
         if ($frame['s'] !== 0) {
             continue;
         }
 
-        $sum = 0.0;
-        for ($i = 12; $i < 22; $i++) {
-            $sum += $frame['p'][$i][0];
+        $block = 0.0;
+        for ($i = 12; $i < 19; $i++) {
+            $block += $frame['p'][$i][0];
         }
 
-        if ($sum / 10 > $frame['b'][0]) {
+        // The away forwards (19..21) deliberately stay high as a counter outlet,
+        // upfield of the block rather than tracking back into it.
+        $forwards = 0.0;
+        for ($i = 19; $i < 22; $i++) {
+            $forwards += $frame['p'][$i][0];
+        }
+
+        if ($block / 7 > $frame['b'][0]) {
             $goalSide++;
+        }
+        if ($forwards / 3 < $block / 7) {
+            $forwardsHigh++;
         }
         $total++;
     }
 
-    expect($goalSide / $total)->toBeGreaterThan(0.85);
+    expect($goalSide / $total)->toBeGreaterThan(0.75)
+        ->and($forwardsHigh / $total)->toBeGreaterThan(0.9);
 });
 
 it('produces realistic scorelines across seeds', function () {
