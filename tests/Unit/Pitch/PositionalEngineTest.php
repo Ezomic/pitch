@@ -128,6 +128,30 @@ it('attacks down the wings and crosses into the box', function () {
     expect($crosses)->toBeGreaterThan(0);
 });
 
+it('shows the ball in the net on the goal frame before the kickoff', function () {
+    // Find a match with a goal and inspect the marked goal frame.
+    foreach (range(1, 20) as $seed) {
+        $frames = pitchMatch($seed)->frames;
+
+        foreach ($frames as $i => $frame) {
+            if ($frame['goal'] < 0 || ! isset($frames[$i + 1])) {
+                continue;
+            }
+
+            // The ball sits at a goal, not the centre spot...
+            expect(abs($frame['b'][0] - 0.5))->toBeGreaterThan(0.35);
+            // ...and the very next frame is the placed-ball kickoff restart back
+            // around the centre spot.
+            expect($frames[$i + 1]['j'])->toBeTrue()
+                ->and(abs($frames[$i + 1]['b'][0] - 0.5))->toBeLessThan(0.1);
+
+            return;
+        }
+    }
+
+    throw new Exception('no goal frame found across seeds 1..20');
+});
+
 it('awards the occasional penalty for a foul in the box', function () {
     // Penalties are rare (well under one a match), so sample a wide spread of seeds.
     $penalties = 0;

@@ -47,8 +47,8 @@ final class LivePitch
      * The slice's position frames, downsampled on the global tick so the phase is
      * continuous across advances, with the carrier id mapped to its stream index.
      *
-     * @param  list<array{m: int, b: array{float, float}, c: int, s: int, p: list<array{float, float}>, j: bool}>  $frames
-     * @return list<array{m: int, b: array{float, float}, c: int, s: int, p: list<array{float, float}>, j: bool}>
+     * @param  list<array{m: int, b: array{float, float}, c: int, s: int, p: list<array{float, float}>, j: bool, goal: int}>  $frames
+     * @return list<array{m: int, b: array{float, float}, c: int, s: int, p: list<array{float, float}>, j: bool, goal: int}>
      */
     public function frames(array $frames, int $startTick): array
     {
@@ -59,7 +59,9 @@ final class LivePitch
                 $cut = true; // the ball was placed somewhere in this downsample window
             }
 
-            if (($startTick + $i) % self::STEP !== 0) {
+            // Always keep the frame that shows the ball in the net, even off the
+            // downsample cadence, so the goal is seen and announced on that frame.
+            if (($startTick + $i) % self::STEP !== 0 && $frame['goal'] < 0) {
                 continue;
             }
 
@@ -70,6 +72,7 @@ final class LivePitch
                 's' => $frame['s'],
                 'p' => $frame['p'],
                 'j' => $cut,
+                'goal' => $frame['goal'],
             ];
             $cut = false;
         }

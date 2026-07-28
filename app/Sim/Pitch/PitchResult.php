@@ -12,7 +12,7 @@ use App\Sim\Domain\MatchEvent;
  * plus a per-tick position stream (all 22 players and the ball) that the replay
  * consumes directly instead of inventing positions from the ball path.
  *
- * @phpstan-type Frame array{m: int, b: array{float, float}, c: int, s: int, p: list<array{float, float}>, j: bool}
+ * @phpstan-type Frame array{m: int, b: array{float, float}, c: int, s: int, p: list<array{float, float}>, j: bool, goal: int}
  */
 final readonly class PitchResult
 {
