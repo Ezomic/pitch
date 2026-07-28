@@ -39,6 +39,7 @@ it('advances a live match slice by slice to full time', function () {
 
     $finished = false;
     $goals = 0;
+    $moments = [];
     for ($i = 0; $i < 40 && ! $finished; $i++) {
         $body = $this->actingAs($user)
             ->postJson(route('play.advance', $matchId), ['ticks' => 300])
@@ -46,10 +47,17 @@ it('advances a live match slice by slice to full time', function () {
             ->json();
         $finished = $body['finished'];
         $goals = $body['homeGoals'] + $body['awayGoals'];
+        $moments = [...$moments, ...$body['moments']];
     }
 
     expect($finished)->toBeTrue()
-        ->and($goals)->toBeGreaterThanOrEqual(0);
+        ->and($goals)->toBeGreaterThanOrEqual(0)
+        ->and($moments)->not->toBeEmpty();
+
+    // Each key moment carries the kind the live view filters highlights by.
+    foreach ($moments as $moment) {
+        expect($moment)->toHaveKeys(['minute', 'side', 'kind', 'text']);
+    }
 });
 
 it('changes mentality mid-match', function () {

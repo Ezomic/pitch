@@ -19,6 +19,7 @@ interface PlayerMeta {
 interface Moment {
     minute: number;
     side: 0 | 1;
+    kind: string;
     text: string;
 }
 interface BenchPlayer {
@@ -61,6 +62,7 @@ const finished = ref(false);
 const serverTick = ref(0);
 const celebrating = ref(false);
 const celebrationText = ref('');
+const reviewingMinute = ref<number | null>(null);
 let fetching = false;
 let raf: number | null = null;
 let lastTs: number | null = null;
@@ -147,6 +149,38 @@ const caption = computed(() => feed.value[0]?.text ?? 'Kick-off');
 const sideName = computed(() =>
     cur.value?.s === 1 ? props.awayName : props.homeName,
 );
+
+// The moments worth reviewing: goals, clear chances, big saves and penalties.
+const MAJOR_KINDS = new Set(['goal', 'chance', 'save']);
+function isMajor(m: Moment): boolean {
+    return MAJOR_KINDS.has(m.kind) || /penalt/i.test(m.text);
+}
+
+// feed is newest-first; keep that order so the latest highlight sits on top.
+const majorEvents = computed(() => feed.value.filter(isMajor));
+
+// How many keyframes of run-up to rewind so the chance is seen developing.
+const REVIEW_LEAD = 12;
+
+// Jump the replay back to a moment and play it from just before it happened.
+function review(minute: number): void {
+    const target = frames.value.findIndex((f) => f.m >= minute);
+
+    if (target < 0) {
+        return;
+    }
+
+    if (celebrationTimer !== null) {
+        window.clearTimeout(celebrationTimer);
+        celebrationTimer = null;
+    }
+
+    celebrating.value = false;
+    reviewingMinute.value = minute;
+    playhead.value = Math.max(0, target - REVIEW_LEAD);
+    lastTs = null;
+    void play();
+}
 
 function xsrf(): string {
     const m = document.cookie.match(/XSRF-TOKEN=([^;]+)/);
@@ -309,6 +343,8 @@ function pause(): void {
 }
 
 function toggle(): void {
+    reviewingMinute.value = null;
+
     if (playing.value) {
         pause();
     } else {
@@ -543,6 +579,57 @@ onBeforeUnmount(() => {
 
         <!-- Management -->
         <div class="flex w-full flex-col gap-4 md:w-80">
+            <div class="rounded-xl border border-border p-3">
+                <h3 class="mb-2 text-sm font-semibold">Key moments</h3>
+                <ul class="flex max-h-56 flex-col gap-1 overflow-y-auto">
+                    <li v-for="(m, i) in majorEvents" :key="`ke-${i}`">
+                        <button
+                            type="button"
+                            class="flex w-full items-start gap-2 rounded-md border px-2 py-1.5 text-left text-xs transition-colors"
+                            :class="
+                                reviewingMinute === m.minute
+                                    ? 'border-primary bg-primary/10'
+                                    : 'border-transparent hover:border-border hover:bg-muted/50'
+                            "
+                            @click="review(m.minute)"
+                        >
+                            <span
+                                class="mt-0.5 size-2 shrink-0 rounded-full"
+                                :class="{
+                                    'bg-emerald-500': m.kind === 'goal',
+                                    'bg-sky-500': m.kind === 'chance',
+                                    'bg-violet-500': m.kind === 'save',
+                                    'bg-rose-500':
+                                        m.kind !== 'goal' &&
+                                        m.kind !== 'chance' &&
+                                        m.kind !== 'save',
+                                }"
+                            ></span>
+                            <span
+                                class="w-6 shrink-0 font-mono text-muted-foreground"
+                                >{{ m.minute }}'</span
+                            >
+                            <span
+                                class="flex-1"
+                                :class="{
+                                    'font-semibold': m.kind === 'goal',
+                                }"
+                                >{{ m.text }}</span
+                            >
+                            <Play
+                                class="mt-0.5 size-3 shrink-0 text-muted-foreground"
+                            />
+                        </button>
+                    </li>
+                    <li
+                        v-if="majorEvents.length === 0"
+                        class="px-2 py-1.5 text-xs text-muted-foreground"
+                    >
+                        Goals and big chances will appear here.
+                    </li>
+                </ul>
+            </div>
+
             <div class="rounded-xl border border-border p-3">
                 <h3 class="mb-2 text-sm font-semibold">Mentality</h3>
                 <div class="grid grid-cols-3 gap-1">
