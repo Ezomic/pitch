@@ -85,7 +85,7 @@ final class LivePitch
      *
      * @param  list<MatchEvent>  $events
      * @param  array<int, string>  $names
-     * @return list<array{minute: int, side: int, kind: string, text: string}>
+     * @return list<array{minute: int, side: int, kind: string, text: string, why: array<string, mixed>|null}>
      */
     public function moments(array $events, array $names): array
     {
@@ -98,11 +98,42 @@ final class LivePitch
                     'side' => $event->actorId >= 100 ? 1 : 0,
                     'kind' => $moment->kind,
                     'text' => $moment->text,
+                    'why' => $this->why($event),
                 ];
             }
         }
 
         return $moments;
+    }
+
+    /**
+     * The decision behind a moment: what the player could see and the random draw
+     * that resolved it, so a moment can be inspected rather than just watched.
+     *
+     * @return array<string, mixed>|null
+     */
+    private function why(MatchEvent $event): ?array
+    {
+        if ($event->decision === null && $event->roll === null) {
+            return null;
+        }
+
+        return [
+            'decision' => $event->decision !== null ? [
+                'optionsVisible' => $event->decision->optionsVisible,
+                'optionsTotal' => $event->decision->optionsTotal,
+                'chosenThreat' => round($event->decision->chosenThreat, 3),
+                'bestThreat' => round($event->decision->bestAvailableThreat, 3),
+                'gap' => round($event->decision->gap(), 3),
+            ] : null,
+            'roll' => $event->roll !== null ? [
+                'threshold' => round($event->roll->threshold, 3),
+                'draw' => round($event->roll->draw, 3),
+                'succeeded' => $event->roll->succeeded(),
+                'attribute' => round($event->roll->attributeContribution, 3),
+                'pressure' => round($event->roll->pressure, 3),
+            ] : null,
+        ];
     }
 
     private function index(int $id): int

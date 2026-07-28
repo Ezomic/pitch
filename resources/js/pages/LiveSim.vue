@@ -18,11 +18,28 @@ interface PlayerMeta {
     name: string | null;
     gk: boolean;
 }
+interface MomentWhy {
+    decision: {
+        optionsVisible: number;
+        optionsTotal: number;
+        chosenThreat: number;
+        bestThreat: number;
+        gap: number;
+    } | null;
+    roll: {
+        threshold: number;
+        draw: number;
+        succeeded: boolean;
+        attribute: number;
+        pressure: number;
+    } | null;
+}
 interface Moment {
     minute: number;
     side: 0 | 1;
     kind: string;
     text: string;
+    why?: MomentWhy | null;
 }
 interface BenchPlayer {
     id: number;
@@ -67,6 +84,15 @@ const serverTick = ref(0);
 const celebrating = ref(false);
 const celebrationText = ref('');
 const reviewingMinute = ref<number | null>(null);
+const openWhy = ref<Moment | null>(null);
+
+function toggleWhy(m: Moment): void {
+    if (!m.why) {
+        return;
+    }
+
+    openWhy.value = openWhy.value === m ? null : m;
+}
 let fetching = false;
 let raf: number | null = null;
 let lastTs: number | null = null;
@@ -734,16 +760,84 @@ onBeforeUnmount(() => {
                 <ul
                     class="flex max-h-72 flex-col gap-1 overflow-y-auto text-xs"
                 >
-                    <li
-                        v-for="(m, i) in feed.slice(0, 40)"
-                        :key="i"
-                        class="flex gap-2"
-                    >
-                        <span
-                            class="w-6 shrink-0 font-mono text-muted-foreground"
-                            >{{ m.minute }}'</span
+                    <li v-for="(m, i) in feed.slice(0, 40)" :key="i">
+                        <button
+                            type="button"
+                            class="flex w-full gap-2 rounded text-left"
+                            :class="
+                                m.why
+                                    ? 'cursor-pointer hover:text-foreground'
+                                    : 'cursor-default'
+                            "
+                            @click="toggleWhy(m)"
                         >
-                        <span>{{ m.text }}</span>
+                            <span
+                                class="w-6 shrink-0 font-mono text-muted-foreground"
+                                >{{ m.minute }}'</span
+                            >
+                            <span class="flex-1">{{ m.text }}</span>
+                            <span
+                                v-if="m.why"
+                                class="shrink-0 font-mono text-[10px] text-muted-foreground"
+                                >{{ openWhy === m ? '▾' : 'why' }}</span
+                            >
+                        </button>
+
+                        <!-- Decision inspector: what the player saw and the draw -->
+                        <div
+                            v-if="openWhy === m && m.why"
+                            class="mt-1 ml-8 flex flex-col gap-1 rounded-md bg-muted/50 px-2 py-1.5 font-mono text-[10px] text-muted-foreground"
+                        >
+                            <div v-if="m.why.decision">
+                                Saw
+                                <span class="text-foreground">{{
+                                    m.why.decision.optionsVisible
+                                }}</span>
+                                of {{ m.why.decision.optionsTotal }} options ·
+                                chose threat
+                                <span class="text-foreground">{{
+                                    m.why.decision.chosenThreat.toFixed(2)
+                                }}</span>
+                                · best
+                                <span class="text-foreground">{{
+                                    m.why.decision.bestThreat.toFixed(2)
+                                }}</span>
+                                <span
+                                    v-if="m.why.decision.gap > 0.05"
+                                    class="text-amber-500"
+                                >
+                                    (left {{ m.why.decision.gap.toFixed(2) }} on
+                                    the table)</span
+                                >
+                            </div>
+                            <div v-if="m.why.roll">
+                                Roll
+                                <span class="text-foreground">{{
+                                    m.why.roll.draw.toFixed(2)
+                                }}</span>
+                                vs threshold
+                                {{ m.why.roll.threshold.toFixed(2) }} →
+                                <span
+                                    :class="
+                                        m.why.roll.succeeded
+                                            ? 'text-emerald-500'
+                                            : 'text-rose-500'
+                                    "
+                                    >{{
+                                        m.why.roll.succeeded
+                                            ? 'made it'
+                                            : 'lost'
+                                    }}</span
+                                >
+                                <span class="opacity-70">
+                                    (skill +{{
+                                        m.why.roll.attribute.toFixed(2)
+                                    }}, pressure −{{
+                                        m.why.roll.pressure.toFixed(2)
+                                    }})</span
+                                >
+                            </div>
+                        </div>
                     </li>
                     <li v-if="feed.length === 0" class="text-muted-foreground">
                         Press play to kick off.

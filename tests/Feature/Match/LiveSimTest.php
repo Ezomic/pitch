@@ -56,8 +56,17 @@ it('advances a live match slice by slice to full time', function () {
 
     // Each key moment carries the kind the live view filters highlights by.
     foreach ($moments as $moment) {
-        expect($moment)->toHaveKeys(['minute', 'side', 'kind', 'text']);
+        expect($moment)->toHaveKeys(['minute', 'side', 'kind', 'text', 'why']);
     }
+
+    // The decision inspector: at least one moment records what the player saw and
+    // the draw that resolved it.
+    $inspectable = array_filter($moments, fn (array $m): bool => ($m['why']['decision'] ?? null) !== null);
+    expect($inspectable)->not->toBeEmpty();
+
+    $why = array_values($inspectable)[0]['why'];
+    expect($why['decision'])->toHaveKeys(['optionsVisible', 'optionsTotal', 'chosenThreat', 'bestThreat', 'gap'])
+        ->and($why['roll'])->toHaveKeys(['threshold', 'draw', 'succeeded']);
 });
 
 it('changes mentality mid-match', function () {
