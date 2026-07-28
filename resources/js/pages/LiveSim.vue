@@ -70,7 +70,9 @@ const count = computed(() => frames.value.length);
 const seg = computed(() =>
     Math.min(Math.floor(playhead.value), Math.max(0, count.value - 1)),
 );
-const frac = computed(() => Math.min(1, Math.max(0, playhead.value - seg.value)));
+const frac = computed(() =>
+    Math.min(1, Math.max(0, playhead.value - seg.value)),
+);
 const cur = computed(() => frames.value[seg.value] ?? null);
 
 const px = (n: number) => PAD_X + n * (100 - 2 * PAD_X);
@@ -194,7 +196,10 @@ function loop(ts: number): void {
     lastTs = ts;
 
     const max = count.value - 1;
-    playhead.value = Math.min(max, playhead.value + (dt / SEG_MS) * speed.value);
+    playhead.value = Math.min(
+        max,
+        playhead.value + (dt / SEG_MS) * speed.value,
+    );
 
     if (cur.value) tickGoals(cur.value.m);
 
@@ -241,7 +246,9 @@ function cycleSpeed(): void {
     speed.value = speed.value === 1 ? 2 : speed.value === 2 ? 4 : 1;
 }
 
-async function setMentality(m: 'attacking' | 'balanced' | 'defensive'): Promise<void> {
+async function setMentality(
+    m: 'attacking' | 'balanced' | 'defensive',
+): Promise<void> {
     mentality.value = m;
     await postJson(`/play/${props.matchId}/mentality`, { mentality: m });
 }
@@ -250,7 +257,11 @@ const benchList = ref<BenchPlayer[]>(props.bench.map((b) => ({ ...b })));
 const onPitchList = ref(props.onPitch.map((p) => ({ ...p })));
 
 async function makeSub(): Promise<void> {
-    if (outSlot.value === null || inPlayer.value === null || subsLeft.value <= 0)
+    if (
+        outSlot.value === null ||
+        inPlayer.value === null ||
+        subsLeft.value <= 0
+    )
         return;
     const incoming = benchList.value.find((b) => b.id === inPlayer.value);
     const res = (await postJson(`/play/${props.matchId}/sub`, {
@@ -265,7 +276,9 @@ async function makeSub(): Promise<void> {
         if (m) m.name = incoming.name;
         const op = onPitchList.value.find((x) => x.slot === slot);
         if (op) op.name = incoming.name;
-        benchList.value = benchList.value.filter((b) => b.id !== inPlayer.value);
+        benchList.value = benchList.value.filter(
+            (b) => b.id !== inPlayer.value,
+        );
     }
     outSlot.value = null;
     inPlayer.value = null;
@@ -361,7 +374,11 @@ onBeforeUnmount(pause);
                     >
                         <span
                             class="block size-2 rounded-full bg-white ring-1 ring-black/30"
-                            style="filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.45))"
+                            style="
+                                filter: drop-shadow(
+                                    0 1px 1px rgba(0, 0, 0, 0.45)
+                                );
+                            "
                         ></span>
                     </div>
                 </div>
@@ -374,9 +391,12 @@ onBeforeUnmount(pause);
                 <div
                     class="absolute right-2 bottom-2 max-w-[75%] truncate rounded-md bg-black/45 px-2 py-0.5 text-right font-mono text-xs text-white"
                 >
-                    <span :class="cur?.s === 1 ? 'text-amber-300' : 'text-emerald-200'">{{
-                        sideName
-                    }}</span>
+                    <span
+                        :class="
+                            cur?.s === 1 ? 'text-amber-300' : 'text-emerald-200'
+                        "
+                        >{{ sideName }}</span
+                    >
                     &middot; {{ caption }}
                 </div>
                 <div
@@ -422,7 +442,11 @@ onBeforeUnmount(pause);
                 <h3 class="mb-2 text-sm font-semibold">Mentality</h3>
                 <div class="grid grid-cols-3 gap-1">
                     <button
-                        v-for="m in ['defensive', 'balanced', 'attacking'] as const"
+                        v-for="m in [
+                            'defensive',
+                            'balanced',
+                            'attacking',
+                        ] as const"
                         :key="m"
                         type="button"
                         class="rounded-md border px-2 py-1.5 text-xs capitalize transition-colors"
@@ -445,17 +469,25 @@ onBeforeUnmount(pause);
                         >{{ subsLeft }} left</span
                     >
                 </div>
-                <label class="mb-1 block text-xs text-muted-foreground">Off</label>
+                <label class="mb-1 block text-xs text-muted-foreground"
+                    >Off</label
+                >
                 <select
                     v-model="outSlot"
                     class="mb-2 w-full rounded-md border border-border bg-transparent px-2 py-1.5 text-xs"
                 >
                     <option :value="null">Select player</option>
-                    <option v-for="p in onPitchList" :key="p.slot" :value="p.slot">
+                    <option
+                        v-for="p in onPitchList"
+                        :key="p.slot"
+                        :value="p.slot"
+                    >
                         {{ p.slot }} · {{ p.name }}
                     </option>
                 </select>
-                <label class="mb-1 block text-xs text-muted-foreground">On</label>
+                <label class="mb-1 block text-xs text-muted-foreground"
+                    >On</label
+                >
                 <select
                     v-model="inPlayer"
                     class="mb-2 w-full rounded-md border border-border bg-transparent px-2 py-1.5 text-xs"
@@ -479,13 +511,16 @@ onBeforeUnmount(pause);
 
             <div class="rounded-xl border border-border p-3">
                 <h3 class="mb-2 text-sm font-semibold">Commentary</h3>
-                <ul class="flex max-h-72 flex-col gap-1 overflow-y-auto text-xs">
+                <ul
+                    class="flex max-h-72 flex-col gap-1 overflow-y-auto text-xs"
+                >
                     <li
                         v-for="(m, i) in feed.slice(0, 40)"
                         :key="i"
                         class="flex gap-2"
                     >
-                        <span class="w-6 shrink-0 font-mono text-muted-foreground"
+                        <span
+                            class="w-6 shrink-0 font-mono text-muted-foreground"
                             >{{ m.minute }}'</span
                         >
                         <span>{{ m.text }}</span>
