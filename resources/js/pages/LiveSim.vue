@@ -9,6 +9,7 @@ interface Frame {
     c: number;
     s: 0 | 1;
     p: [number, number][];
+    j?: boolean; // ball placed (kickoff/set piece): snap, don't glide
 }
 interface PlayerMeta {
     s: 0 | 1;
@@ -92,6 +93,12 @@ const ball = computed(() => {
 
     if (!b) {
         return { x: px(a.b[0]), y: py(a.b[1]) };
+    }
+
+    // The ball was placed by hand this segment (kickoff / set piece): snap to it
+    // instead of gliding, so it does not drift untouched across the pitch.
+    if (b.j) {
+        return { x: px(b.b[0]), y: py(b.b[1]) };
     }
 
     return {

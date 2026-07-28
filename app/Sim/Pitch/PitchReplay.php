@@ -154,14 +154,19 @@ final class PitchReplay
     }
 
     /**
-     * @param  list<array{m: int, b: array{float, float}, c: int, s: int, p: list<array{float, float}>}>  $frames
+     * @param  list<array{m: int, b: array{float, float}, c: int, s: int, p: list<array{float, float}>, j: bool}>  $frames
      * @param  array<int, string>  $captions
-     * @return list<array{m: int, b: array{float, float}, c: int, s: int, p: list<array{float, float}>, cap: string}>
+     * @return list<array{m: int, b: array{float, float}, c: int, s: int, p: list<array{float, float}>, cap: string, j: bool}>
      */
     private function frames(array $frames, array $captions): array
     {
         $out = [];
+        $cut = false;
         foreach ($frames as $tick => $frame) {
+            if ($frame['j']) {
+                $cut = true;
+            }
+
             if ($tick % self::STEP !== 0) {
                 continue;
             }
@@ -173,7 +178,9 @@ final class PitchReplay
                 's' => $frame['s'],
                 'p' => $frame['p'],
                 'cap' => $captions[$frame['m']] ?? '',
+                'j' => $cut,
             ];
+            $cut = false;
         }
 
         return $out;

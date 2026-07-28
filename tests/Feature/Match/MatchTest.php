@@ -35,7 +35,7 @@ it('renders a match report with a scoreline, moments and a positional replay str
             ->has('report.stream.players', 22)
             ->has('report.stream.frames')
             ->has('report.stream.frames.0', fn (Assert $frame) => $frame
-                ->has('m')->has('b')->has('c')->has('s')->has('p')->has('cap'))
+                ->has('m')->has('b')->has('c')->has('s')->has('p')->has('cap')->has('j'))
             ->has('report.stream.players.0', fn (Assert $meta) => $meta
                 ->has('s')->has('slot')->has('name')->has('gk')),
         );

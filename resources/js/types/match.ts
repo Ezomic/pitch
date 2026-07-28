@@ -50,6 +50,7 @@ export interface PitchStreamFrame {
     s: 0 | 1; // possessing side
     p: [number, number][]; // [x, y] per player, players[] order, 0..1
     cap: string; // caption for this frame
+    j?: boolean; // ball was placed (kickoff/set piece): snap, don't glide
 }
 
 export interface PitchStream {
