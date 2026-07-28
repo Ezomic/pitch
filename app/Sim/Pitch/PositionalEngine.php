@@ -41,7 +41,7 @@ final class PositionalEngine
 
     private const float SHOT_SPEED = 0.55;
 
-    private const float SHOOT_RANGE = 0.23;       // distance to goal a shot is viable from
+    private const float SHOOT_RANGE = 0.16;      // distance to goal a shot is viable from (calibrated: shots ~26/match)
 
     private const float MAX_PASS = 0.55;          // longest pass a player attempts
 
