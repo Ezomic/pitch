@@ -10,7 +10,7 @@ const props = defineProps<{
 }>();
 
 const PAD_X = 5;
-const PAD_Y = 10;
+const PAD_Y = 6; // near-symmetric with PAD_X so full-width shapes are not pinched
 const SEG_MS = 190; // real time per keyframe at 1×; a calm, watchable tempo
 
 const reduceMotion =

@@ -43,7 +43,7 @@ const props = defineProps<{
 defineOptions({ layout: { breadcrumbs: [{ title: 'Play', href: '/play' }] } });
 
 const PAD_X = 5;
-const PAD_Y = 10;
+const PAD_Y = 6; // near-symmetric with PAD_X so full-width shapes are not pinched
 const SEG_MS = 210;
 const CHUNK = 300; // ticks per fetch (~75 keyframes)
 const PREFETCH = 24; // keyframes of headroom before fetching more
