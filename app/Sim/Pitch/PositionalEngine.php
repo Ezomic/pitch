@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace App\Sim\Pitch;
 
 use App\Sim\Domain\Attributes;
+use App\Sim\Domain\Decision;
 use App\Sim\Domain\EventType;
 use App\Sim\Domain\MatchEvent;
 use App\Sim\Domain\Player;
 use App\Sim\Domain\Position;
+use App\Sim\Domain\Roll;
 use App\Sim\Domain\Zone;
 use App\Sim\Engine\Formation;
 use App\Sim\Engine\Rng;
@@ -883,9 +885,12 @@ final class PositionalEngine
             ? (self::LANE_RADIUS - $laneDist) / self::LANE_RADIUS * self::LANE_WEIGHT
             : 0.0;
         $threshold = max(0.1, min(0.97, 0.55 + $carrier->attributes->passing / 100 * 0.38 - $pressure - $laneRisk));
-        $success = $rng->next() <= $threshold;
+        $draw = $rng->next();
+        $success = $draw <= $threshold;
 
-        $events[] = $this->event($minute, EventType::Pass, $carrier, $target->id, $carrier->pos, $dest, $success);
+        $decision = $this->buildDecision($state, $carrier, $this->danger($dest, $carrier->side));
+        $roll = new Roll(0.55, $carrier->attributes->passing / 100 * 0.38, $pressure + $laneRisk, $threshold, $draw);
+        $events[] = $this->event($minute, EventType::Pass, $carrier, $target->id, $carrier->pos, $dest, $success, $decision, $roll);
 
         // An errant ball sometimes runs out of play for a throw-in to the other side.
         if (! $success && $rng->next() < self::THROW_CHANCE) {
@@ -1120,9 +1125,12 @@ final class PositionalEngine
         $quality = $this->shotQuality($state, $carrier, $goal, $distToGoal);
         $keeperSave = $keeper !== null ? $keeper->attributes->tackling / 100 * 0.33 : 0.0;
         $threshold = max(0.02, min(0.5, $carrier->attributes->finishing / 100 * $quality * 0.78 - $keeperSave));
-        $goalScored = $rng->next() <= $threshold;
+        $draw = $rng->next();
+        $goalScored = $draw <= $threshold;
 
-        $events[] = $this->event($minute, EventType::Shot, $carrier, null, $carrier->pos, null, $goalScored);
+        $decision = $this->buildDecision($state, $carrier, $quality);
+        $roll = new Roll(0.0, $carrier->attributes->finishing / 100 * $quality * 0.78, $keeperSave, $threshold, $draw);
+        $events[] = $this->event($minute, EventType::Shot, $carrier, null, $carrier->pos, null, $goalScored, $decision, $roll);
 
         $state->carrierId = PitchState::NO_CARRIER;
         $state->ballKind = 'shot';
@@ -1500,7 +1508,7 @@ final class PositionalEngine
         return $side === 0 ? new Vec2(1.0, 0.5) : new Vec2(0.0, 0.5);
     }
 
-    private function event(int $minute, EventType $type, PlayerState $actor, ?int $targetId, Vec2 $from, ?Vec2 $to, bool $success): MatchEvent
+    private function event(int $minute, EventType $type, PlayerState $actor, ?int $targetId, Vec2 $from, ?Vec2 $to, bool $success, ?Decision $decision = null, ?Roll $roll = null): MatchEvent
     {
         return new MatchEvent(
             $minute,
@@ -1510,8 +1518,63 @@ final class PositionalEngine
             $this->zone($from, $actor->side),
             $to !== null ? $this->zone($to, $actor->side) : null,
             $success,
-            null,
-            null,
+            $decision,
+            $roll,
+        );
+    }
+
+    /**
+     * How dangerous it is to have the ball at a point: 1 on the goal line, fading
+     * to 0 by ~0.7 of the pitch away. A shared yardstick for comparing the options
+     * a carrier weighs, so a decision can be audited after the fact.
+     */
+    private function danger(Vec2 $pos, int $side): float
+    {
+        $dist = $pos->distanceTo($this->goalOf($side));
+
+        return max(0.0, min(1.0, 1.0 - $dist / 0.7));
+    }
+
+    /**
+     * A record of what the carrier could see and how the chosen action compared:
+     * how many team-mates were reachable, how many had a clear lane, the threat of
+     * the action taken and the best threat on offer.
+     */
+    private function buildDecision(PitchState $state, PlayerState $carrier, float $chosenThreat): Decision
+    {
+        $goal = $this->goalOf($carrier->side);
+        $distToGoal = $carrier->pos->distanceTo($goal);
+
+        /** @var list<array{float, bool}> $options threat, clear-lane */
+        $options = [];
+
+        if ($distToGoal < self::SHOOT_RANGE + 0.06) {
+            $options[] = [$this->shotQuality($state, $carrier, $goal, $distToGoal), true];
+        }
+
+        foreach ($state->players as $mate) {
+            if ($mate->side !== $carrier->side || $mate->id === $carrier->id || $mate->isGoalkeeper()) {
+                continue;
+            }
+
+            $reach = $carrier->pos->distanceTo($mate->pos);
+            if ($reach > self::MAX_PASS || $reach < 0.04) {
+                continue;
+            }
+
+            [$laneDefender, $laneDist] = $this->nearestOpponentToSegment($state, $carrier->pos, $mate->pos, $carrier->side);
+            $clear = $laneDefender === null || $laneDist >= self::LANE_RADIUS;
+            $options[] = [$this->danger($mate->pos, $carrier->side), $clear];
+        }
+
+        $visible = array_values(array_filter($options, fn (array $o): bool => $o[1]));
+        $bestVisible = array_map(fn (array $o): float => $o[0], $visible);
+
+        return new Decision(
+            optionsVisible: count($visible),
+            optionsTotal: count($options),
+            chosenThreat: $chosenThreat,
+            bestAvailableThreat: $bestVisible === [] ? $chosenThreat : max($bestVisible),
         );
     }
 
