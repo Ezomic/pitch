@@ -1124,12 +1124,12 @@ final class PositionalEngine
         $keeper = $state->players[PlayerState::id(1 - $carrier->side, 0)] ?? null;
         $quality = $this->shotQuality($state, $carrier, $goal, $distToGoal);
         $keeperSave = $keeper !== null ? $keeper->attributes->tackling / 100 * 0.33 : 0.0;
-        $threshold = max(0.02, min(0.5, $carrier->attributes->finishing / 100 * $quality * 0.78 - $keeperSave));
+        $threshold = max(0.02, min(0.5, $carrier->attributes->finishing / 100 * $quality * 0.60 - $keeperSave));
         $draw = $rng->next();
         $goalScored = $draw <= $threshold;
 
         $decision = $this->buildDecision($state, $carrier, $quality);
-        $roll = new Roll(0.0, $carrier->attributes->finishing / 100 * $quality * 0.78, $keeperSave, $threshold, $draw);
+        $roll = new Roll(0.0, $carrier->attributes->finishing / 100 * $quality * 0.60, $keeperSave, $threshold, $draw);
         $events[] = $this->event($minute, EventType::Shot, $carrier, null, $carrier->pos, null, $goalScored, $decision, $roll);
 
         $state->carrierId = PitchState::NO_CARRIER;
