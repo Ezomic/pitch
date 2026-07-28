@@ -242,8 +242,10 @@ final class PositionalEngine
                 $goal = $this->goalOf($player->side);
 
                 // A wide player in the attacking third attacks the byline to cross,
-                // rather than cutting inside into the crowded centre.
-                if (abs($player->pos->y - 0.5) > 0.22 && $player->pos->distanceTo($goal) < 0.5) {
+                // rather than cutting inside, unless he is clean through, in which
+                // case he drives straight at goal to shoot.
+                if (abs($player->pos->y - 0.5) > 0.22 && $player->pos->distanceTo($goal) < 0.5
+                    && ! $this->clearRunToGoal($state, $player, $goal)) {
                     $bylineX = $player->side === 0 ? 0.95 : 0.05;
                     $wideY = $player->pos->y < 0.5 ? 0.12 : 0.88;
                     $player->target = new Vec2($bylineX, $wideY);
@@ -529,6 +531,17 @@ final class PositionalEngine
         $goal = $this->goalOf($carrier->side);
         $distToGoal = $carrier->pos->distanceTo($goal);
 
+        // Clean through on the keeper: shoot if close enough, otherwise drive
+        // straight at goal. This comes first so a player who has beaten the line
+        // never crosses, switches wide or lays it off from a one-on-one.
+        if ($this->clearRunToGoal($state, $carrier, $goal)) {
+            if ($distToGoal < self::SHOOT_RANGE + 0.06) {
+                $this->shoot($state, $events, $rng, $minute, $carrier, $goal, $distToGoal);
+            }
+
+            return; // otherwise carry on at goal (the carrier already drives at it)
+        }
+
         // Wide and advanced: whip a cross into the box instead of cutting inside.
         // Wing play is a real route to goal, not just a way back into the middle.
         if ($distToGoal < 0.5 && abs($carrier->pos->y - 0.5) > 0.24) {
@@ -560,25 +573,22 @@ final class PositionalEngine
             $quality = $this->shotQuality($state, $carrier, $goal, $distToGoal);
             $inBox = $this->bestPassTarget($state, $carrier, $goal, $distToGoal, minProgress: 0.02);
 
-            // A decent chance, or a clear sight of goal: shoot. A player in range
-            // never turns back, so it drives at goal for a better angle instead of
-            // recycling the ball away from the chance.
-            $clean = $this->clearRunToGoal($state, $carrier, $goal);
-
-            if (($quality > 0.58 || $clean) && ($inBox === null || $rng->next() < 0.6)) {
+            // A decent chance: shoot. (A genuine clean-through has already been
+            // handled at the top of decide, so this is the in-a-crowd case.)
+            if ($quality > 0.58 && ($inBox === null || $rng->next() < 0.6)) {
                 $this->shoot($state, $events, $rng, $minute, $carrier, $goal, $distToGoal);
 
                 return;
             }
 
-            if (! $clean && $inBox !== null && $rng->next() < 0.7) {
+            if ($inBox !== null && $rng->next() < 0.7) {
                 $this->pass($state, $events, $rng, $minute, $carrier, $inBox);
 
                 return;
             }
 
-            if ($this->pressed($state) || $clean) {
-                // Forced, or clean through: get the shot away rather than turn back.
+            if ($this->pressed($state)) {
+                // Forced: get the shot away rather than lose it in the box.
                 $this->shoot($state, $events, $rng, $minute, $carrier, $goal, $distToGoal);
 
                 return;
@@ -621,12 +631,6 @@ final class PositionalEngine
         if ($forward !== null && $rng->next() < ($pressed ? 0.62 : 0.88)) {
             $this->pass($state, $events, $rng, $minute, $carrier, $forward);
 
-            return;
-        }
-
-        // A clear run at goal: carry it in rather than turning back. A player bearing
-        // down on goal should run at it, not recycle to a defender.
-        if ($this->clearRunToGoal($state, $carrier, $goal)) {
             return;
         }
 
