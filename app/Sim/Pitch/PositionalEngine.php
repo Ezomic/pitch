@@ -636,11 +636,16 @@ final class PositionalEngine
         }
 
         // Central and advanced but NOT in shooting range: switch it out to a winger
-        // in space to attack the flank. A player near goal shoots (below), and never
-        // turns back out to the wing from a shooting position.
+        // in space to attack the flank. But an unmarked player with clear space
+        // ahead drives at the goal himself rather than turning it back out wide, so
+        // a forward through on a channel keeps running instead of laying it off.
         if ($distToGoal > self::SHOOT_RANGE + 0.07 && $distToGoal < 0.72 && abs($carrier->pos->y - 0.5) < 0.3) {
             $wide = $this->wideOutlet($state, $carrier, $goal, $distToGoal);
-            if ($wide !== null && $rng->next() < 0.6) {
+            // With space ahead the carrier mostly drives on himself; only now and
+            // then does he still switch it wide, so he does not turn back out from a
+            // promising run, but the play keeps some variety.
+            $switchChance = $this->spaceAhead($state, $carrier, 0.24) ? 0.25 : 0.6;
+            if ($wide !== null && $rng->next() < $switchChance) {
                 $this->pass($state, $events, $rng, $minute, $carrier, $wide);
 
                 return;
@@ -844,7 +849,7 @@ final class PositionalEngine
     }
 
     /** True when no opponent is close and goal-side of the carrier, so it can drive on. */
-    private function spaceAhead(PitchState $state, PlayerState $carrier): bool
+    private function spaceAhead(PitchState $state, PlayerState $carrier, float $radius = 0.12): bool
     {
         $goal = $this->goalOf($carrier->side);
         $carrierToGoal = $carrier->pos->distanceTo($goal);
@@ -855,7 +860,7 @@ final class PositionalEngine
             }
 
             if ($opponent->pos->distanceTo($goal) < $carrierToGoal
-                && $opponent->pos->distanceTo($carrier->pos) < 0.12) {
+                && $opponent->pos->distanceTo($carrier->pos) < $radius) {
                 return false;
             }
         }
