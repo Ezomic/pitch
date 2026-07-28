@@ -19,7 +19,7 @@ const props = withDefaults(
 );
 
 const PAD_X = 5; // keep markers inside the touchlines / behind the goals
-const PAD_Y = 10;
+const PAD_Y = 6; // near-symmetric with PAD_X so full-width shapes are not pinched
 const SEG_MS = 850; // base time to move REF_SPAN of the pitch at 1×
 // Playback time is proportional to how far things actually move, so the ball and
 // players travel at a roughly constant speed instead of the whole event taking a
