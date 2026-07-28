@@ -3,6 +3,7 @@
 use App\Http\Controllers\Auth\LoginCodeController;
 use App\Http\Controllers\CupController;
 use App\Http\Controllers\LiveMatchController;
+use App\Http\Controllers\LiveSimController;
 use App\Http\Controllers\MatchController;
 use App\Http\Controllers\NewsController;
 use App\Http\Controllers\ScoutController;
@@ -44,6 +45,10 @@ Route::middleware(['auth'])->group(function () {
     Route::post('transfers/{player}/renew', [TransferController::class, 'renew'])->name('transfers.renew');
 
     Route::get('match', [MatchController::class, 'show'])->name('match.show');
+    Route::get('play', [LiveSimController::class, 'show'])->name('play.show');
+    Route::post('play/{match}/advance', [LiveSimController::class, 'advance'])->name('play.advance');
+    Route::post('play/{match}/sub', [LiveSimController::class, 'sub'])->name('play.sub');
+    Route::post('play/{match}/mentality', [LiveSimController::class, 'mentality'])->name('play.mentality');
     Route::get('match/live/{fixture}', [LiveMatchController::class, 'show'])->name('match.live.show');
     Route::post('match/live/{fixture}/bench', [LiveMatchController::class, 'bench'])->name('match.live.bench');
     Route::post('match/live/{fixture}/sub', [LiveMatchController::class, 'sub'])->name('match.live.sub');
