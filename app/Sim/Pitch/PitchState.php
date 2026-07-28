@@ -40,6 +40,14 @@ final class PitchState
     /** Ticks left of a dead-ball pause after a set piece is awarded. */
     public int $deadBall = 0;
 
+    /**
+     * True on the tick the ball was placed by hand (a kickoff or a set-piece
+     * restart) rather than travelling there. Transient (reset each tick, not
+     * persisted); the replay uses it to snap the ball instead of gliding it, so a
+     * placed ball does not drift untouched across the pitch.
+     */
+    public bool $teleported = false;
+
     /** Running score, carried on the state so a paused match resumes exactly. */
     public int $homeGoals = 0;
 

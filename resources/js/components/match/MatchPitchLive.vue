@@ -52,6 +52,12 @@ const ball = computed(() => {
         return { x: px(a.b[0]), y: py(a.b[1]) };
     }
 
+    // The ball was placed by hand this segment (kickoff / set piece): snap to it
+    // instead of gliding, so it does not drift untouched across the pitch.
+    if (b.j) {
+        return { x: px(b.b[0]), y: py(b.b[1]) };
+    }
+
     return {
         x: px(lerp(a.b[0], b.b[0], frac.value)),
         y: py(lerp(a.b[1], b.b[1], frac.value)),

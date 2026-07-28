@@ -106,7 +106,7 @@ final class PositionalEngine
     {
         /** @var list<MatchEvent> $events */
         $events = [];
-        /** @var list<array{m: int, b: array{float, float}, c: int, s: int, p: list<array{float, float}>}> $frames */
+        /** @var list<array{m: int, b: array{float, float}, c: int, s: int, p: list<array{float, float}>, j: bool}> $frames */
         $frames = [];
 
         $toTick = min($toTick, self::TOTAL_TICKS);
@@ -122,11 +122,12 @@ final class PositionalEngine
      * is a fresh kickoff state after a goal.
      *
      * @param  list<MatchEvent>  $events
-     * @param  list<array{m: int, b: array{float, float}, c: int, s: int, p: list<array{float, float}>}>  $frames
+     * @param  list<array{m: int, b: array{float, float}, c: int, s: int, p: list<array{float, float}>, j: bool}>  $frames
      */
     private function tick(PitchState $state, Rng $rng, int $tick, array &$events, array &$frames): PitchState
     {
         $minute = (int) min(89, $tick / self::TOTAL_TICKS * 90);
+        $state->teleported = false;
 
         $this->setTargets($state, $tick);
         $this->moveAll($state);
@@ -214,6 +215,7 @@ final class PositionalEngine
     {
         $state = new PitchState($states, new Vec2(0.5, 0.5), PitchState::NO_CARRIER);
         $state->possessing = $side;
+        $state->teleported = true; // the ball is placed on the centre spot
 
         // A central player of the restarting side taps off from the centre spot.
         $starter = $this->centralOutfielder($state, $side);
@@ -1191,6 +1193,7 @@ final class PositionalEngine
         $state->ballGoal = false;
         $state->holdTicks = 0;
         $state->deadBall = self::DEADBALL_TICKS;
+        $state->teleported = true; // the ball is placed at the restart spot
     }
 
     private function nearestTeammateTo(PitchState $state, int $side, Vec2 $spot): ?PlayerState
@@ -1459,7 +1462,7 @@ final class PositionalEngine
     }
 
     /**
-     * @return array{m: int, b: array{float, float}, c: int, s: int, p: list<array{float, float}>}
+     * @return array{m: int, b: array{float, float}, c: int, s: int, p: list<array{float, float}>, j: bool}
      */
     private function snapshot(PitchState $state, int $minute): array
     {
@@ -1475,6 +1478,7 @@ final class PositionalEngine
             'c' => $state->carrierId,
             's' => $state->possessing,
             'p' => $positions,
+            'j' => $state->teleported,
         ];
     }
 

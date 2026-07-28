@@ -47,13 +47,18 @@ final class LivePitch
      * The slice's position frames, downsampled on the global tick so the phase is
      * continuous across advances, with the carrier id mapped to its stream index.
      *
-     * @param  list<array{m: int, b: array{float, float}, c: int, s: int, p: list<array{float, float}>}>  $frames
-     * @return list<array{m: int, b: array{float, float}, c: int, s: int, p: list<array{float, float}>}>
+     * @param  list<array{m: int, b: array{float, float}, c: int, s: int, p: list<array{float, float}>, j: bool}>  $frames
+     * @return list<array{m: int, b: array{float, float}, c: int, s: int, p: list<array{float, float}>, j: bool}>
      */
     public function frames(array $frames, int $startTick): array
     {
         $out = [];
+        $cut = false;
         foreach ($frames as $i => $frame) {
+            if ($frame['j']) {
+                $cut = true; // the ball was placed somewhere in this downsample window
+            }
+
             if (($startTick + $i) % self::STEP !== 0) {
                 continue;
             }
@@ -64,7 +69,9 @@ final class LivePitch
                 'c' => $frame['c'] >= 0 ? $this->index($frame['c']) : -1,
                 's' => $frame['s'],
                 'p' => $frame['p'],
+                'j' => $cut,
             ];
+            $cut = false;
         }
 
         return $out;
