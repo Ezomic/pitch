@@ -152,9 +152,14 @@ const clock = computed(() => {
     return `${minute}:${secs.toString().padStart(2, '0')}`;
 });
 
-const caption = computed(() => feed.value[0]?.text ?? 'Kick-off');
+// The caption shows the latest commentary line, so its team label must come from
+// that moment's side, not from whoever happens to be in possession in the frame
+// currently on screen. Otherwise an opposition line gets stamped "Your squad".
+const captionMoment = computed(() => feed.value[0] ?? null);
+const caption = computed(() => captionMoment.value?.text ?? 'Kick-off');
+const captionSide = computed<0 | 1>(() => captionMoment.value?.side ?? 0);
 const sideName = computed(() =>
-    cur.value?.s === 1 ? props.awayName : props.homeName,
+    captionSide.value === 1 ? props.awayName : props.homeName,
 );
 
 // The moments worth reviewing: goals, clear chances, big saves and penalties.
@@ -527,7 +532,9 @@ onBeforeUnmount(() => {
                 >
                     <span
                         :class="
-                            cur?.s === 1 ? 'text-amber-300' : 'text-emerald-200'
+                            captionSide === 1
+                                ? 'text-amber-300'
+                                : 'text-emerald-200'
                         "
                         >{{ sideName }}</span
                     >
