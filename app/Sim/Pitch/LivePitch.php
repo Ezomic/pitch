@@ -82,7 +82,7 @@ final class LivePitch
      *
      * @param  list<MatchEvent>  $events
      * @param  array<int, string>  $names
-     * @return list<array{minute: int, side: int, text: string}>
+     * @return list<array{minute: int, side: int, kind: string, text: string}>
      */
     public function moments(array $events, array $names): array
     {
@@ -93,6 +93,7 @@ final class LivePitch
                 $moments[] = [
                     'minute' => $moment->minute,
                     'side' => $event->actorId >= 100 ? 1 : 0,
+                    'kind' => $moment->kind,
                     'text' => $moment->text,
                 ];
             }
