@@ -86,7 +86,7 @@ final class PositionalEngine
         for ($tick = 0; $tick < self::TOTAL_TICKS; $tick++) {
             $minute = (int) min(89, $tick / self::TOTAL_TICKS * 90);
 
-            $this->setTargets($state);
+            $this->setTargets($state, $tick);
             $this->moveAll($state);
 
             if ($state->inFlight()) {
@@ -182,7 +182,7 @@ final class PositionalEngine
         return $state;
     }
 
-    private function setTargets(PitchState $state): void
+    private function setTargets(PitchState $state, int $tick): void
     {
         $ballX = $state->ball->x;
 
@@ -252,10 +252,27 @@ final class PositionalEngine
                     }
                 }
 
-                $player->target = (new Vec2(
+                $base = new Vec2(
                     $targetX,
                     $player->anchor->y + ($state->ball->y - 0.5) * 0.2,
-                ))->clampToPitch();
+                );
+
+                // Off-ball run: every so often, if the space ahead toward goal is
+                // free of a defender, a forward or midfielder bursts into it to be
+                // played in behind, rather than holding the line. Runs are staggered
+                // per player and deterministic (no random draw), so the shape breaks
+                // and reforms instead of everyone lurching at once.
+                if ($player->id !== $state->carrierId
+                    && $player->position === Position::Forward
+                    && $this->runWindow($player, $tick)) {
+                    $goal = $this->goalOf($player->side);
+                    $ahead = $base->moveToward($goal, 0.14);
+                    if ($this->spaceFreeAt($state, $ahead, $player->side)) {
+                        $base = $ahead;
+                    }
+                }
+
+                $player->target = $base->clampToPitch();
 
                 continue;
             }
@@ -310,6 +327,32 @@ final class PositionalEngine
 
             $player->target = $base->clampToPitch();
         }
+    }
+
+    /**
+     * A deterministic, staggered window during which a player is minded to make a
+     * run: a few of them at any moment, spread out by id, so runs come "every so
+     * often" rather than all together. No random draw, to keep determinism.
+     */
+    private function runWindow(PlayerState $player, int $tick): bool
+    {
+        return (intdiv($tick, 10) + $player->id) % 12 < 2;
+    }
+
+    /** True when no opponent is close to the point, so it is space to run into. */
+    private function spaceFreeAt(PitchState $state, Vec2 $point, int $side): bool
+    {
+        foreach ($state->players as $player) {
+            if ($player->side === $side || $player->isGoalkeeper()) {
+                continue;
+            }
+
+            if ($player->pos->distanceTo($point) < 0.07) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private function moveAll(PitchState $state): void
@@ -442,9 +485,10 @@ final class PositionalEngine
             }
         }
 
-        // Central and advanced: switch it out to a winger in space to attack down
-        // the flank, so play is not funnelled through a crowded middle.
-        if ($distToGoal < 0.72 && abs($carrier->pos->y - 0.5) < 0.3) {
+        // Central and advanced but NOT in shooting range: switch it out to a winger
+        // in space to attack the flank. A player near goal shoots (below), and never
+        // turns back out to the wing from a shooting position.
+        if ($distToGoal > self::SHOOT_RANGE + 0.07 && $distToGoal < 0.72 && abs($carrier->pos->y - 0.5) < 0.3) {
             $wide = $this->wideOutlet($state, $carrier, $goal, $distToGoal);
             if ($wide !== null && $rng->next() < 0.6) {
                 $this->pass($state, $events, $rng, $minute, $carrier, $wide);
@@ -571,7 +615,11 @@ final class PositionalEngine
                 continue; // too tightly marked to receive
             }
 
-            $score = $progress * 1.2 + $openness * 0.6 - $reach * 0.2;
+            // Prefer the shorter progressive pass through the lines (defence to
+            // midfield to attack) over a long ball that skips a line: cap the reward
+            // for sheer distance gained and lean on keeping it short, so the midfield
+            // is the connecting point rather than being bypassed.
+            $score = min($progress, 0.32) * 1.4 + $openness * 0.6 - $reach * 0.5;
             if ($score > $bestScore) {
                 $bestScore = $score;
                 $best = $mate;
