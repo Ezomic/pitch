@@ -59,9 +59,12 @@ const playing = ref(false);
 const speed = ref(1);
 const finished = ref(false);
 const serverTick = ref(0);
+const celebrating = ref(false);
+const celebrationText = ref('');
 let fetching = false;
 let raf: number | null = null;
 let lastTs: number | null = null;
+let celebrationTimer: number | null = null;
 
 const outSlot = ref<number | null>(null);
 const inPlayer = ref<number | null>(null);
@@ -216,7 +219,24 @@ function tickGoals(minute: number): void {
         } else {
             score.value.a++;
         }
+
+        celebrate(g.side);
     }
+}
+
+function celebrate(side: 0 | 1): void {
+    celebrating.value = true;
+    celebrationText.value = side === 0 ? props.homeName : props.awayName;
+
+    if (celebrationTimer !== null) {
+        window.clearTimeout(celebrationTimer);
+    }
+
+    celebrationTimer = window.setTimeout(() => {
+        celebrating.value = false;
+        celebrationTimer = null;
+        lastTs = null; // avoid a jump when play resumes
+    }, 5000);
 }
 
 function loop(ts: number): void {
@@ -232,13 +252,17 @@ function loop(ts: number): void {
     lastTs = ts;
 
     const max = count.value - 1;
-    playhead.value = Math.min(
-        max,
-        playhead.value + (dt / SEG_MS) * speed.value,
-    );
 
-    if (cur.value) {
-        tickGoals(cur.value.m);
+    // Freeze the pitch during a goal celebration, then resume for the restart.
+    if (!celebrating.value) {
+        playhead.value = Math.min(
+            max,
+            playhead.value + (dt / SEG_MS) * speed.value,
+        );
+
+        if (cur.value) {
+            tickGoals(cur.value.m);
+        }
     }
 
     if (
@@ -348,7 +372,13 @@ async function makeSub(): Promise<void> {
 onMounted(() => {
     void fetchNext();
 });
-onBeforeUnmount(pause);
+onBeforeUnmount(() => {
+    pause();
+
+    if (celebrationTimer !== null) {
+        window.clearTimeout(celebrationTimer);
+    }
+});
 </script>
 
 <template>
@@ -459,6 +489,20 @@ onBeforeUnmount(pause);
                         >{{ sideName }}</span
                     >
                     &middot; {{ caption }}
+                </div>
+                <div
+                    v-if="celebrating"
+                    class="absolute inset-0 flex flex-col items-center justify-center gap-1 bg-black/60 text-white"
+                >
+                    <span class="text-4xl font-black tracking-widest"
+                        >GOAL!</span
+                    >
+                    <span class="font-mono text-sm">{{ celebrationText }}</span>
+                    <span
+                        class="mt-1 font-mono text-2xl font-bold tabular-nums"
+                    >
+                        {{ score.h }} – {{ score.a }}
+                    </span>
                 </div>
                 <div
                     v-if="finished"
