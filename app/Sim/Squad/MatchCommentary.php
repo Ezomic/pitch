@@ -38,7 +38,7 @@ final class MatchCommentary
             EventType::Corner => new MatchMoment($event->minute, 'setpiece', $this->pick(self::CORNERS, $key)),
             EventType::Penalty => new MatchMoment($event->minute, 'setpiece', 'Penalty awarded!'),
             EventType::Cross => $event->success
-                ? new MatchMoment($event->minute, 'chance', $this->fill(self::CROSSES, $actor, $target, $key))
+                ? new MatchMoment($event->minute, 'chance', $this->fill(self::CROSSES, $actor, $target, $key, self::CROSSES_SOLO))
                 : null,
             EventType::Tackle, EventType::Interception, EventType::Clearance => $this->defensiveMoment($event, $key),
             EventType::Pass => $this->passMoment($event, $actor, $target, $key),
@@ -54,6 +54,12 @@ final class MatchCommentary
         }
 
         $who = $actor ?? 'The ball';
+
+        // Same label on both ends (the unnamed opposition) would read
+        // "Opposition → Opposition"; drop the duplicated receiver.
+        if ($actor !== null && $actor === $target) {
+            $target = null;
+        }
 
         return match ($type) {
             EventType::Header => $ok ? 'Header on goal' : 'Header off target',
@@ -85,11 +91,11 @@ final class MatchCommentary
         // A ball in behind is always worth a line; a final-third entry is sampled
         // so the feed does not list every one.
         if ($event->to->x >= 5) {
-            return new MatchMoment($event->minute, 'chance', $this->fill(self::THROUGH_BALLS, $actor, $target, $key));
+            return new MatchMoment($event->minute, 'chance', $this->fill(self::THROUGH_BALLS, $actor, $target, $key, self::THROUGH_BALLS_SOLO));
         }
 
         if ($key % 2 === 0) {
-            return new MatchMoment($event->minute, 'chance', $this->fill(self::FINAL_THIRD, $actor, $target, $key));
+            return new MatchMoment($event->minute, 'chance', $this->fill(self::FINAL_THIRD, $actor, $target, $key, self::FINAL_THIRD_SOLO));
         }
 
         return null;
@@ -122,9 +128,14 @@ final class MatchCommentary
 
     /**
      * @param  list<string>  $pool
+     * @param  list<string>  $soloPool  subjectless variants used when actor === target
      */
-    private function fill(array $pool, string $actor, ?string $target, int $key): string
+    private function fill(array $pool, string $actor, ?string $target, int $key, array $soloPool = []): string
     {
+        if ($target !== null && $actor === $target && $soloPool !== []) {
+            return str_replace('{actor}', $actor, $this->pick($soloPool, $key));
+        }
+
         $text = $this->pick($pool, $key);
 
         return str_replace(['{actor}', '{target}'], [$actor, $target ?? 'a team-mate'], $text);
@@ -187,6 +198,17 @@ final class MatchCommentary
         '{actor} floats a cross onto the head of {target}.',
     ];
 
+    // When actor and target are the same label (the unnamed opposition passing
+    // among themselves), the {target} templates would read "Opposition ...
+    // Opposition"; these subjectless variants are used instead.
+    /** @var list<string> */
+    private const CROSSES_SOLO = [
+        '{actor} whip a cross into the box.',
+        '{actor} swing one into the area.',
+        '{actor} clip a ball to the far post.',
+        '{actor} float a cross into the box.',
+    ];
+
     /** @var list<string> */
     private const THROUGH_BALLS = [
         '{actor} slips {target} in behind.',
@@ -195,11 +217,26 @@ final class MatchCommentary
     ];
 
     /** @var list<string> */
+    private const THROUGH_BALLS_SOLO = [
+        '{actor} slip a ball in behind.',
+        '{actor} split the defence.',
+        '{actor} work it through the middle.',
+    ];
+
+    /** @var list<string> */
     private const FINAL_THIRD = [
         '{actor} threads it through to {target}.',
         '{actor} picks out {target} between the lines.',
         '{actor} feeds {target} on the edge of the box.',
         '{actor} works it forward to {target}.',
+    ];
+
+    /** @var list<string> */
+    private const FINAL_THIRD_SOLO = [
+        '{actor} thread it into the box.',
+        '{actor} work an opening between the lines.',
+        '{actor} knock it to the edge of the box.',
+        '{actor} work it into the final third.',
     ];
 
     /** @var list<string> */

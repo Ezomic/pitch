@@ -3,9 +3,28 @@
 declare(strict_types=1);
 
 use App\Sim\Domain\Attributes;
+use App\Sim\Domain\EventType;
+use App\Sim\Domain\MatchEvent;
+use App\Sim\Domain\Zone;
 use App\Sim\Engine\MatchEngine;
 use App\Sim\Engine\Roster;
+use App\Sim\Squad\MatchCommentary;
 use App\Sim\Squad\MatchNarrator;
+
+function throughBall(int $actorId, int $targetId): MatchEvent
+{
+    return new MatchEvent(
+        minute: 30,
+        type: EventType::Pass,
+        actorId: $actorId,
+        targetId: $targetId,
+        from: new Zone(3, 2),
+        to: new Zone(5, 2),
+        success: true,
+        decision: null,
+        roll: null,
+    );
+}
 
 function feedTexts(int $seed): array
 {
@@ -37,4 +56,41 @@ it('never leaves a name placeholder unfilled', function () {
         expect($text)->not->toContain('{actor}')
             ->and($text)->not->toContain('{target}');
     }
+});
+
+it('does not repeat the label when the opposition passes among itself', function () {
+    $names = [101 => 'Opposition', 102 => 'Opposition'];
+
+    $moment = (new MatchCommentary)->moment(throughBall(101, 102), 0, $names);
+
+    expect($moment)->not->toBeNull()
+        ->and($moment->kind)->toBe('chance')
+        ->and(substr_count($moment->text, 'Opposition'))->toBe(1)
+        ->and($moment->text)->not->toContain('Opposition Opposition');
+});
+
+it('still names both players for a home through ball', function () {
+    $names = [1 => 'Alice', 2 => 'Bob'];
+
+    $moment = (new MatchCommentary)->moment(throughBall(1, 2), 0, $names);
+
+    expect($moment->text)->toContain('Alice')->toContain('Bob');
+});
+
+it('produces the same opposition line for the same event and index', function () {
+    $names = [101 => 'Opposition', 102 => 'Opposition'];
+    $commentary = new MatchCommentary;
+
+    $first = $commentary->moment(throughBall(101, 102), 4, $names);
+    $second = $commentary->moment(throughBall(101, 102), 4, $names);
+
+    expect($first->text)->toBe($second->text);
+});
+
+it('drops the duplicated receiver from a 2D caption', function () {
+    $caption = (new MatchCommentary)->label(
+        EventType::Cross, true, false, 'Opposition', 'Opposition', 7,
+    );
+
+    expect(substr_count($caption, 'Opposition'))->toBe(1);
 });
