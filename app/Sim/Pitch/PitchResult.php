@@ -25,5 +25,6 @@ final readonly class PitchResult
         public array $frames,
         public int $homeGoals,
         public int $awayGoals,
+        public ?PitchState $state = null,
     ) {}
 }

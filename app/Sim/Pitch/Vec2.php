@@ -73,4 +73,23 @@ final readonly class Vec2
     {
         return [round($this->x, 4), round($this->y, 4)];
     }
+
+    /**
+     * Full-precision pair for state persistence (unlike toArray, which rounds for
+     * display). JSON round-trips PHP doubles losslessly, so resuming is exact.
+     *
+     * @return array{float, float}
+     */
+    public function pair(): array
+    {
+        return [$this->x, $this->y];
+    }
+
+    /**
+     * @param  array{float, float}  $pair
+     */
+    public static function fromPair(array $pair): self
+    {
+        return new self((float) $pair[0], (float) $pair[1]);
+    }
 }

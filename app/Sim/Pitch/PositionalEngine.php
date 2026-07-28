@@ -73,53 +73,97 @@ final class PositionalEngine
      */
     public function simulate(array $home, array $away, int $seed, ?Formation $homeFormation = null, ?Formation $awayFormation = null): PitchResult
     {
-        $rng = new Rng($seed);
-        $state = $this->kickOff($this->buildStates($home, $away), side: 0);
+        [$state, $rng] = $this->start($home, $away, $seed);
 
+        return $this->resume($state, $rng, 0, self::TOTAL_TICKS);
+    }
+
+    /** How many ticks make up a full match, so callers can pace a live sim. */
+    public function totalTicks(): int
+    {
+        return self::TOTAL_TICKS;
+    }
+
+    /**
+     * The kickoff state and a fresh Rng for a match: the starting point a live
+     * match persists and then advances a slice at a time.
+     *
+     * @param  array<int, Player>  $home
+     * @param  array<int, Player>  $away
+     * @return array{PitchState, Rng}
+     */
+    public function start(array $home, array $away, int $seed): array
+    {
+        return [$this->kickOff($this->buildStates($home, $away), side: 0), new Rng($seed)];
+    }
+
+    /**
+     * Advance a match from $fromTick up to (not including) $toTick, mutating the
+     * state and Rng in place and returning just this slice's events and frames.
+     * Resuming in slices is byte-identical to one continuous simulate().
+     */
+    public function resume(PitchState $state, Rng $rng, int $fromTick, int $toTick): PitchResult
+    {
         /** @var list<MatchEvent> $events */
         $events = [];
         /** @var list<array{m: int, b: array{float, float}, c: int, s: int, p: list<array{float, float}>}> $frames */
         $frames = [];
-        $homeGoals = 0;
-        $awayGoals = 0;
 
-        for ($tick = 0; $tick < self::TOTAL_TICKS; $tick++) {
-            $minute = (int) min(89, $tick / self::TOTAL_TICKS * 90);
-
-            $this->setTargets($state, $tick);
-            $this->moveAll($state);
-
-            if ($state->inFlight()) {
-                $scorer = $this->advanceBall($state, $events, $minute);
-
-                if ($scorer >= 0) {
-                    $scorer === 0 ? $homeGoals++ : $awayGoals++;
-                    $state = $this->kickOff($state->players, side: 1 - $scorer);
-                }
-            } else {
-                $carrier = $state->carrier();
-
-                if ($carrier !== null && $state->deadBall > 0) {
-                    // A set piece is being taken: the ball sits at the taker's feet
-                    // for a beat before play resumes, uncontested.
-                    $state->deadBall--;
-                    $state->ball = $carrier->pos;
-                } elseif ($carrier !== null) {
-                    $state->ball = $carrier->pos;
-                    $state->holdTicks++;
-
-                    if (! $this->contest($state, $events, $rng, $minute)
-                        && ($state->holdTicks >= self::DECIDE_TICKS || $this->pressed($state))) {
-                        $this->decide($state, $events, $rng, $minute);
-                        $state->holdTicks = 0;
-                    }
-                }
-            }
-
-            $frames[] = $this->snapshot($state, $minute);
+        $toTick = min($toTick, self::TOTAL_TICKS);
+        for ($tick = $fromTick; $tick < $toTick; $tick++) {
+            $state = $this->tick($state, $rng, $tick, $events, $frames);
         }
 
-        return new PitchResult($events, $frames, $homeGoals, $awayGoals);
+        return new PitchResult($events, $frames, $state->homeGoals, $state->awayGoals, $state);
+    }
+
+    /**
+     * One tick of the match. Returns the state to carry into the next tick, which
+     * is a fresh kickoff state after a goal.
+     *
+     * @param  list<MatchEvent>  $events
+     * @param  list<array{m: int, b: array{float, float}, c: int, s: int, p: list<array{float, float}>}>  $frames
+     */
+    private function tick(PitchState $state, Rng $rng, int $tick, array &$events, array &$frames): PitchState
+    {
+        $minute = (int) min(89, $tick / self::TOTAL_TICKS * 90);
+
+        $this->setTargets($state, $tick);
+        $this->moveAll($state);
+
+        if ($state->inFlight()) {
+            $scorer = $this->advanceBall($state, $events, $minute);
+
+            if ($scorer >= 0) {
+                $scorer === 0 ? $state->homeGoals++ : $state->awayGoals++;
+                $restart = $this->kickOff($state->players, side: 1 - $scorer);
+                $restart->homeGoals = $state->homeGoals;
+                $restart->awayGoals = $state->awayGoals;
+                $state = $restart;
+            }
+        } else {
+            $carrier = $state->carrier();
+
+            if ($carrier !== null && $state->deadBall > 0) {
+                // A set piece is being taken: the ball sits at the taker's feet for
+                // a beat before play resumes, uncontested.
+                $state->deadBall--;
+                $state->ball = $carrier->pos;
+            } elseif ($carrier !== null) {
+                $state->ball = $carrier->pos;
+                $state->holdTicks++;
+
+                if (! $this->contest($state, $events, $rng, $minute)
+                    && ($state->holdTicks >= self::DECIDE_TICKS || $this->pressed($state))) {
+                    $this->decide($state, $events, $rng, $minute);
+                    $state->holdTicks = 0;
+                }
+            }
+        }
+
+        $frames[] = $this->snapshot($state, $minute);
+
+        return $state;
     }
 
     /**
@@ -232,8 +276,9 @@ final class PositionalEngine
                 // builds: the back line and midfield push up toward the halfway
                 // line, while the forwards play high on the shoulder of the
                 // opponent's last defender, ready to receive around their defence.
+                $bias = $this->mentalityBias($state, $player->side);
                 $ballAdvance = $player->side === 0 ? $ballX : 1.0 - $ballX;
-                $push = max(0.0, $ballAdvance - 0.15);
+                $push = max(0.0, $ballAdvance - 0.15) * (1.0 + 0.22 * $bias);
                 $dir = $player->side === 0 ? 1.0 : -1.0;
 
                 if ($player->position === Position::Forward) {
@@ -264,7 +309,7 @@ final class PositionalEngine
                 // and reforms instead of everyone lurching at once.
                 if ($player->id !== $state->carrierId
                     && $player->position === Position::Forward
-                    && $this->runWindow($player, $tick)) {
+                    && $this->runWindow($player, $tick, $this->mentalityBias($state, $player->side))) {
                     $goal = $this->goalOf($player->side);
                     $ahead = $base->moveToward($goal, 0.14);
                     if ($this->spaceFreeAt($state, $ahead, $player->side)) {
@@ -334,9 +379,19 @@ final class PositionalEngine
      * run: a few of them at any moment, spread out by id, so runs come "every so
      * often" rather than all together. No random draw, to keep determinism.
      */
-    private function runWindow(PlayerState $player, int $tick): bool
+    private function runWindow(PlayerState $player, int $tick, int $bias = 0): bool
     {
-        return (intdiv($tick, 10) + $player->id) % 12 < 2;
+        return (intdiv($tick, 10) + $player->id) % 12 < 2 + $bias;
+    }
+
+    /** Mentality as a bias: +1 attacking, 0 balanced, -1 defensive. */
+    private function mentalityBias(PitchState $state, int $side): int
+    {
+        return match ($state->mentality($side)) {
+            'attacking' => 1,
+            'defensive' => -1,
+            default => 0,
+        };
     }
 
     /** True when no opponent is close to the point, so it is space to run into. */

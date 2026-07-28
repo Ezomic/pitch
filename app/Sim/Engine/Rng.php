@@ -21,6 +21,21 @@ final class Rng
         $this->state = $this->scramble($seed);
     }
 
+    /** The internal state, so a live match can be paused and resumed exactly. */
+    public function stateValue(): int
+    {
+        return $this->state;
+    }
+
+    /** Rebuild an Rng at a saved point in its stream. */
+    public static function fromState(int $state): self
+    {
+        $rng = new self(0);
+        $rng->state = $state;
+
+        return $rng;
+    }
+
     public function next(): float
     {
         return $this->nextInt() / 4294967296.0;

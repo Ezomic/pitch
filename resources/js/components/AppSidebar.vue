@@ -4,6 +4,7 @@ import {
     ArrowRightLeft,
     BookOpen,
     Clapperboard,
+    Gamepad2,
     FolderGit2,
     Dumbbell,
     LayoutGrid,
@@ -89,6 +90,11 @@ const mainNavItems: NavItem[] = [
         title: 'Match',
         href: matchShow(),
         icon: Clapperboard,
+    },
+    {
+        title: 'Play',
+        href: '/play',
+        icon: Gamepad2,
     },
 ];
 
