@@ -48,6 +48,20 @@ final class PitchState
      */
     public bool $teleported = false;
 
+    /**
+     * The side that just scored on this tick (0 or 1), or -1. Transient (reset
+     * each tick, not persisted); it marks the frame that shows the ball in the
+     * net so the replay can hold on it and announce the goal at the right moment.
+     */
+    public int $justScored = -1;
+
+    /**
+     * A kickoff owed from a goal on the previous tick: the scoring tick shows the
+     * ball in the net, then this restarts play. Persisted, so a goal on a slice
+     * boundary still restarts correctly on the next slice.
+     */
+    public ?int $pendingKickoff = null;
+
     /** Running score, carried on the state so a paused match resumes exactly. */
     public int $homeGoals = 0;
 
@@ -125,6 +139,7 @@ final class PitchState
             'pendingSpot' => $this->pendingSpot?->pair(),
             'homeGoals' => $this->homeGoals,
             'awayGoals' => $this->awayGoals,
+            'pendingKickoff' => $this->pendingKickoff,
             'homeMentality' => $this->homeMentality,
             'awayMentality' => $this->awayMentality,
         ];
@@ -158,6 +173,7 @@ final class PitchState
         $state->pendingSpot = $s['pendingSpot'] !== null ? Vec2::fromPair($s['pendingSpot']) : null;
         $state->homeGoals = (int) $s['homeGoals'];
         $state->awayGoals = (int) $s['awayGoals'];
+        $state->pendingKickoff = isset($s['pendingKickoff']) ? (int) $s['pendingKickoff'] : null;
         $state->homeMentality = (string) ($s['homeMentality'] ?? 'balanced');
         $state->awayMentality = (string) ($s['awayMentality'] ?? 'balanced');
 

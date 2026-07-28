@@ -10,6 +10,7 @@ interface Frame {
     s: 0 | 1;
     p: [number, number][];
     j?: boolean; // ball placed (kickoff/set piece): snap, don't glide
+    goal?: number; // side that scored on this frame (ball is in the net), else -1
 }
 interface PlayerMeta {
     s: 0 | 1;
@@ -51,8 +52,10 @@ const PREFETCH = 24; // keyframes of headroom before fetching more
 const meta = ref<PlayerMeta[]>(props.players.map((p) => ({ ...p })));
 const frames = ref<Frame[]>([]);
 const feed = ref<Moment[]>([]);
-const pendingGoals = ref<{ minute: number; side: 0 | 1 }[]>([]);
 const score = ref({ h: 0, a: 0 });
+// Frame indices whose goal has already been counted/celebrated, so replaying or
+// reviewing a goal never double-counts the score.
+const celebratedGoals = new Set<number>();
 const subsLeft = ref(props.subsRemaining);
 const mentality = ref<'attacking' | 'balanced' | 'defensive'>('balanced');
 
@@ -97,10 +100,11 @@ const ball = computed(() => {
         return { x: px(a.b[0]), y: py(a.b[1]) };
     }
 
-    // The ball was placed by hand this segment (kickoff / set piece): snap to it
-    // instead of gliding, so it does not drift untouched across the pitch.
+    // The next frame is a placed ball (kickoff / set piece): hold on the current
+    // spot instead of gliding across the pitch, so a goal stays in the net until
+    // the restart and a set-piece ball doesn't drift untouched.
     if (b.j) {
-        return { x: px(b.b[0]), y: py(b.b[1]) };
+        return { x: px(a.b[0]), y: py(a.b[1]) };
     }
 
     return {
@@ -242,7 +246,6 @@ async function fetchNext(): Promise<void> {
             feed.value.unshift(m);
         }
 
-        pendingGoals.value.push(...res.goals);
         serverTick.value = res.tick;
 
         if (res.finished) {
@@ -253,21 +256,31 @@ async function fetchNext(): Promise<void> {
     }
 }
 
-function tickGoals(minute: number): void {
-    while (
-        pendingGoals.value.length > 0 &&
-        pendingGoals.value[0].minute <= minute
-    ) {
-        const g = pendingGoals.value.shift()!;
+// Fire the goal the moment the ball reaches the net (the frame the engine marks),
+// freezing the playhead on it so the ball is seen in the goal before the
+// announcement, then the celebration resumes into the restart.
+function scanGoals(from: number, to: number): boolean {
+    for (let i = Math.max(0, from); i <= to; i++) {
+        const f = frames.value[i];
+        const side = f?.goal ?? -1;
 
-        if (g.side === 0) {
-            score.value.h++;
-        } else {
-            score.value.a++;
+        if (side >= 0 && !celebratedGoals.has(i)) {
+            celebratedGoals.add(i);
+
+            if (side === 0) {
+                score.value.h++;
+            } else {
+                score.value.a++;
+            }
+
+            playhead.value = i; // hold on the ball-in-net frame
+            celebrate(side as 0 | 1);
+
+            return true;
         }
-
-        celebrate(g.side);
     }
+
+    return false;
 }
 
 function celebrate(side: 0 | 1): void {
@@ -301,14 +314,15 @@ function loop(ts: number): void {
 
     // Freeze the pitch during a goal celebration, then resume for the restart.
     if (!celebrating.value) {
+        const prev = Math.floor(playhead.value);
         playhead.value = Math.min(
             max,
             playhead.value + (dt / SEG_MS) * speed.value,
         );
 
-        if (cur.value) {
-            tickGoals(cur.value.m);
-        }
+        // Any frame newly crossed this step may be the goal; scanGoals freezes on
+        // it and celebrates, so nothing is skipped even at higher speeds.
+        scanGoals(prev, Math.floor(playhead.value));
     }
 
     if (

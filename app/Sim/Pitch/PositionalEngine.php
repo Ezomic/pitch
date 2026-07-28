@@ -113,7 +113,7 @@ final class PositionalEngine
     {
         /** @var list<MatchEvent> $events */
         $events = [];
-        /** @var list<array{m: int, b: array{float, float}, c: int, s: int, p: list<array{float, float}>, j: bool}> $frames */
+        /** @var list<array{m: int, b: array{float, float}, c: int, s: int, p: list<array{float, float}>, j: bool, goal: int}> $frames */
         $frames = [];
 
         $toTick = min($toTick, self::TOTAL_TICKS);
@@ -129,12 +129,23 @@ final class PositionalEngine
      * is a fresh kickoff state after a goal.
      *
      * @param  list<MatchEvent>  $events
-     * @param  list<array{m: int, b: array{float, float}, c: int, s: int, p: list<array{float, float}>, j: bool}>  $frames
+     * @param  list<array{m: int, b: array{float, float}, c: int, s: int, p: list<array{float, float}>, j: bool, goal: int}>  $frames
      */
     private function tick(PitchState $state, Rng $rng, int $tick, array &$events, array &$frames): PitchState
     {
+        // A goal on the previous tick left the ball in the net for that frame and
+        // owes a kickoff; take it now so the restart is its own frame.
+        if ($state->pendingKickoff !== null) {
+            $restart = $this->kickOff($state->players, side: $state->pendingKickoff);
+            $restart->homeGoals = $state->homeGoals;
+            $restart->awayGoals = $state->awayGoals;
+            $state = $restart; // kickOff marks this frame as a placed-ball (teleported) restart
+        } else {
+            $state->teleported = false;
+        }
+
+        $state->justScored = -1;
         $minute = (int) min(89, $tick / self::TOTAL_TICKS * 90);
-        $state->teleported = false;
 
         $this->setTargets($state, $tick);
         $this->moveAll($state);
@@ -143,11 +154,11 @@ final class PositionalEngine
             $scorer = $this->advanceBall($state, $events, $minute);
 
             if ($scorer >= 0) {
+                // Keep the ball where it crossed the line and mark this frame as the
+                // goal; the kickoff waits for the next tick so the net is shown first.
                 $scorer === 0 ? $state->homeGoals++ : $state->awayGoals++;
-                $restart = $this->kickOff($state->players, side: 1 - $scorer);
-                $restart->homeGoals = $state->homeGoals;
-                $restart->awayGoals = $state->awayGoals;
-                $state = $restart;
+                $state->justScored = $scorer;
+                $state->pendingKickoff = 1 - $scorer;
             }
         } else {
             $carrier = $state->carrier();
@@ -1511,7 +1522,7 @@ final class PositionalEngine
     }
 
     /**
-     * @return array{m: int, b: array{float, float}, c: int, s: int, p: list<array{float, float}>, j: bool}
+     * @return array{m: int, b: array{float, float}, c: int, s: int, p: list<array{float, float}>, j: bool, goal: int}
      */
     private function snapshot(PitchState $state, int $minute): array
     {
@@ -1528,6 +1539,7 @@ final class PositionalEngine
             's' => $state->possessing,
             'p' => $positions,
             'j' => $state->teleported,
+            'goal' => $state->justScored,
         ];
     }
 

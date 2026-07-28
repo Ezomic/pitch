@@ -52,10 +52,11 @@ const ball = computed(() => {
         return { x: px(a.b[0]), y: py(a.b[1]) };
     }
 
-    // The ball was placed by hand this segment (kickoff / set piece): snap to it
-    // instead of gliding, so it does not drift untouched across the pitch.
+    // The next frame is a placed ball (kickoff / set piece): hold on the current
+    // spot instead of gliding, so a goal stays in the net until the restart and a
+    // set-piece ball doesn't drift untouched across the pitch.
     if (b.j) {
-        return { x: px(b.b[0]), y: py(b.b[1]) };
+        return { x: px(a.b[0]), y: py(a.b[1]) };
     }
 
     return {

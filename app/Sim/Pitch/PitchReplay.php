@@ -154,9 +154,9 @@ final class PitchReplay
     }
 
     /**
-     * @param  list<array{m: int, b: array{float, float}, c: int, s: int, p: list<array{float, float}>, j: bool}>  $frames
+     * @param  list<array{m: int, b: array{float, float}, c: int, s: int, p: list<array{float, float}>, j: bool, goal: int}>  $frames
      * @param  array<int, string>  $captions
-     * @return list<array{m: int, b: array{float, float}, c: int, s: int, p: list<array{float, float}>, cap: string, j: bool}>
+     * @return list<array{m: int, b: array{float, float}, c: int, s: int, p: list<array{float, float}>, cap: string, j: bool, goal: int}>
      */
     private function frames(array $frames, array $captions): array
     {
@@ -167,7 +167,9 @@ final class PitchReplay
                 $cut = true;
             }
 
-            if ($tick % self::STEP !== 0) {
+            // Always keep the frame that shows the ball in the net, even off the
+            // downsample cadence, so the goal is seen on that frame.
+            if ($tick % self::STEP !== 0 && $frame['goal'] < 0) {
                 continue;
             }
 
@@ -179,6 +181,7 @@ final class PitchReplay
                 'p' => $frame['p'],
                 'cap' => $captions[$frame['m']] ?? '',
                 'j' => $cut,
+                'goal' => $frame['goal'],
             ];
             $cut = false;
         }
