@@ -82,8 +82,15 @@ const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 const ball = computed(() => {
     const a = frames.value[seg.value];
     const b = frames.value[seg.value + 1];
-    if (!a) return { x: 50, y: 50 };
-    if (!b) return { x: px(a.b[0]), y: py(a.b[1]) };
+
+    if (!a) {
+        return { x: 50, y: 50 };
+    }
+
+    if (!b) {
+        return { x: px(a.b[0]), y: py(a.b[1]) };
+    }
+
     return {
         x: px(lerp(a.b[0], b.b[0], frac.value)),
         y: py(lerp(a.b[1], b.b[1], frac.value)),
@@ -101,13 +108,18 @@ interface LivePlayer {
     ball: boolean;
 }
 
-const players = computed<LivePlayer[]>(() => {
+const livePlayers = computed<LivePlayer[]>(() => {
     const a = frames.value[seg.value];
     const b = frames.value[seg.value + 1];
-    if (!a) return [];
+
+    if (!a) {
+        return [];
+    }
+
     return meta.value.map((m, i) => {
         const pa = a.p[i];
         const pb = b?.p[i] ?? pa;
+
         return {
             key: i,
             x: px(lerp(pa[0], pb[0], frac.value)),
@@ -124,6 +136,7 @@ const players = computed<LivePlayer[]>(() => {
 const clock = computed(() => {
     const minute = cur.value?.m ?? 0;
     const secs = Math.floor(frac.value * 60);
+
     return `${minute}:${secs.toString().padStart(2, '0')}`;
 });
 
@@ -134,6 +147,7 @@ const sideName = computed(() =>
 
 function xsrf(): string {
     const m = document.cookie.match(/XSRF-TOKEN=([^;]+)/);
+
     return m ? decodeURIComponent(m[1]) : '';
 }
 
@@ -152,12 +166,17 @@ async function postJson(
         credentials: 'same-origin',
         body: JSON.stringify(body),
     });
+
     return res.json();
 }
 
 async function fetchNext(): Promise<void> {
-    if (fetching || finished.value) return;
+    if (fetching || finished.value) {
+        return;
+    }
+
     fetching = true;
+
     try {
         const res = (await postJson(`/play/${props.matchId}/advance`, {
             ticks: CHUNK,
@@ -169,10 +188,17 @@ async function fetchNext(): Promise<void> {
             finished: boolean;
         };
         frames.value.push(...res.frames);
-        for (const m of res.moments) feed.value.unshift(m);
+
+        for (const m of res.moments) {
+            feed.value.unshift(m);
+        }
+
         pendingGoals.value.push(...res.goals);
         serverTick.value = res.tick;
-        if (res.finished) finished.value = true;
+
+        if (res.finished) {
+            finished.value = true;
+        }
     } finally {
         fetching = false;
     }
@@ -184,14 +210,24 @@ function tickGoals(minute: number): void {
         pendingGoals.value[0].minute <= minute
     ) {
         const g = pendingGoals.value.shift()!;
-        if (g.side === 0) score.value.h++;
-        else score.value.a++;
+
+        if (g.side === 0) {
+            score.value.h++;
+        } else {
+            score.value.a++;
+        }
     }
 }
 
 function loop(ts: number): void {
-    if (!playing.value) return;
-    if (lastTs === null) lastTs = ts;
+    if (!playing.value) {
+        return;
+    }
+
+    if (lastTs === null) {
+        lastTs = ts;
+    }
+
     const dt = Math.min(ts - lastTs, 64);
     lastTs = ts;
 
@@ -201,7 +237,9 @@ function loop(ts: number): void {
         playhead.value + (dt / SEG_MS) * speed.value,
     );
 
-    if (cur.value) tickGoals(cur.value.m);
+    if (cur.value) {
+        tickGoals(cur.value.m);
+    }
 
     if (
         !finished.value &&
@@ -214,6 +252,7 @@ function loop(ts: number): void {
     if (finished.value && playhead.value >= max) {
         playing.value = false;
         lastTs = null;
+
         return;
     }
 
@@ -221,8 +260,14 @@ function loop(ts: number): void {
 }
 
 async function play(): Promise<void> {
-    if (finished.value && playhead.value >= count.value - 1) return;
-    if (count.value === 0) await fetchNext();
+    if (finished.value && playhead.value >= count.value - 1) {
+        return;
+    }
+
+    if (count.value === 0) {
+        await fetchNext();
+    }
+
     playing.value = true;
     lastTs = null;
     raf = requestAnimationFrame(loop);
@@ -230,16 +275,21 @@ async function play(): Promise<void> {
 
 function pause(): void {
     playing.value = false;
+
     if (raf !== null) {
         cancelAnimationFrame(raf);
         raf = null;
     }
+
     lastTs = null;
 }
 
 function toggle(): void {
-    if (playing.value) pause();
-    else void play();
+    if (playing.value) {
+        pause();
+    } else {
+        void play();
+    }
 }
 
 function cycleSpeed(): void {
@@ -261,8 +311,10 @@ async function makeSub(): Promise<void> {
         outSlot.value === null ||
         inPlayer.value === null ||
         subsLeft.value <= 0
-    )
+    ) {
         return;
+    }
+
     const incoming = benchList.value.find((b) => b.id === inPlayer.value);
     const res = (await postJson(`/play/${props.matchId}/sub`, {
         out_slot: outSlot.value,
@@ -273,13 +325,22 @@ async function makeSub(): Promise<void> {
     if (incoming) {
         const slot = outSlot.value;
         const m = meta.value.find((x) => x.s === 0 && x.slot === slot);
-        if (m) m.name = incoming.name;
+
+        if (m) {
+            m.name = incoming.name;
+        }
+
         const op = onPitchList.value.find((x) => x.slot === slot);
-        if (op) op.name = incoming.name;
+
+        if (op) {
+            op.name = incoming.name;
+        }
+
         benchList.value = benchList.value.filter(
             (b) => b.id !== inPlayer.value,
         );
     }
+
     outSlot.value = null;
     inPlayer.value = null;
 }
@@ -337,7 +398,7 @@ onBeforeUnmount(pause);
                     </svg>
 
                     <div
-                        v-for="p in players"
+                        v-for="p in livePlayers"
                         :key="`pl-${p.key}`"
                         class="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-1/2"
                         :style="{ left: `${p.x}%`, top: `${p.y}%` }"
