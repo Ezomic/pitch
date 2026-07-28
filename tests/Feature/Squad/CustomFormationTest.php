@@ -81,17 +81,27 @@ it('rejects placements outside the pitch grid', function () {
 it('reshapes the profile when the custom shape changes', function () {
     [$user, $squad] = squadWithSquad();
 
-    $defensive = tenPlacements(forwardY: 2);
-    // Push the whole side forward to a far more attacking shape.
-    $attacking = array_map(fn (array $p) => [...$p, 'x' => min(5, $p['x'] + 1)], $defensive);
+    // SquadEvaluator is already deterministic (fixed per-match seeds), so pinning
+    // the player attributes makes the whole evaluation reproducible: the only thing
+    // that differs between the two profiles is the shape. A tiny x+1 shift used to
+    // sometimes yield an identical chancesPer90 for a given random squad; comparing
+    // an extreme deep line against an extreme high line separates them reliably.
+    Player::query()->update([
+        'vision' => 12, 'passing' => 12, 'dribbling' => 12,
+        'finishing' => 12, 'tackling' => 12, 'pace' => 12,
+    ]);
 
-    $squad->forceFill(['formation' => Formation::CUSTOM_ID, 'custom_formation' => collect($defensive)->mapWithKeys(fn ($p) => [$p['slot'] => [$p['x'], $p['y']]])->all()])->save();
-    $before = app(EvaluateSquad::class)->handle($squad->fresh());
+    $atDepth = fn (int $x) => collect(tenPlacements())
+        ->mapWithKeys(fn (array $p) => [$p['slot'] => [$x, $p['y']]])
+        ->all();
 
-    $squad->forceFill(['custom_formation' => collect($attacking)->mapWithKeys(fn ($p) => [$p['slot'] => [$p['x'], $p['y']]])->all()])->save();
-    $after = app(EvaluateSquad::class)->handle($squad->fresh());
+    $squad->forceFill(['formation' => Formation::CUSTOM_ID, 'custom_formation' => $atDepth(1)])->save();
+    $deep = app(EvaluateSquad::class)->handle($squad->fresh());
 
-    expect($after->chancesPer90)->not->toBe($before->chancesPer90);
+    $squad->forceFill(['custom_formation' => $atDepth(5)])->save();
+    $high = app(EvaluateSquad::class)->handle($squad->fresh());
+
+    expect($high->chancesPer90)->not->toBe($deep->chancesPer90);
 });
 
 it('offers a custom option and flags a custom squad on the squad page', function () {
