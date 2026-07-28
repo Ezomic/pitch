@@ -129,9 +129,9 @@ it('attacks down the wings and crosses into the box', function () {
 });
 
 it('awards the occasional penalty for a foul in the box', function () {
-    // Penalties are rare (~0.25 a match), so sample a spread of seeds.
+    // Penalties are rare (well under one a match), so sample a wide spread of seeds.
     $penalties = 0;
-    foreach (range(1, 20) as $seed) {
+    foreach (range(1, 50) as $seed) {
         foreach (pitchMatch($seed)->events as $event) {
             if ($event->type === EventType::Penalty) {
                 $penalties++;

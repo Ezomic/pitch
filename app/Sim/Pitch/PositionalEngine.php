@@ -57,6 +57,13 @@ final class PositionalEngine
 
     private const float LANE_WEIGHT = 0.2;        // how much a covered lane suppresses a pass
 
+    // The centre circle in normalised space. The pitch renders 3:2, so the circle
+    // is an ellipse in 0..1 coordinates: wider across the goals than across the
+    // width. No defender may stand inside it at a restart.
+    public const float CIRCLE_RX = 0.087;
+
+    public const float CIRCLE_RY = 0.13;
+
     private const int DEADBALL_TICKS = 7;         // pause while a set piece is taken
 
     private const float FOUL_CHANCE = 0.035;      // a mistimed tackle is sometimes a foul
@@ -217,15 +224,77 @@ final class PositionalEngine
         $state->possessing = $side;
         $state->teleported = true; // the ball is placed on the centre spot
 
-        // A central player of the restarting side taps off from the centre spot.
-        $starter = $this->centralOutfielder($state, $side);
-        if ($starter !== null) {
-            $starter->pos = new Vec2(0.5, 0.5);
-            $state->carrierId = $starter->id;
-            $state->ball = $starter->pos;
+        // No defender may stand inside the centre circle at the restart; push any
+        // that do out to its edge.
+        $defending = 1 - $side;
+        foreach ($state->players as $player) {
+            if ($player->side === $defending && ! $player->isGoalkeeper()) {
+                $this->pushOutsideCentreCircle($player, $defending);
+            }
+        }
+
+        // The kicking-off side taps off: a central player on the spot, with a
+        // second dropping just behind to receive.
+        [$passer, $receiver] = $this->kickoffPair($state, $side);
+        if ($passer !== null) {
+            $passer->pos = new Vec2(0.5, 0.5);
+            $state->carrierId = $passer->id;
+            $state->ball = $passer->pos;
+        }
+        if ($receiver !== null) {
+            $receiver->pos = new Vec2($side === 0 ? 0.46 : 0.54, 0.5);
         }
 
         return $state;
+    }
+
+    /**
+     * Move a defender that has strayed inside the centre circle radially out to
+     * its edge; a player exactly on the spot retreats toward its own goal.
+     */
+    private function pushOutsideCentreCircle(PlayerState $player, int $defendingSide): void
+    {
+        $dx = $player->pos->x - 0.5;
+        $dy = $player->pos->y - 0.5;
+        $norm = ($dx / self::CIRCLE_RX) ** 2 + ($dy / self::CIRCLE_RY) ** 2;
+
+        if ($norm >= 1.0) {
+            return;
+        }
+
+        if ($norm <= 1e-9) {
+            $dx = $defendingSide === 0 ? -self::CIRCLE_RX : self::CIRCLE_RX;
+            $dy = 0.0;
+            $norm = 1.0;
+        }
+
+        // A hair beyond the edge so the player is unambiguously outside the circle.
+        $scale = 1.02 / sqrt($norm);
+        $player->pos = (new Vec2(0.5 + $dx * $scale, 0.5 + $dy * $scale))->clampToPitch();
+    }
+
+    /**
+     * The two most central outfielders of a side, by formation anchor: the passer
+     * who taps off and the team-mate dropping in to receive.
+     *
+     * @return array{?PlayerState, ?PlayerState}
+     */
+    private function kickoffPair(PitchState $state, int $side): array
+    {
+        $centre = new Vec2(0.5, 0.5);
+        $outfield = [];
+        foreach ($state->players as $player) {
+            if ($player->side === $side && ! $player->isGoalkeeper()) {
+                $outfield[] = $player;
+            }
+        }
+
+        usort(
+            $outfield,
+            fn (PlayerState $a, PlayerState $b): int => $a->anchor->distanceTo($centre) <=> $b->anchor->distanceTo($centre),
+        );
+
+        return [$outfield[0] ?? null, $outfield[1] ?? null];
     }
 
     private function setTargets(PitchState $state, int $tick): void
@@ -1408,26 +1477,6 @@ final class PositionalEngine
         $t = max(0.0, min(1.0, $t));
 
         return $point->distanceTo($a->add($ab->scale($t)));
-    }
-
-    private function centralOutfielder(PitchState $state, int $side): ?PlayerState
-    {
-        $best = null;
-        $bestDist = INF;
-
-        foreach ($state->players as $player) {
-            if ($player->side !== $side || $player->isGoalkeeper()) {
-                continue;
-            }
-
-            $dist = $player->anchor->distanceTo(new Vec2(0.5, 0.5));
-            if ($dist < $bestDist) {
-                $bestDist = $dist;
-                $best = $player;
-            }
-        }
-
-        return $best;
     }
 
     private function goalOf(int $side): Vec2
