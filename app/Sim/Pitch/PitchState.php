@@ -37,6 +37,26 @@ final class PitchState
     /** Ticks the current carrier has held the ball, so decisions pace out. */
     public int $holdTicks = 0;
 
+    /**
+     * Recent ball positions, newest first, a few ticks deep. Off-ball players shade
+     * toward a lagged entry rather than the live ball, each with its own delay, so
+     * team-mates react at different moments instead of the whole shape sliding at
+     * once. Persisted so a resumed match reacts identically.
+     *
+     * @var list<Vec2>
+     */
+    public array $ballTrail = [];
+
+    /** The ball as it was $lag ticks ago, or the oldest position known. */
+    public function laggedBall(int $lag): Vec2
+    {
+        if ($this->ballTrail === []) {
+            return $this->ball;
+        }
+
+        return $this->ballTrail[min($lag, count($this->ballTrail) - 1)];
+    }
+
     /** Ticks left of a dead-ball pause after a set piece is awarded. */
     public int $deadBall = 0;
 
@@ -133,6 +153,7 @@ final class PitchState
             'ballKind' => $this->ballKind,
             'ballGoal' => $this->ballGoal,
             'holdTicks' => $this->holdTicks,
+            'ballTrail' => array_map(fn (Vec2 $p): array => $p->pair(), $this->ballTrail),
             'deadBall' => $this->deadBall,
             'pendingType' => $this->pendingType?->value,
             'pendingSide' => $this->pendingSide,
@@ -167,6 +188,9 @@ final class PitchState
         $state->ballKind = (string) $s['ballKind'];
         $state->ballGoal = (bool) $s['ballGoal'];
         $state->holdTicks = (int) $s['holdTicks'];
+        /** @var list<array{float, float}> $trail */
+        $trail = $s['ballTrail'] ?? [];
+        $state->ballTrail = array_map(fn (array $p): Vec2 => Vec2::fromPair($p), $trail);
         $state->deadBall = (int) $s['deadBall'];
         $state->pendingType = $s['pendingType'] !== null ? EventType::from($s['pendingType']) : null;
         $state->pendingSide = (int) $s['pendingSide'];
