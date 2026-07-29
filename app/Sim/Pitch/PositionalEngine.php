@@ -66,6 +66,8 @@ final class PositionalEngine
 
     public const float CIRCLE_RY = 0.13;
 
+    private const int TRAIL_TICKS = 6;            // ticks of ball history kept for reaction lag
+
     private const int DEADBALL_TICKS = 7;         // pause while a set piece is taken
 
     private const float FOUL_CHANCE = 0.035;      // a mistimed tackle is sometimes a foul
@@ -148,6 +150,11 @@ final class PositionalEngine
 
         $state->justScored = -1;
         $minute = (int) min(89, $tick / self::TOTAL_TICKS * 90);
+
+        // Remember where the ball has been, so off-ball players can react to it with
+        // their own delay rather than all turning the instant it moves.
+        array_unshift($state->ballTrail, $state->ball);
+        $state->ballTrail = array_slice($state->ballTrail, 0, self::TRAIL_TICKS);
 
         $this->setTargets($state, $tick);
         $this->moveAll($state);
@@ -362,8 +369,11 @@ final class PositionalEngine
                 // builds: the back line and midfield push up toward the halfway
                 // line, while the forwards play high on the shoulder of the
                 // opponent's last defender, ready to receive around their defence.
+                // Each player reads a slightly older ball, so they set off in their
+                // own time rather than the shape sliding as one body.
+                $seen = $state->laggedBall($this->reactionLag($player));
                 $bias = $this->mentalityBias($state, $player->side);
-                $ballAdvance = $player->side === 0 ? $ballX : 1.0 - $ballX;
+                $ballAdvance = $player->side === 0 ? $seen->x : 1.0 - $seen->x;
                 $push = max(0.0, $ballAdvance - 0.15) * (1.0 + 0.22 * $bias);
                 $dir = $player->side === 0 ? 1.0 : -1.0;
 
@@ -385,7 +395,7 @@ final class PositionalEngine
 
                 $base = new Vec2(
                     $targetX,
-                    $player->anchor->y + ($state->ball->y - 0.5) * 0.2,
+                    $player->anchor->y + ($seen->y - 0.5) * 0.2 * $this->shadeFactor($player),
                 );
 
                 // Off-ball run: every so often, if the space ahead toward goal is
@@ -423,13 +433,14 @@ final class PositionalEngine
             // and defensive lines, so winning the ball springs an immediate attack
             // with a target already in behind instead of building from deep.
             if ($player->position === Position::Forward) {
+                $seen = $state->laggedBall($this->reactionLag($player));
                 $line = $this->opponentLastLineX($state, $player->side);
                 $holdX = $player->side === 0
                     ? min(max($line - 0.08, 0.52), 0.66)
                     : max(min($line + 0.08, 0.48), 0.34);
                 $player->target = (new Vec2(
                     $holdX,
-                    $player->anchor->y + ($state->ball->y - 0.5) * 0.1,
+                    $player->anchor->y + ($seen->y - 0.5) * 0.1 * $this->shadeFactor($player),
                 ))->clampToPitch();
 
                 continue;
@@ -439,11 +450,12 @@ final class PositionalEngine
             // needs timed off-ball runs to exploit the space it concedes, which the
             // engine does not model yet, so stepping it up here only strangles the
             // build-up; that is deferred to the off-ball-runs stage.
+            $seen = $state->laggedBall($this->reactionLag($player));
             $ownGoalX = $player->side === 0 ? 0.0 : 1.0;
-            $blockX = $ballX + ($ownGoalX - $ballX) * 0.45;
+            $blockX = $seen->x + ($ownGoalX - $seen->x) * 0.45;
             $base = new Vec2(
                 $player->anchor->x + ($blockX - $player->anchor->x) * 0.5,
-                $player->anchor->y + ($state->ball->y - 0.5) * 0.3,
+                $player->anchor->y + ($seen->y - 0.5) * 0.3 * $this->shadeFactor($player),
             );
 
             $man = $this->markAssignment($state, $player);
@@ -468,6 +480,26 @@ final class PositionalEngine
     private function runWindow(PlayerState $player, int $tick, int $bias = 0): bool
     {
         return (intdiv($tick, 10) + $player->id) % 12 < 2 + $bias;
+    }
+
+    /**
+     * How many ticks behind the ball a player reads the game, fixed per player (from
+     * its id, no random draw). Team-mates therefore start adjusting at different
+     * moments, so the shape shifts raggedly like a real team instead of every player
+     * turning on the same tick.
+     */
+    private function reactionLag(PlayerState $player): int
+    {
+        return ($player->id * 3) % self::TRAIL_TICKS;
+    }
+
+    /**
+     * How strongly a player shades across with the ball, as a multiplier around 1.
+     * Fixed per player, so the whole line does not travel exactly the same distance.
+     */
+    private function shadeFactor(PlayerState $player): float
+    {
+        return 0.75 + ($player->id % 5) * 0.125; // 0.75 .. 1.25
     }
 
     /** Mentality as a bias: +1 attacking, 0 balanced, -1 defensive. */
