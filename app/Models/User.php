@@ -64,6 +64,16 @@ class User extends Authenticatable implements PasskeyUser
     }
 
     /**
+     * The manager's saves; each one is an independent game world.
+     *
+     * @return HasMany<Career, $this>
+     */
+    public function careers(): HasMany
+    {
+        return $this->hasMany(Career::class);
+    }
+
+    /**
      * @return HasMany<Scout, $this>
      */
     public function scouts(): HasMany

@@ -22,7 +22,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $resolved_at
  * @property Carbon|null $created_at
  */
-#[Fillable(['user_id', 'season_id', 'category', 'title', 'body', 'payload', 'read_at', 'resolved_at'])]
+#[Fillable(['user_id', 'career_id', 'season_id', 'category', 'title', 'body', 'payload', 'read_at', 'resolved_at'])]
 class News extends Model
 {
     protected $table = 'news';

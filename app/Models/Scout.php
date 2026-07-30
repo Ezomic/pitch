@@ -23,7 +23,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['user_id', 'name', 'rating', 'status', 'next_delivery_on'])]
+#[Fillable(['user_id', 'career_id', 'name', 'rating', 'status', 'next_delivery_on'])]
 class Scout extends Model
 {
     /** @use HasFactory<ScoutFactory> */

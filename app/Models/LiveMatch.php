@@ -34,7 +34,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $updated_at
  */
 #[Fillable([
-    'user_id', 'seed', 'current_tick', 'total_ticks', 'pitch_state', 'rng_state',
+    'user_id', 'career_id', 'seed', 'current_tick', 'total_ticks', 'pitch_state', 'rng_state',
     'home_goals', 'away_goals', 'home_name', 'away_name', 'players', 'moments',
     'subs_remaining', 'status',
 ])]

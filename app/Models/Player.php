@@ -43,7 +43,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['user_id', 'is_free_agent', 'name', 'position', 'age', 'potential', 'is_youth', 'training_focus', 'vision', 'passing', 'dribbling', 'finishing', 'tackling', 'pace', 'handling', 'fitness', 'form', 'trait', 'injured_weeks', 'yellow_cards', 'suspended_weeks', 'contract_years', 'on_loan', 'loan_weeks_remaining'])]
+#[Fillable(['user_id', 'career_id', 'is_free_agent', 'name', 'position', 'age', 'potential', 'is_youth', 'training_focus', 'vision', 'passing', 'dribbling', 'finishing', 'tackling', 'pace', 'handling', 'fitness', 'form', 'trait', 'injured_weeks', 'yellow_cards', 'suspended_weeks', 'contract_years', 'on_loan', 'loan_weeks_remaining'])]
 class Player extends Model
 {
     /** @use HasFactory<PlayerFactory> */

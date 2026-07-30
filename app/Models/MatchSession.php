@@ -25,7 +25,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['user_id', 'fixture_id', 'seed', 'home_goals', 'away_goals', 'moments', 'lineup', 'bench', 'scorers', 'subs_remaining', 'status'])]
+#[Fillable(['user_id', 'career_id', 'fixture_id', 'seed', 'home_goals', 'away_goals', 'moments', 'lineup', 'bench', 'scorers', 'subs_remaining', 'status'])]
 class MatchSession extends Model
 {
     /**

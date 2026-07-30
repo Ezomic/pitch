@@ -31,7 +31,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['user_id', 'name', 'budget', 'bank', 'weekly_income', 'division', 'goalkeeper_id', 'set_piece_taker_id', 'formation', 'mentality', 'custom_formation'])]
+#[Fillable(['user_id', 'career_id', 'name', 'budget', 'bank', 'weekly_income', 'division', 'goalkeeper_id', 'set_piece_taker_id', 'formation', 'mentality', 'custom_formation'])]
 class Squad extends Model
 {
     /** The keeper rating used when no goalkeeper is assigned: a stand-in reserve. */
