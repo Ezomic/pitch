@@ -21,7 +21,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['user_id', 'number', 'division', 'starts_on', 'current_date', 'completed_at'])]
+#[Fillable(['user_id', 'career_id', 'number', 'division', 'starts_on', 'current_date', 'completed_at'])]
 class Season extends Model
 {
     /** The campaign always kicks off on this date; matchdays fall one week apart. */
