@@ -34,6 +34,12 @@ final class PitchState
     /** True while a struck shot is flying goalward and will beat the keeper. */
     public bool $ballGoal = false;
 
+    /**
+     * True while a cross is in the air: whoever meets it in the box heads at goal
+     * rather than simply collecting it.
+     */
+    public bool $crossPending = false;
+
     /** Ticks the current carrier has held the ball, so decisions pace out. */
     public int $holdTicks = 0;
 
@@ -152,6 +158,7 @@ final class PitchState
             'ballSpeed' => $this->ballSpeed,
             'ballKind' => $this->ballKind,
             'ballGoal' => $this->ballGoal,
+            'crossPending' => $this->crossPending,
             'holdTicks' => $this->holdTicks,
             'ballTrail' => array_map(fn (Vec2 $p): array => $p->pair(), $this->ballTrail),
             'deadBall' => $this->deadBall,
@@ -187,6 +194,7 @@ final class PitchState
         $state->ballSpeed = (float) $s['ballSpeed'];
         $state->ballKind = (string) $s['ballKind'];
         $state->ballGoal = (bool) $s['ballGoal'];
+        $state->crossPending = (bool) ($s['crossPending'] ?? false);
         $state->holdTicks = (int) $s['holdTicks'];
         /** @var list<array{float, float}> $trail */
         $trail = $s['ballTrail'] ?? [];
