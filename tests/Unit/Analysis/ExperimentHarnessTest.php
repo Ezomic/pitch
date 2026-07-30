@@ -22,7 +22,9 @@ it('isolates one attribute deterministically', function () {
 });
 
 it('sharpens finishing into conversion', function () {
-    $result = (new ExperimentHarness)->run('finishing', 40, 6);
+    // Conversion is noisy match to match, so this needs a batch big enough for the
+    // effect to clear the noise; a handful of seeds flips on chance alone.
+    $result = (new ExperimentHarness)->run('finishing', 40, 20);
 
     $control = $result['control']->goalsFor / max(1, $result['control']->shots);
     $treatment = $result['treatment']->goalsFor / max(1, $result['treatment']->shots);
