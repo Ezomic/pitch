@@ -66,6 +66,12 @@ final class PositionalEngine
 
     public const float CIRCLE_RY = 0.13;
 
+    private const float HEADER_RANGE = 0.17;      // a cross met this close to goal is headed at it
+
+    private const float BLOCK_RADIUS = 0.035;     // a defender this near the shot's path can block it
+
+    private const float BLOCK_CHANCE = 0.55;      // how often a defender right in the way gets a block in
+
     private const int TRAIL_TICKS = 6;            // ticks of ball history kept for reaction lag
 
     private const int DEADBALL_TICKS = 7;         // pause while a set piece is taken
@@ -160,7 +166,7 @@ final class PositionalEngine
         $this->moveAll($state);
 
         if ($state->inFlight()) {
-            $scorer = $this->advanceBall($state, $events, $minute);
+            $scorer = $this->advanceBall($state, $events, $rng, $minute);
 
             if ($scorer >= 0) {
                 // Keep the ball where it crossed the line and mark this frame as the
@@ -541,7 +547,7 @@ final class PositionalEngine
      *
      * @param  list<MatchEvent>  $events
      */
-    private function advanceBall(PitchState $state, array &$events, int $minute): int
+    private function advanceBall(PitchState $state, array &$events, Rng $rng, int $minute): int
     {
         if ($state->ballTarget === null) {
             $state->carrierId = $state->ballTo;
@@ -583,6 +589,17 @@ final class PositionalEngine
         $state->ballTarget = null;
         $state->ballKind = 'idle';
         $state->holdTicks = 0;
+
+        // A cross met in the box is headed straight at goal rather than controlled.
+        $wasCross = $state->crossPending;
+        $state->crossPending = false;
+
+        if ($wasCross && $receiver !== null && ! $receiver->isGoalkeeper()) {
+            $goal = $this->goalOf($receiver->side);
+            if ($receiver->pos->distanceTo($goal) < self::HEADER_RANGE) {
+                $this->header($state, $events, $rng, $minute, $receiver, $goal);
+            }
+        }
 
         return -1;
     }
@@ -942,6 +959,7 @@ final class PositionalEngine
         }
 
         $state->carrierId = PitchState::NO_CARRIER;
+        $state->crossPending = false;
         $state->ballKind = 'pass';
         $state->ballSpeed = self::PASS_SPEED;
 
@@ -1116,6 +1134,7 @@ final class PositionalEngine
         if ($success) {
             $state->ballTarget = $target->pos;
             $state->ballTo = $target->id;
+            $state->crossPending = true; // whoever meets it in the box heads at goal
 
             return;
         }
@@ -1153,18 +1172,52 @@ final class PositionalEngine
      */
     private function shoot(PitchState $state, array &$events, Rng $rng, int $minute, PlayerState $carrier, Vec2 $goal, float $distToGoal): void
     {
+        // A defender square in the path can throw himself in front of the shot.
+        if ($this->blockAttempt($state, $events, $rng, $minute, $carrier, $goal)) {
+            return;
+        }
+
+        $this->attemptOnGoal(
+            $state, $events, $rng, $minute, $carrier, $goal,
+            EventType::Shot, $this->shotQuality($state, $carrier, $goal, $distToGoal), 0.60,
+        );
+    }
+
+    /**
+     * A header at goal from a cross met in the box. Harder than the same chance
+     * struck with the foot: less placement, so a lower share of it goes in.
+     *
+     * @param  list<MatchEvent>  $events
+     */
+    private function header(PitchState $state, array &$events, Rng $rng, int $minute, PlayerState $carrier, Vec2 $goal): void
+    {
+        $this->attemptOnGoal(
+            $state, $events, $rng, $minute, $carrier, $goal,
+            EventType::Header, $this->shotQuality($state, $carrier, $goal, $carrier->pos->distanceTo($goal)), 0.30,
+        );
+    }
+
+    /**
+     * Resolve an attempt on goal, struck or headed: whether it beats the keeper,
+     * and if not, how it finishes (saved and held, behind for a corner, or wide).
+     *
+     * @param  list<MatchEvent>  $events
+     */
+    private function attemptOnGoal(PitchState $state, array &$events, Rng $rng, int $minute, PlayerState $carrier, Vec2 $goal, EventType $type, float $quality, float $skill): void
+    {
         $keeper = $state->players[PlayerState::id(1 - $carrier->side, 0)] ?? null;
-        $quality = $this->shotQuality($state, $carrier, $goal, $distToGoal);
         $keeperSave = $keeper !== null ? $keeper->attributes->tackling / 100 * 0.33 : 0.0;
-        $threshold = max(0.02, min(0.5, $carrier->attributes->finishing / 100 * $quality * 0.60 - $keeperSave));
+        $attribute = $carrier->attributes->finishing / 100 * $quality * $skill;
+        $threshold = max(0.02, min(0.5, $attribute - $keeperSave));
         $draw = $rng->next();
         $goalScored = $draw <= $threshold;
 
         $decision = $this->buildDecision($state, $carrier, $quality);
-        $roll = new Roll(0.0, $carrier->attributes->finishing / 100 * $quality * 0.60, $keeperSave, $threshold, $draw);
-        $events[] = $this->event($minute, EventType::Shot, $carrier, null, $carrier->pos, null, $goalScored, $decision, $roll);
+        $roll = new Roll(0.0, $attribute, $keeperSave, $threshold, $draw);
+        $events[] = $this->event($minute, $type, $carrier, null, $carrier->pos, null, $goalScored, $decision, $roll);
 
         $state->carrierId = PitchState::NO_CARRIER;
+        $state->crossPending = false;
         $state->ballKind = 'shot';
         $state->ballSpeed = self::SHOT_SPEED;
         $state->ballTarget = $goal;
@@ -1184,7 +1237,7 @@ final class PositionalEngine
             $events[] = $this->event($minute, EventType::Save, $keeper, null, $goal, null, true);
             $state->ballTo = $keeper->id;
             $state->ballTarget = $keeper->pos;
-        } elseif ($roll < 0.65) {
+        } elseif ($roll < 0.85) {
             // Deflected behind for a corner to the attacking side.
             $state->pendingType = EventType::Corner;
             $state->pendingSide = $carrier->side;
@@ -1197,6 +1250,51 @@ final class PositionalEngine
             $state->pendingSpot = $this->goalKickSpot(1 - $carrier->side);
             $state->ballTo = PitchState::NO_CARRIER;
         }
+    }
+
+    /**
+     * A defender in the shot's path blocks it: the closer he is to the line of the
+     * shot, the more often he gets a body in the way. Returns true when the attempt
+     * never reaches goal.
+     *
+     * @param  list<MatchEvent>  $events
+     */
+    private function blockAttempt(PitchState $state, array &$events, Rng $rng, int $minute, PlayerState $carrier, Vec2 $goal): bool
+    {
+        [$blocker, $laneDist] = $this->nearestOpponentToSegment($state, $carrier->pos, $goal, $carrier->side);
+
+        if ($blocker === null || $laneDist > self::BLOCK_RADIUS) {
+            return false;
+        }
+
+        if ($rng->next() >= (1.0 - $laneDist / self::BLOCK_RADIUS) * self::BLOCK_CHANCE) {
+            return false;
+        }
+
+        $events[] = $this->event($minute, EventType::Block, $blocker, null, $blocker->pos, null, true);
+
+        $state->carrierId = PitchState::NO_CARRIER;
+        $state->crossPending = false;
+        $state->ballKind = 'shot';
+        $state->ballSpeed = self::SHOT_SPEED;
+        $state->ballGoal = false;
+
+        if ($rng->next() < 0.55) {
+            // Deflected behind off the block: a corner to the attacking side.
+            $state->ballTarget = $goal;
+            $state->pendingType = EventType::Corner;
+            $state->pendingSide = $carrier->side;
+            $state->pendingSpot = $this->cornerSpot($carrier->side, $carrier->pos->y);
+            $state->ballTo = PitchState::NO_CARRIER;
+
+            return true;
+        }
+
+        // The block breaks to the defender, who plays on.
+        $state->ballTarget = $blocker->pos;
+        $state->ballTo = $blocker->id;
+
+        return true;
     }
 
     private function pressed(PitchState $state): bool
