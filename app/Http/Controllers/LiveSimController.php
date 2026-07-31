@@ -8,6 +8,7 @@ use App\Actions\LiveSim\AdvanceMatch;
 use App\Actions\LiveSim\SetMentality;
 use App\Actions\LiveSim\StartMatch;
 use App\Actions\LiveSim\Substitute;
+use App\Actions\Season\RateClubs;
 use App\Actions\Squad\EnsureSquad;
 use App\Models\LiveMatch;
 use App\Models\Player;
@@ -19,6 +20,10 @@ use Inertia\Response;
 
 class LiveSimController extends Controller
 {
+    public function __construct(
+        private readonly RateClubs $rateClubs = new RateClubs,
+    ) {}
+
     public function show(Request $request, EnsureSquad $ensureSquad, StartMatch $start): Response
     {
         $user = $this->user($request);
@@ -41,11 +46,19 @@ class LiveSimController extends Controller
             $onPitch[] = ['slot' => (int) $assignment->slot, 'name' => $assignment->player->name];
         }
 
+        // How the two sides rate in the division they share, so the size of the
+        // task is clear before kick-off.
+        $rated = $this->rateClubs->handle($squad);
+
         return Inertia::render('LiveSim', [
             'matchId' => $match->id,
             'players' => $match->players,
             'homeName' => $match->home_name,
             'awayName' => $match->away_name,
+            'homeStars' => $rated[RateClubs::USER_KEY]['league'] ?? null,
+            'awayStars' => $match->opponent_team_id !== null
+                ? ($rated[$match->opponent_team_id]['league'] ?? null)
+                : null,
             'totalTicks' => $match->total_ticks,
             'subsRemaining' => $match->subs_remaining,
             'onPitch' => $onPitch,

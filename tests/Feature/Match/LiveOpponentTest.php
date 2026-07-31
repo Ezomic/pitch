@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Sim\Domain\Position;
 use App\Sim\Pitch\PitchState;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Inertia\Testing\AssertableInertia as Assert;
 
 uses(RefreshDatabase::class);
 
@@ -70,6 +71,28 @@ it('varies the opponent shape across matches', function () {
     // Different clubs line up differently, so a run of matches must not all be
     // played against the identical shape.
     expect(count($shapes))->toBeGreaterThan(1);
+});
+
+it('shows how both sides rate in the division they share', function () {
+    $user = User::factory()->create();
+    $squad = app(EnsureSquad::class)->handle($user);
+
+    Team::factory()->create([
+        'name' => 'Ironside FC', 'is_youth' => false, 'division' => $squad->division,
+        'vision' => 30, 'passing' => 30, 'dribbling' => 30,
+        'finishing' => 30, 'tackling' => 30, 'pace' => 30, 'keeping' => 30,
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('play.show'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('LiveSim')
+            ->where('awayName', 'Ironside FC')
+            // The manager's side is far stronger, so the stars must say so.
+            ->where('homeStars', fn (float|int $s): bool => (float) $s === 5.0)
+            ->where('awayStars', fn (float|int $s): bool => (float) $s === 1.0)
+            ->etc());
 });
 
 it('rebuilds the same opponent when a match resumes', function () {
