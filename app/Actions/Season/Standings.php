@@ -5,10 +5,15 @@ declare(strict_types=1);
 namespace App\Actions\Season;
 
 use App\Models\Season;
+use App\Models\Squad;
 use App\Models\Team;
 
 class Standings
 {
+    public function __construct(
+        private readonly RateClubs $rateClubs = new RateClubs,
+    ) {}
+
     /**
      * Fold the season's played fixtures into a ranked league table. The user is
      * one row, flagged, alongside every rival. Ordered by points, then goal
@@ -20,6 +25,10 @@ class Standings
     {
         $rows = ['user' => $this->emptyRow($youth ? 'Your academy' : 'Your squad', true)];
 
+        // The academy plays its own age-group league, which the senior star ratings
+        // do not describe, so only senior tables carry them.
+        $rated = $youth ? [] : $this->rateClubs->handle(Squad::query()->where('user_id', $season->user_id)->first());
+
         $teams = Team::query()->where('is_youth', $youth)->orderBy('id');
 
         if (! $youth) {
@@ -28,6 +37,11 @@ class Standings
 
         foreach ($teams->get() as $team) {
             $rows[$team->id] = $this->emptyRow($team->name, false);
+        }
+
+        foreach ($rows as $key => $row) {
+            $rows[$key]['worldStars'] = $rated[$key]['world'] ?? null;
+            $rows[$key]['leagueStars'] = $rated[$key]['league'] ?? null;
         }
 
         foreach ($season->fixtures()->where('youth', $youth)->where('played', true)->get() as $fixture) {
@@ -64,6 +78,8 @@ class Standings
             'goalsAgainst' => 0,
             'goalDifference' => 0,
             'points' => 0,
+            'worldStars' => null,
+            'leagueStars' => null,
         ];
     }
 

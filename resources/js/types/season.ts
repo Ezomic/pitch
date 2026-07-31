@@ -9,6 +9,8 @@ export interface StandingRow {
     goalsAgainst: number;
     goalDifference: number;
     points: number;
+    worldStars: number | null;
+    leagueStars: number | null;
 }
 
 export interface FixtureView {

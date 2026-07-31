@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { Head, Link, router } from '@inertiajs/vue3';
+import ClubStars from '@/components/ClubStars.vue';
 import { Button } from '@/components/ui/button';
 import { advance, friendlies, rollover, show } from '@/routes/season';
 import type {
@@ -243,6 +244,12 @@ const columns: { key: keyof StandingRow; label: string }[] = [
                             <th class="py-1 pr-2 text-left font-medium">#</th>
                             <th class="py-1 text-left font-medium">Team</th>
                             <th
+                                class="py-1 pr-3 text-left font-medium whitespace-nowrap"
+                                title="Strength among the clubs in this division"
+                            >
+                                Rating
+                            </th>
+                            <th
                                 v-for="col in columns"
                                 :key="col.key"
                                 class="w-8 py-1 text-right font-medium tabular-nums"
@@ -281,6 +288,12 @@ const columns: { key: keyof StandingRow; label: string }[] = [
                                 </span>
                             </td>
                             <td class="py-1.5">{{ row.name }}</td>
+                            <td class="py-1.5 pr-3">
+                                <ClubStars
+                                    :stars="row.leagueStars"
+                                    label="In this division"
+                                />
+                            </td>
                             <td
                                 v-for="col in columns"
                                 :key="col.key"
