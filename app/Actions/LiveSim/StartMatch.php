@@ -6,6 +6,7 @@ namespace App\Actions\LiveSim;
 
 use App\Models\LiveMatch;
 use App\Models\Squad;
+use App\Models\Team;
 use App\Models\User;
 use App\Sim\Pitch\LivePitch;
 use App\Sim\Pitch\PositionalEngine;
@@ -26,7 +27,13 @@ class StartMatch
     public function handle(User $user, Squad $squad): LiveMatch
     {
         $setup = $squad->setup();
-        $opponent = TeamSetup::baseline();
+
+        // Face a real club rather than one hardcoded sparring partner: each has its
+        // own formation, mentality and ratings, so the shape across the pitch and
+        // the level of the test change from match to match.
+        $team = $this->opponentFor($squad);
+        $opponent = $team !== null ? $team->setup() : TeamSetup::baseline();
+        $awayName = $team !== null ? $team->name : 'Opposition';
 
         $names = [];
         foreach ($squad->assignments()->with('player')->get() as $assignment) {
@@ -49,11 +56,23 @@ class StartMatch
             'home_goals' => 0,
             'away_goals' => 0,
             'home_name' => 'Your squad',
-            'away_name' => 'Opposition',
+            'away_name' => $awayName,
             'players' => $this->live->players($names),
             'moments' => [],
             'subs_remaining' => 5,
             'status' => 'live',
         ]);
+    }
+
+    /**
+     * A senior club from the squad's own division to play, chosen at random so the
+     * opponent (and with it the formation, mentality and quality) changes between
+     * matches. Falls back to any senior club, then to the sparring baseline when no
+     * clubs are seeded at all.
+     */
+    private function opponentFor(Squad $squad): ?Team
+    {
+        return Team::query()->where('is_youth', false)->where('division', $squad->division)->inRandomOrder()->first()
+            ?? Team::query()->where('is_youth', false)->inRandomOrder()->first();
     }
 }
