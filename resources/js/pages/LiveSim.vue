@@ -2,6 +2,7 @@
 import { Head } from '@inertiajs/vue3';
 import { Pause, Play, RotateCcw } from '@lucide/vue';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import ClubStars from '@/components/ClubStars.vue';
 
 interface Frame {
     m: number;
@@ -52,6 +53,8 @@ const props = defineProps<{
     players: PlayerMeta[];
     homeName: string;
     awayName: string;
+    homeStars: number | null;
+    awayStars: number | null;
     totalTicks: number;
     subsRemaining: number;
     onPitch: { slot: number; name: string }[];
@@ -475,13 +478,19 @@ onBeforeUnmount(() => {
     <div class="flex flex-col gap-4 p-4 md:flex-row">
         <div class="flex flex-1 flex-col gap-3">
             <div class="flex items-center justify-between font-mono text-sm">
-                <span class="truncate">{{ homeName }}</span>
+                <span class="flex min-w-0 flex-col gap-0.5">
+                    <span class="truncate">{{ homeName }}</span>
+                    <ClubStars :stars="homeStars" label="In this division" />
+                </span>
                 <span class="flex items-center gap-2 tabular-nums">
                     <span class="text-2xl font-bold">{{ score.h }}</span>
                     <span class="text-muted-foreground">–</span>
                     <span class="text-2xl font-bold">{{ score.a }}</span>
                 </span>
-                <span class="truncate text-right">{{ awayName }}</span>
+                <span class="flex min-w-0 flex-col items-end gap-0.5">
+                    <span class="truncate">{{ awayName }}</span>
+                    <ClubStars :stars="awayStars" label="In this division" />
+                </span>
             </div>
 
             <div

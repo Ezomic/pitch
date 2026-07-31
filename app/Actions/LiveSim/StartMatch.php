@@ -57,6 +57,7 @@ class StartMatch
             'away_goals' => 0,
             'home_name' => 'Your squad',
             'away_name' => $awayName,
+            'opponent_team_id' => $team?->id,
             'players' => $this->live->players($names),
             'moments' => [],
             'subs_remaining' => 5,

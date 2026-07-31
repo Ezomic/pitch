@@ -35,7 +35,7 @@ use Illuminate\Support\Carbon;
  */
 #[Fillable([
     'user_id', 'career_id', 'seed', 'current_tick', 'total_ticks', 'pitch_state', 'rng_state',
-    'home_goals', 'away_goals', 'home_name', 'away_name', 'players', 'moments',
+    'home_goals', 'away_goals', 'home_name', 'away_name', 'opponent_team_id', 'players', 'moments',
     'subs_remaining', 'status',
 ])]
 class LiveMatch extends Model
