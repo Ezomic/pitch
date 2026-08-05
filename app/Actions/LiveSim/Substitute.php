@@ -46,6 +46,17 @@ class Substitute
             'pitch_state' => $state,
             'players' => $players,
             'moments' => [...$match->moments, $this->moment($match, $off, $in->name)],
+            // Recorded with the tick it happened on, so a replay can make the
+            // same change at the same moment and come out identical.
+            'interventions' => [...$match->interventions ?? [], [
+                'tick' => $match->current_tick,
+                'type' => 'sub',
+                'slot' => $outSlot,
+                'pid' => $in->id,
+                'name' => $in->name,
+                'attr' => [$in->vision, $in->passing, $in->dribbling, $in->finishing, $in->tackling, $in->pace],
+                'off' => $off,
+            ]],
             'subs_remaining' => $match->subs_remaining - 1,
         ]);
     }

@@ -76,6 +76,7 @@ class StartMatch
             'current_tick' => 0,
             'total_ticks' => $this->engine->totalTicks(),
             'pitch_state' => $state->toSnapshot(),
+            'kickoff_state' => $state->toSnapshot(),
             'rng_state' => $rng->stateValue(),
             'home_goals' => 0,
             'away_goals' => 0,
@@ -85,6 +86,7 @@ class StartMatch
             'players' => $this->live->players($names),
             'moments' => [],
             'scorers' => [],
+            'interventions' => [],
             'subs_remaining' => 5,
             'status' => LiveMatch::LIVE,
         ]);

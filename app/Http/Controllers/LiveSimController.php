@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers;
 
 use App\Actions\LiveSim\AdvanceMatch;
+use App\Actions\LiveSim\ReplayMatch;
 use App\Actions\LiveSim\SetMentality;
 use App\Actions\LiveSim\StartMatch;
 use App\Actions\LiveSim\Substitute;
@@ -40,6 +41,28 @@ class LiveSimController extends Controller
         $squad = $ensureSquad->handle($user);
         $match = LiveMatch::inProgressFor($user) ?? $this->kickOff($user, $squad, $start);
 
+        return $this->page($user, $squad, $match, null);
+    }
+
+    /**
+     * Watch a finished match again, re-simulated from its seed. Nothing is
+     * written back: the stored match and its fixture are left exactly as they
+     * were, so a replay can be run as often as you like.
+     */
+    public function replay(Request $request, LiveMatch $match, EnsureSquad $ensureSquad, ReplayMatch $replay): Response
+    {
+        $user = $this->authorizeMatch($request, $match);
+
+        abort_unless($match->status === LiveMatch::FINISHED, 404);
+
+        return $this->page($user, $ensureSquad->handle($user), $match, $replay->handle($match));
+    }
+
+    /**
+     * @param  array{frames: list<array<string, mixed>>, homeGoals: int, awayGoals: int}|null  $replay
+     */
+    private function page(User $user, Squad $squad, LiveMatch $match, ?array $replay): Response
+    {
         $lineupIds = array_map('intval', array_values($squad->assignments()->pluck('player_id', 'slot')->all()));
 
         // Drawn from the same pool the lineup was picked from. Filtering on
@@ -88,6 +111,11 @@ class LiveSimController extends Controller
             // full time. A friendly does not.
             'competitive' => $match->fixture_id !== null,
             'seasonUrl' => route('season.show'),
+            // A finished match can be watched again from its seed. The whole
+            // re-simulation is handed over at once, so the page plays it back
+            // rather than asking the server for the next slice.
+            'replay' => $replay,
+            'replayUrl' => $match->status === LiveMatch::FINISHED ? route('play.replay', $match) : null,
         ]);
     }
 

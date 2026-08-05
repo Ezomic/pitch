@@ -49,6 +49,7 @@ Route::middleware(['auth'])->group(function () {
     Route::post('play/{match}/advance', [LiveSimController::class, 'advance'])->name('play.advance');
     Route::post('play/{match}/sub', [LiveSimController::class, 'sub'])->name('play.sub');
     Route::post('play/{match}/mentality', [LiveSimController::class, 'mentality'])->name('play.mentality');
+    Route::get('play/{match}/replay', [LiveSimController::class, 'replay'])->name('play.replay');
 
     Route::get('season', [SeasonController::class, 'show'])->name('season.show');
     Route::get('cup', [CupController::class, 'show'])->name('cup.show');

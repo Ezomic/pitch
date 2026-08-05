@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, router } from '@inertiajs/vue3';
-import { Pause, Play, RotateCcw, Trophy } from '@lucide/vue';
+import { Pause, Play, Repeat, RotateCcw, Trophy } from '@lucide/vue';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import ClubStars from '@/components/ClubStars.vue';
 import {
@@ -74,7 +74,17 @@ const props = defineProps<{
     mentality: 'attacking' | 'balanced' | 'defensive';
     competitive: boolean;
     seasonUrl: string;
+    replay: {
+        frames: Frame[];
+        homeGoals: number;
+        awayGoals: number;
+    } | null;
+    replayUrl: string | null;
 }>();
+
+// A replay arrives whole: the match was re-simulated from its seed on the
+// server, so there is nothing left to fetch and it plays from the first tick.
+const isReplay = props.replay !== null;
 
 defineOptions({
     layout: { breadcrumbs: [{ title: 'Play', href: playShow().url }] },
@@ -87,12 +97,16 @@ const CHUNK = 300; // ticks per fetch (~75 keyframes)
 const PREFETCH = 24; // keyframes of headroom before fetching more
 
 const meta = ref<PlayerMeta[]>(props.players.map((p) => ({ ...p })));
-const frames = ref<Frame[]>([]);
+const frames = ref<Frame[]>(props.replay ? [...props.replay.frames] : []);
 // A resumed match picks up where it left off. Its earlier frames are not
 // persisted, so what has happened so far is read in the feed (newest first,
 // matching how fetchNext unshifts) rather than re-watched.
-const feed = ref<Moment[]>([...props.moments].reverse());
-const score = ref({ h: props.homeGoals, a: props.awayGoals });
+const feed = ref<Moment[]>(isReplay ? [] : [...props.moments].reverse());
+// A replay starts nil-nil and counts the goals again as the playhead reaches
+// them, so they are celebrated on the way past rather than known in advance.
+const score = ref(
+    isReplay ? { h: 0, a: 0 } : { h: props.homeGoals, a: props.awayGoals },
+);
 // Frame indices whose goal has already been counted/celebrated, so replaying or
 // reviewing a goal never double-counts the score.
 const celebratedGoals = new Set<number>();
@@ -102,9 +116,10 @@ const mentality = ref<'attacking' | 'balanced' | 'defensive'>(props.mentality);
 const playhead = ref(0);
 const playing = ref(false);
 const speed = ref(1);
-const finished = ref(props.currentTick >= props.totalTicks);
-const serverTick = ref(props.currentTick);
-const resumed = props.currentTick > 0;
+// Nothing more will arrive in a replay, so the fetch loop stays shut.
+const finished = ref(isReplay || props.currentTick >= props.totalTicks);
+const serverTick = ref(isReplay ? props.totalTicks : props.currentTick);
+const resumed = !isReplay && props.currentTick > 0;
 const resumedMinute = Math.min(
     90,
     Math.round((props.currentTick / Math.max(1, props.totalTicks)) * 90),
@@ -272,6 +287,15 @@ function backToSeason(): void {
     router.get(props.seasonUrl);
 }
 
+function watchReplay(): void {
+    if (!props.replayUrl) {
+        return;
+    }
+
+    pause();
+    router.get(props.replayUrl);
+}
+
 function xsrf(): string {
     const m = document.cookie.match(/XSRF-TOKEN=([^;]+)/);
 
@@ -357,6 +381,27 @@ function scanGoals(from: number, to: number): boolean {
     return false;
 }
 
+// The positions are re-simulated, but the commentary is the record of what was
+// actually said, so it is let through as the playhead reaches each minute
+// rather than all appearing at once. A live match gets its feed from fetchNext
+// and needs none of this.
+let revealed = 0;
+function revealMoments(): void {
+    if (!props.replay) {
+        return;
+    }
+
+    const minute = cur.value?.m ?? 0;
+
+    while (
+        revealed < props.moments.length &&
+        props.moments[revealed].minute <= minute
+    ) {
+        feed.value.unshift(props.moments[revealed]);
+        revealed++;
+    }
+}
+
 function celebrate(side: 0 | 1): void {
     celebrating.value = true;
     celebrationText.value = side === 0 ? props.homeName : props.awayName;
@@ -397,6 +442,7 @@ function loop(ts: number): void {
         // Any frame newly crossed this step may be the goal; scanGoals freezes on
         // it and celebrates, so nothing is skipped even at higher speeds.
         scanGoals(prev, Math.floor(playhead.value));
+        revealMoments();
     }
 
     if (
@@ -526,6 +572,10 @@ async function makeSub(): Promise<void> {
 }
 
 onMounted(() => {
+    if (isReplay) {
+        return;
+    }
+
     void fetchNext();
 });
 onBeforeUnmount(() => {
@@ -543,7 +593,11 @@ onBeforeUnmount(() => {
     <div class="flex flex-col gap-4 p-4 md:flex-row">
         <div class="flex flex-1 flex-col gap-3">
             <p class="text-xs text-muted-foreground">
-                <span v-if="competitive">
+                <span v-if="isReplay">
+                    Replay, re-simulated from seed {{ matchId }}. Same seed,
+                    same match.
+                </span>
+                <span v-else-if="competitive">
                     League fixture. The score counts towards the table.
                 </span>
                 <span v-else>Friendly. Nothing rides on this one.</span>
@@ -698,6 +752,14 @@ onBeforeUnmount(() => {
                     @click="cycleSpeed"
                 >
                     {{ speed }}×
+                </button>
+                <button
+                    v-if="replayUrl && !isReplay"
+                    type="button"
+                    class="flex items-center gap-1 rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
+                    @click="watchReplay"
+                >
+                    <Repeat class="size-3.5" /> Watch again
                 </button>
                 <button
                     v-if="competitive && finished"
