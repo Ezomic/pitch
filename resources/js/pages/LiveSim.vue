@@ -1,8 +1,15 @@
 <script setup lang="ts">
-import { Head } from '@inertiajs/vue3';
+import { Head, router } from '@inertiajs/vue3';
 import { Pause, Play, RotateCcw } from '@lucide/vue';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import ClubStars from '@/components/ClubStars.vue';
+import {
+    advance,
+    mentality as mentalityRoute,
+    show as playShow,
+    store as startNewMatch,
+    sub as subRoute,
+} from '@/routes/play';
 
 interface Frame {
     m: number;
@@ -59,9 +66,16 @@ const props = defineProps<{
     subsRemaining: number;
     onPitch: { slot: number; name: string }[];
     bench: BenchPlayer[];
+    currentTick: number;
+    homeGoals: number;
+    awayGoals: number;
+    moments: Moment[];
+    mentality: 'attacking' | 'balanced' | 'defensive';
 }>();
 
-defineOptions({ layout: { breadcrumbs: [{ title: 'Play', href: '/play' }] } });
+defineOptions({
+    layout: { breadcrumbs: [{ title: 'Play', href: playShow().url }] },
+});
 
 const PAD_X = 5;
 const PAD_Y = 6; // near-symmetric with PAD_X so full-width shapes are not pinched
@@ -71,19 +85,27 @@ const PREFETCH = 24; // keyframes of headroom before fetching more
 
 const meta = ref<PlayerMeta[]>(props.players.map((p) => ({ ...p })));
 const frames = ref<Frame[]>([]);
-const feed = ref<Moment[]>([]);
-const score = ref({ h: 0, a: 0 });
+// A resumed match picks up where it left off. Its earlier frames are not
+// persisted, so what has happened so far is read in the feed (newest first,
+// matching how fetchNext unshifts) rather than re-watched.
+const feed = ref<Moment[]>([...props.moments].reverse());
+const score = ref({ h: props.homeGoals, a: props.awayGoals });
 // Frame indices whose goal has already been counted/celebrated, so replaying or
 // reviewing a goal never double-counts the score.
 const celebratedGoals = new Set<number>();
 const subsLeft = ref(props.subsRemaining);
-const mentality = ref<'attacking' | 'balanced' | 'defensive'>('balanced');
+const mentality = ref<'attacking' | 'balanced' | 'defensive'>(props.mentality);
 
 const playhead = ref(0);
 const playing = ref(false);
 const speed = ref(1);
-const finished = ref(false);
-const serverTick = ref(0);
+const finished = ref(props.currentTick >= props.totalTicks);
+const serverTick = ref(props.currentTick);
+const resumed = props.currentTick > 0;
+const resumedMinute = Math.min(
+    90,
+    Math.round((props.currentTick / Math.max(1, props.totalTicks)) * 90),
+);
 const celebrating = ref(false);
 const celebrationText = ref('');
 const reviewingMinute = ref<number | null>(null);
@@ -227,6 +249,20 @@ function review(minute: number): void {
     void play();
 }
 
+// Starting a fresh match is a deliberate act, not something a page load does.
+// It walks away from whatever is in progress, so it asks first.
+function newMatch(): void {
+    if (
+        !finished.value &&
+        !window.confirm('Abandon the match in progress and start a new one?')
+    ) {
+        return;
+    }
+
+    pause();
+    router.post(startNewMatch().url);
+}
+
 function xsrf(): string {
     const m = document.cookie.match(/XSRF-TOKEN=([^;]+)/);
 
@@ -260,7 +296,7 @@ async function fetchNext(): Promise<void> {
     fetching = true;
 
     try {
-        const res = (await postJson(`/play/${props.matchId}/advance`, {
+        const res = (await postJson(advance(props.matchId).url, {
             ticks: CHUNK,
         })) as {
             frames: Frame[];
@@ -415,7 +451,7 @@ async function setMentality(
     m: 'attacking' | 'balanced' | 'defensive',
 ): Promise<void> {
     mentality.value = m;
-    await postJson(`/play/${props.matchId}/mentality`, { mentality: m });
+    await postJson(mentalityRoute(props.matchId).url, { mentality: m });
 }
 
 const benchList = ref<BenchPlayer[]>(props.bench.map((b) => ({ ...b })));
@@ -431,7 +467,7 @@ async function makeSub(): Promise<void> {
     }
 
     const incoming = benchList.value.find((b) => b.id === inPlayer.value);
-    const res = (await postJson(`/play/${props.matchId}/sub`, {
+    const res = (await postJson(subRoute(props.matchId).url, {
         out_slot: outSlot.value,
         player_id: inPlayer.value,
     })) as { subsRemaining: number };
@@ -628,13 +664,23 @@ onBeforeUnmount(() => {
                 >
                     {{ speed }}×
                 </button>
-                <a
-                    href="/play"
+                <button
+                    type="button"
                     class="flex items-center gap-1 rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
+                    @click="newMatch"
                 >
                     <RotateCcw class="size-3.5" /> New match
-                </a>
-                <span class="ml-auto font-mono text-xs text-muted-foreground">
+                </button>
+                <span
+                    v-if="resumed && !finished"
+                    class="ml-auto font-mono text-xs text-muted-foreground"
+                >
+                    Resumed from {{ resumedMinute }}'
+                </span>
+                <span
+                    class="font-mono text-xs text-muted-foreground"
+                    :class="{ 'ml-auto': !resumed || finished }"
+                >
                     {{ finished ? 'Finished' : playing ? 'Playing' : 'Paused' }}
                 </span>
             </div>

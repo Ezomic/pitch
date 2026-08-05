@@ -46,6 +46,7 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('match', [MatchController::class, 'show'])->name('match.show');
     Route::get('play', [LiveSimController::class, 'show'])->name('play.show');
+    Route::post('play/new', [LiveSimController::class, 'store'])->name('play.store');
     Route::post('play/{match}/advance', [LiveSimController::class, 'advance'])->name('play.advance');
     Route::post('play/{match}/sub', [LiveSimController::class, 'sub'])->name('play.sub');
     Route::post('play/{match}/mentality', [LiveSimController::class, 'mentality'])->name('play.mentality');

@@ -14,6 +14,7 @@ use App\Models\LiveMatch;
 use App\Models\Player;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -24,11 +25,16 @@ class LiveSimController extends Controller
         private readonly RateClubs $rateClubs = new RateClubs,
     ) {}
 
+    /**
+     * Resume the match already in progress, or start one when there is none.
+     * A plain page load must never kick off a fresh match: refreshing mid-game
+     * used to abandon it and start another, losing the match being played.
+     */
     public function show(Request $request, EnsureSquad $ensureSquad, StartMatch $start): Response
     {
         $user = $this->user($request);
         $squad = $ensureSquad->handle($user);
-        $match = $start->handle($user, $squad);
+        $match = LiveMatch::inProgressFor($user) ?? $start->handle($user, $squad);
 
         $lineupSlots = array_map('intval', array_keys(iterator_to_array($squad->assignments()->pluck('player_id', 'slot'))));
         $lineupIds = array_map('intval', array_values($squad->assignments()->pluck('player_id', 'slot')->all()));
@@ -63,7 +69,25 @@ class LiveSimController extends Controller
             'subsRemaining' => $match->subs_remaining,
             'onPitch' => $onPitch,
             'bench' => $bench,
+            // Where the match already is. A resumed match picks up from its
+            // current tick with the score and feed it had built up: the frames
+            // it already played are not persisted, so the action so far is read
+            // in the feed rather than re-watched.
+            'currentTick' => $match->current_tick,
+            'homeGoals' => $match->home_goals,
+            'awayGoals' => $match->away_goals,
+            'moments' => $match->moments,
+            'mentality' => $match->pitch_state['homeMentality'] ?? 'balanced',
         ]);
+    }
+
+    /** Deliberately walk away from the current match and kick off a new one. */
+    public function store(Request $request, EnsureSquad $ensureSquad, StartMatch $start): RedirectResponse
+    {
+        $user = $this->user($request);
+        $start->handle($user, $ensureSquad->handle($user));
+
+        return to_route('play.show');
     }
 
     public function advance(Request $request, LiveMatch $match, AdvanceMatch $advance): JsonResponse
