@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Support\Carbon;
@@ -65,6 +66,28 @@ class Fixture extends Model
     public function involvesUser(): bool
     {
         return $this->home_team_id === null || $this->away_team_id === null;
+    }
+
+    /**
+     * The manager's own senior fixture that is due to be played: unplayed, and
+     * scheduled on or before the season's current date. This is the match /play
+     * puts you into, and the one the season waits on before rolling forward.
+     */
+    public static function dueFor(User $user): ?self
+    {
+        $season = Season::query()->where('user_id', $user->id)->whereNull('completed_at')->latest('id')->first();
+
+        if (! $season instanceof Season) {
+            return null;
+        }
+
+        return $season->fixtures()
+            ->where('youth', false)
+            ->where('played', false)
+            ->where(fn (Builder $query) => $query->whereNull('home_team_id')->orWhereNull('away_team_id'))
+            ->whereDate('scheduled_on', '<=', $season->current_date)
+            ->orderBy('matchday')
+            ->first();
     }
 
     public function userIsHome(): bool

@@ -23,7 +23,7 @@ it('lets a manager hold several independent careers', function () {
 });
 
 it('scopes every game table to a career', function () {
-    foreach (['squads', 'seasons', 'players', 'scouts', 'match_sessions', 'news', 'live_matches'] as $table) {
+    foreach (['squads', 'seasons', 'players', 'scouts', 'news', 'live_matches'] as $table) {
         expect(Schema::hasColumn($table, 'career_id'))->toBeTrue("{$table} should carry career_id");
     }
 });

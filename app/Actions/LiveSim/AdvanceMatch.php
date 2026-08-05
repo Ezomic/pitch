@@ -20,6 +20,7 @@ class AdvanceMatch
     public function __construct(
         private readonly PositionalEngine $engine = new PositionalEngine,
         private readonly LivePitch $live = new LivePitch,
+        private readonly FinishFixture $finishFixture = new FinishFixture,
     ) {}
 
     /**
@@ -42,9 +43,19 @@ class AdvanceMatch
         $frames = $this->live->frames($result->frames, $from);
         $moments = $this->live->moments($result->events, $names);
         $goals = [];
+        $scorers = [];
         foreach ($result->events as $event) {
-            if ($event->type->isShot() && $event->success) {
-                $goals[] = ['minute' => $event->minute, 'side' => $event->actorId >= 100 ? 1 : 0];
+            if (! $event->type->isShot() || ! $event->success) {
+                continue;
+            }
+
+            $side = $event->actorId >= 100 ? 1 : 0;
+            $goals[] = ['minute' => $event->minute, 'side' => $side];
+
+            // Only the manager's own goals need crediting; the slot is recovered
+            // from the actor id, which encodes side and slot together.
+            if ($side === 0) {
+                $scorers[] = ['minute' => $event->minute, 'slot' => $event->actorId % 100];
             }
         }
         $finished = $to >= $match->total_ticks;
@@ -56,8 +67,15 @@ class AdvanceMatch
             'home_goals' => $result->homeGoals,
             'away_goals' => $result->awayGoals,
             'moments' => array_merge($match->moments, $moments),
+            'scorers' => [...$match->scorers ?? [], ...$scorers],
             'status' => $finished ? LiveMatch::FINISHED : LiveMatch::LIVE,
         ]);
+
+        // Full time on a league match settles the fixture: the score counts, the
+        // goals are credited and the eleven's condition is worked out.
+        if ($finished) {
+            $this->finishFixture->handle($match->fresh() ?? $match);
+        }
 
         return [
             'frames' => $frames,

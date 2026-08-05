@@ -12,8 +12,10 @@ use App\Actions\Season\RateClubs;
 use App\Actions\Squad\EnsureSquad;
 use App\Http\Requests\LiveSim\SetMentalityRequest;
 use App\Http\Requests\LiveSim\SubstituteRequest;
+use App\Models\Fixture;
 use App\Models\LiveMatch;
 use App\Models\Player;
+use App\Models\Squad;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -36,7 +38,7 @@ class LiveSimController extends Controller
     {
         $user = $this->user($request);
         $squad = $ensureSquad->handle($user);
-        $match = LiveMatch::inProgressFor($user) ?? $start->handle($user, $squad);
+        $match = LiveMatch::inProgressFor($user) ?? $this->kickOff($user, $squad, $start);
 
         $lineupIds = array_map('intval', array_values($squad->assignments()->pluck('player_id', 'slot')->all()));
 
@@ -82,16 +84,37 @@ class LiveSimController extends Controller
             'awayGoals' => $match->away_goals,
             'moments' => $match->moments,
             'mentality' => $match->pitch_state['homeMentality'] ?? 'balanced',
+            // A league match counts: the score is written onto the fixture at
+            // full time. A friendly does not.
+            'competitive' => $match->fixture_id !== null,
+            'seasonUrl' => route('season.show'),
         ]);
     }
 
-    /** Deliberately walk away from the current match and kick off a new one. */
+    /**
+     * Deliberately walk away from the current match and kick off a friendly.
+     * The league fixture is not restarted this way: it is played once, for real.
+     */
     public function store(Request $request, EnsureSquad $ensureSquad, StartMatch $start): RedirectResponse
     {
         $user = $this->user($request);
         $start->handle($user, $ensureSquad->handle($user));
 
         return to_route('play.show');
+    }
+
+    /**
+     * The manager's own league fixture when one is due, so playing it out is
+     * what /play does by default; a friendly otherwise. The league match used to
+     * be played in a different engine entirely, at a different URL.
+     */
+    private function kickOff(User $user, Squad $squad, StartMatch $start): LiveMatch
+    {
+        $fixture = Fixture::dueFor($user);
+
+        return $fixture instanceof Fixture
+            ? $start->forFixture($user, $squad, $fixture)
+            : $start->handle($user, $squad);
     }
 
     public function advance(Request $request, LiveMatch $match, AdvanceMatch $advance): JsonResponse
