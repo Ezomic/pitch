@@ -45,10 +45,10 @@ class StartMatch
 
         $names = [];
         foreach ($squad->assignments()->with('player')->get() as $assignment) {
-            $names[$assignment->slot] = $assignment->player->name;
+            $names[$assignment->slot] = ['id' => $assignment->player->id, 'name' => $assignment->player->name];
         }
         foreach ($setup->formation->slots() as $slot) {
-            $names[$slot] ??= "Slot {$slot}";
+            $names[$slot] ??= ['id' => null, 'name' => "Slot {$slot}"];
         }
 
         $seed = random_int(1, 2_000_000_000);

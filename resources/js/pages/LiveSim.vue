@@ -23,6 +23,7 @@ interface Frame {
 interface PlayerMeta {
     s: 0 | 1;
     slot: number;
+    pid: number | null;
     name: string | null;
     gk: boolean;
 }
@@ -125,6 +126,7 @@ let celebrationTimer: number | null = null;
 
 const outSlot = ref<number | null>(null);
 const inPlayer = ref<number | null>(null);
+const subError = ref<string | null>(null);
 
 const count = computed(() => frames.value.length);
 const seg = computed(() =>
@@ -450,8 +452,18 @@ function cycleSpeed(): void {
 async function setMentality(
     m: 'attacking' | 'balanced' | 'defensive',
 ): Promise<void> {
+    const previous = mentality.value;
     mentality.value = m;
-    await postJson(mentalityRoute(props.matchId).url, { mentality: m });
+
+    // The server is the authority on what it accepted, so an instruction it
+    // rejects must not be left showing as though it took effect.
+    const res = (await postJson(mentalityRoute(props.matchId).url, {
+        mentality: m,
+    })) as { mentality?: string };
+
+    if (res.mentality !== m) {
+        mentality.value = previous;
+    }
 }
 
 const benchList = ref<BenchPlayer[]>(props.bench.map((b) => ({ ...b })));
@@ -470,7 +482,17 @@ async function makeSub(): Promise<void> {
     const res = (await postJson(subRoute(props.matchId).url, {
         out_slot: outSlot.value,
         player_id: inPlayer.value,
-    })) as { subsRemaining: number };
+    })) as { subsRemaining?: number; message?: string };
+
+    // A rejected swap (a player already on the pitch, no subs left) comes back
+    // as a validation error, so say so rather than acting as though it worked.
+    if (typeof res.subsRemaining !== 'number') {
+        subError.value = res.message ?? 'That substitution was not allowed.';
+
+        return;
+    }
+
+    subError.value = null;
     subsLeft.value = res.subsRemaining;
 
     if (incoming) {
@@ -798,6 +820,12 @@ onBeforeUnmount(() => {
                         {{ b.position }} · {{ b.name }}
                     </option>
                 </select>
+                <p
+                    v-if="subError"
+                    class="mb-2 rounded-md border border-destructive/40 px-2 py-1.5 text-xs text-destructive"
+                >
+                    {{ subError }}
+                </p>
                 <button
                     type="button"
                     class="w-full rounded-md bg-primary py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-40"

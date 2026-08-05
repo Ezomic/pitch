@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\LiveSim;
 
 use App\Models\LiveMatch;
+use App\Sim\Engine\Mentality;
 
 /**
  * Change the user side's mentality mid-match. It is stored on the engine state,
@@ -12,16 +13,10 @@ use App\Models\LiveMatch;
  */
 class SetMentality
 {
-    private const array ALLOWED = ['attacking', 'balanced', 'defensive'];
-
-    public function handle(LiveMatch $match, string $mentality): void
+    public function handle(LiveMatch $match, Mentality $mentality): void
     {
-        if (! in_array($mentality, self::ALLOWED, true)) {
-            return;
-        }
-
         $state = $match->pitch_state;
-        $state['homeMentality'] = $mentality;
+        $state['homeMentality'] = $mentality->value;
         $match->update(['pitch_state' => $state]);
     }
 }
