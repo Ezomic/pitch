@@ -17,6 +17,16 @@ class SetMentality
     {
         $state = $match->pitch_state;
         $state['homeMentality'] = $mentality->value;
-        $match->update(['pitch_state' => $state]);
+
+        $match->update([
+            'pitch_state' => $state,
+            // The engine reads mentality every tick, so when it changed is part
+            // of what made the match what it was.
+            'interventions' => [...$match->interventions ?? [], [
+                'tick' => $match->current_tick,
+                'type' => 'mentality',
+                'value' => $mentality->value,
+            ]],
+        ]);
     }
 }

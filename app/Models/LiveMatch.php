@@ -30,6 +30,8 @@ use Illuminate\Support\Carbon;
  * @property array<int, array<string, mixed>> $moments
  * @property array<int, array{minute: int, slot: int}>|null $scorers
  * @property int|null $fixture_id
+ * @property array<string, mixed>|null $kickoff_state
+ * @property array<int, array<string, mixed>>|null $interventions
  * @property int $subs_remaining
  * @property string $status
  * @property Carbon|null $created_at
@@ -38,7 +40,7 @@ use Illuminate\Support\Carbon;
 #[Fillable([
     'user_id', 'career_id', 'fixture_id', 'seed', 'current_tick', 'total_ticks', 'pitch_state', 'rng_state',
     'home_goals', 'away_goals', 'home_name', 'away_name', 'opponent_team_id', 'players', 'moments',
-    'scorers', 'subs_remaining', 'status',
+    'kickoff_state', 'scorers', 'interventions', 'subs_remaining', 'status',
 ])]
 class LiveMatch extends Model
 {
@@ -92,6 +94,8 @@ class LiveMatch extends Model
             'players' => 'array',
             'moments' => 'array',
             'scorers' => 'array',
+            'kickoff_state' => 'array',
+            'interventions' => 'array',
             'seed' => 'integer',
             'current_tick' => 'integer',
             'total_ticks' => 'integer',
