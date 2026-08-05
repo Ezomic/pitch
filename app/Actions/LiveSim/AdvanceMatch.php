@@ -27,7 +27,7 @@ class AdvanceMatch
      */
     public function handle(LiveMatch $match, int $chunkTicks = 30): array
     {
-        if ($match->status === 'finished' || $match->current_tick >= $match->total_ticks) {
+        if ($match->status === LiveMatch::FINISHED || $match->current_tick >= $match->total_ticks) {
             return $this->done($match);
         }
 
@@ -56,7 +56,7 @@ class AdvanceMatch
             'home_goals' => $result->homeGoals,
             'away_goals' => $result->awayGoals,
             'moments' => array_merge($match->moments, $moments),
-            'status' => $finished ? 'finished' : 'live',
+            'status' => $finished ? LiveMatch::FINISHED : LiveMatch::LIVE,
         ]);
 
         return [

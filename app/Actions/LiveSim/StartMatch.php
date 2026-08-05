@@ -26,6 +26,14 @@ class StartMatch
 
     public function handle(User $user, Squad $squad): LiveMatch
     {
+        // Kicking off a new match walks away from whatever was still running, so
+        // mark it abandoned rather than leaving a second 'live' row behind: only
+        // one match is ever in progress, and the pruner knows what to clear up.
+        LiveMatch::query()
+            ->where('user_id', $user->id)
+            ->where('status', LiveMatch::LIVE)
+            ->update(['status' => LiveMatch::ABANDONED]);
+
         $setup = $squad->setup();
 
         // Face a real club rather than one hardcoded sparring partner: each has its
@@ -61,7 +69,7 @@ class StartMatch
             'players' => $this->live->players($names),
             'moments' => [],
             'subs_remaining' => 5,
-            'status' => 'live',
+            'status' => LiveMatch::LIVE,
         ]);
     }
 

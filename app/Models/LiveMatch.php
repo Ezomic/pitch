@@ -40,12 +40,34 @@ use Illuminate\Support\Carbon;
 ])]
 class LiveMatch extends Model
 {
+    /** Still being played out: the one match a manager can resume. */
+    public const string LIVE = 'live';
+
+    /** Played to the final whistle. */
+    public const string FINISHED = 'finished';
+
+    /** Walked away from by starting another match. */
+    public const string ABANDONED = 'abandoned';
+
     /**
      * @return BelongsTo<User, $this>
      */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * The match this manager is part way through, if any. Only one is ever live:
+     * starting another abandons the previous one.
+     */
+    public static function inProgressFor(User $user): ?self
+    {
+        return self::query()
+            ->where('user_id', $user->id)
+            ->where('status', self::LIVE)
+            ->latest('id')
+            ->first();
     }
 
     /**

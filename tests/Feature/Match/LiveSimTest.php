@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Models\LiveMatch;
 use App\Models\Player;
 use App\Models\User;
 use App\Sim\Domain\Position;
@@ -78,4 +79,81 @@ it('changes mentality mid-match', function () {
         ->postJson(route('play.mentality', $matchId), ['mentality' => 'attacking'])
         ->assertOk()
         ->assertJson(['mentality' => 'attacking']);
+});
+
+it('resumes the match in progress instead of starting another', function () {
+    $user = User::factory()->create();
+
+    $first = $this->actingAs($user)->get(route('play.show'))
+        ->viewData('page')['props']['matchId'];
+
+    // advance() clamps a slice to 120 ticks, so that is what actually gets played.
+    $this->actingAs($user)
+        ->postJson(route('play.advance', $first), ['ticks' => 120])
+        ->assertOk();
+
+    // A refresh mid-match used to abandon the game and kick off another.
+    $page = $this->actingAs($user)->get(route('play.show'))
+        ->assertOk()
+        ->viewData('page')['props'];
+
+    expect($page['matchId'])->toBe($first)
+        ->and($page['currentTick'])->toBe(120)
+        ->and(LiveMatch::query()->where('user_id', $user->id)->count())->toBe(1);
+});
+
+it('hands the resumed match its score, feed and mentality', function () {
+    $user = User::factory()->create();
+
+    $matchId = $this->actingAs($user)->get(route('play.show'))
+        ->viewData('page')['props']['matchId'];
+
+    $this->actingAs($user)->postJson(route('play.mentality', $matchId), ['mentality' => 'defensive']);
+    $this->actingAs($user)->postJson(route('play.advance', $matchId), ['ticks' => 120]);
+
+    $match = LiveMatch::query()->findOrFail($matchId);
+
+    $this->actingAs($user)->get(route('play.show'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('LiveSim')
+            ->where('currentTick', 120)
+            ->where('homeGoals', $match->home_goals)
+            ->where('awayGoals', $match->away_goals)
+            ->where('mentality', 'defensive')
+            ->has('moments', count($match->moments)));
+});
+
+it('starts a new match only when asked to, abandoning the old one', function () {
+    $user = User::factory()->create();
+
+    $first = $this->actingAs($user)->get(route('play.show'))
+        ->viewData('page')['props']['matchId'];
+
+    $second = $this->actingAs($user)->post(route('play.store'))
+        ->assertRedirect(route('play.show'))
+        ->getTargetUrl();
+
+    $current = $this->actingAs($user)->get($second)
+        ->viewData('page')['props']['matchId'];
+
+    expect($current)->not->toBe($first)
+        ->and(LiveMatch::query()->findOrFail($first)->status)->toBe(LiveMatch::ABANDONED)
+        ->and(LiveMatch::query()->findOrFail($current)->status)->toBe(LiveMatch::LIVE);
+});
+
+it('does not resume someone else\'s match', function () {
+    $user = User::factory()->create();
+    $other = User::factory()->create();
+
+    $mine = $this->actingAs($user)->get(route('play.show'))
+        ->viewData('page')['props']['matchId'];
+
+    $theirs = $this->actingAs($other)->get(route('play.show'))
+        ->viewData('page')['props']['matchId'];
+
+    expect($theirs)->not->toBe($mine);
+
+    $this->actingAs($other)
+        ->postJson(route('play.advance', $mine), ['ticks' => 30])
+        ->assertForbidden();
 });
