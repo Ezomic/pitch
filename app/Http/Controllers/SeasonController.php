@@ -55,7 +55,9 @@ class SeasonController extends Controller
             'liveFixture' => $due === null ? null : [
                 'opponentName' => $this->sideName($due->userIsHome() ? $due->away_team_id : $due->home_team_id, $teams),
                 'home' => $due->userIsHome(),
-                'url' => route('match.live.show', $due),
+                // The league match is played out in the positional engine at /play,
+                // the same engine and screen a friendly uses.
+                'url' => route('play.show'),
                 'scoutUrl' => route('season.scout', $due),
             ],
             'complete' => $current === null,

@@ -28,15 +28,17 @@ use Illuminate\Support\Carbon;
  * @property string $away_name
  * @property array<int, array<string, mixed>> $players
  * @property array<int, array<string, mixed>> $moments
+ * @property array<int, array{minute: int, slot: int}>|null $scorers
+ * @property int|null $fixture_id
  * @property int $subs_remaining
  * @property string $status
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
 #[Fillable([
-    'user_id', 'career_id', 'seed', 'current_tick', 'total_ticks', 'pitch_state', 'rng_state',
+    'user_id', 'career_id', 'fixture_id', 'seed', 'current_tick', 'total_ticks', 'pitch_state', 'rng_state',
     'home_goals', 'away_goals', 'home_name', 'away_name', 'opponent_team_id', 'players', 'moments',
-    'subs_remaining', 'status',
+    'scorers', 'subs_remaining', 'status',
 ])]
 class LiveMatch extends Model
 {
@@ -55,6 +57,16 @@ class LiveMatch extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * The league fixture being played out, when this is not a friendly.
+     *
+     * @return BelongsTo<Fixture, $this>
+     */
+    public function fixture(): BelongsTo
+    {
+        return $this->belongsTo(Fixture::class);
     }
 
     /**
@@ -79,6 +91,7 @@ class LiveMatch extends Model
             'pitch_state' => 'array',
             'players' => 'array',
             'moments' => 'array',
+            'scorers' => 'array',
             'seed' => 'integer',
             'current_tick' => 'integer',
             'total_ticks' => 'integer',

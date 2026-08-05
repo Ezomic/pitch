@@ -135,8 +135,19 @@ it('shows a report for a played user fixture', function () {
     $season = $user->season()->first();
     $userFixture = $season->fixtures()->where('played', false)->get()
         ->first(fn ($f) => $f->involvesUser());
-    $this->actingAs($user)->get(route('match.live.show', $userFixture));
-    $this->actingAs($user)->post(route('match.live.finish', $userFixture));
+    // Played out in the positional engine at /play, a slice at a time.
+    $matchId = $this->actingAs($user)->get(route('play.show'))
+        ->viewData('page')['props']['matchId'];
+
+    for ($i = 0; $i < 40; $i++) {
+        $body = $this->actingAs($user)
+            ->postJson(route('play.advance', $matchId), ['ticks' => 120])
+            ->json();
+
+        if ($body['finished']) {
+            break;
+        }
+    }
 
     $this->actingAs($user)
         ->get(route('season.report', $userFixture->refresh()))

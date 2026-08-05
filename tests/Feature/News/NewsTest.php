@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-use App\Actions\Match\FinishLiveMatch;
+use App\Actions\LiveSim\FinishFixture;
 use App\Actions\News\GenerateTransferOffer;
 use App\Actions\News\RecordNews;
 use App\Actions\News\ResolveOffer;
 use App\Actions\Squad\EnsureSquad;
-use App\Models\MatchSession;
+use App\Models\LiveMatch;
 use App\Models\News;
 use App\Models\Player;
 use App\Models\Season;
@@ -101,12 +101,14 @@ it('files a result into the feed when a live match finishes', function () {
         'matchday' => 1, 'scheduled_on' => Season::STARTS_ON,
         'home_team_id' => null, 'away_team_id' => $team->id, 'seed' => 1, 'played' => false,
     ]);
-    $session = MatchSession::create([
+    $match = LiveMatch::create([
         'user_id' => $user->id, 'fixture_id' => $fixture->id, 'seed' => 1,
-        'home_goals' => 2, 'away_goals' => 1, 'moments' => [], 'lineup' => [], 'scorers' => [],
+        'current_tick' => 2700, 'total_ticks' => 2700, 'pitch_state' => [], 'rng_state' => 1,
+        'home_goals' => 2, 'away_goals' => 1, 'home_name' => 'Your squad', 'away_name' => $team->name,
+        'players' => [], 'moments' => [], 'scorers' => [], 'status' => LiveMatch::FINISHED,
     ]);
 
-    app(FinishLiveMatch::class)->handle($session);
+    app(FinishFixture::class)->handle($match);
 
     $result = News::query()->where('user_id', $user->id)->where('category', News::RESULT)->first();
     expect($result)->not->toBeNull()

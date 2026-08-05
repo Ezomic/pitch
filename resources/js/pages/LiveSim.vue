@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Head, router } from '@inertiajs/vue3';
-import { Pause, Play, RotateCcw } from '@lucide/vue';
+import { Pause, Play, RotateCcw, Trophy } from '@lucide/vue';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import ClubStars from '@/components/ClubStars.vue';
 import {
@@ -72,6 +72,8 @@ const props = defineProps<{
     awayGoals: number;
     moments: Moment[];
     mentality: 'attacking' | 'balanced' | 'defensive';
+    competitive: boolean;
+    seasonUrl: string;
 }>();
 
 defineOptions({
@@ -263,6 +265,11 @@ function newMatch(): void {
 
     pause();
     router.post(startNewMatch().url);
+}
+
+function backToSeason(): void {
+    pause();
+    router.get(props.seasonUrl);
 }
 
 function xsrf(): string {
@@ -535,6 +542,12 @@ onBeforeUnmount(() => {
 
     <div class="flex flex-col gap-4 p-4 md:flex-row">
         <div class="flex flex-1 flex-col gap-3">
+            <p class="text-xs text-muted-foreground">
+                <span v-if="competitive">
+                    League fixture. The score counts towards the table.
+                </span>
+                <span v-else>Friendly. Nothing rides on this one.</span>
+            </p>
             <div class="flex items-center justify-between font-mono text-sm">
                 <span class="flex min-w-0 flex-col gap-0.5">
                     <span class="truncate">{{ homeName }}</span>
@@ -687,6 +700,15 @@ onBeforeUnmount(() => {
                     {{ speed }}×
                 </button>
                 <button
+                    v-if="competitive && finished"
+                    type="button"
+                    class="flex items-center gap-1 rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
+                    @click="backToSeason"
+                >
+                    <Trophy class="size-3.5" /> Back to season
+                </button>
+                <button
+                    v-else-if="!competitive"
                     type="button"
                     class="flex items-center gap-1 rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground"
                     @click="newMatch"
