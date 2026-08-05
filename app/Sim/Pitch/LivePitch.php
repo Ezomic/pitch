@@ -23,10 +23,14 @@ final class LivePitch
     ) {}
 
     /**
-     * @param  array<int, string>  $homeNames  slot id => player name
-     * @return list<array{s: int, slot: int, name: string|null, gk: bool}>
+     * The 22-player metadata. Home entries carry the squad player currently in
+     * the slot, id included, so a substitution can tell who is already on the
+     * pitch rather than going by name.
+     *
+     * @param  array<int, array{id: int|null, name: string}>  $home  slot id => player
+     * @return list<array{s: int, slot: int, pid: int|null, name: string|null, gk: bool}>
      */
-    public function players(array $homeNames): array
+    public function players(array $home): array
     {
         $players = [];
         foreach ([0, 1] as $side) {
@@ -34,7 +38,8 @@ final class LivePitch
                 $players[] = [
                     's' => $side,
                     'slot' => $slot,
-                    'name' => $side === 0 ? ($homeNames[$slot] ?? ($slot === 0 ? 'GK' : "Slot {$slot}")) : null,
+                    'pid' => $side === 0 ? ($home[$slot]['id'] ?? null) : null,
+                    'name' => $side === 0 ? ($home[$slot]['name'] ?? ($slot === 0 ? 'GK' : "Slot {$slot}")) : null,
                     'gk' => $slot === 0,
                 ];
             }

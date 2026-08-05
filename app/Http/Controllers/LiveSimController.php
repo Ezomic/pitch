@@ -10,6 +10,8 @@ use App\Actions\LiveSim\StartMatch;
 use App\Actions\LiveSim\Substitute;
 use App\Actions\Season\RateClubs;
 use App\Actions\Squad\EnsureSquad;
+use App\Http\Requests\LiveSim\SetMentalityRequest;
+use App\Http\Requests\LiveSim\SubstituteRequest;
 use App\Models\LiveMatch;
 use App\Models\Player;
 use App\Models\User;
@@ -36,10 +38,12 @@ class LiveSimController extends Controller
         $squad = $ensureSquad->handle($user);
         $match = LiveMatch::inProgressFor($user) ?? $start->handle($user, $squad);
 
-        $lineupSlots = array_map('intval', array_keys(iterator_to_array($squad->assignments()->pluck('player_id', 'slot'))));
         $lineupIds = array_map('intval', array_values($squad->assignments()->pluck('player_id', 'slot')->all()));
 
-        $bench = Player::query()->where('user_id', $user->id)->whereNotIn('id', $lineupIds)
+        // Drawn from the same pool the lineup was picked from. Filtering on
+        // user_id alone left the bench empty for a default squad, whose players
+        // are unowned pool players, so no substitution could ever be made.
+        $bench = Player::query()->selectableFor($user->id)->whereNotIn('id', $lineupIds)
             ->orderBy('position')->orderBy('name')->get()
             ->map(fn (Player $player) => [
                 'id' => $player->id,
@@ -98,29 +102,25 @@ class LiveSimController extends Controller
         return response()->json($advance->handle($match, $chunk));
     }
 
-    public function sub(Request $request, LiveMatch $match, Substitute $substitute): JsonResponse
+    public function sub(SubstituteRequest $request, LiveMatch $match, Substitute $substitute): JsonResponse
     {
         $user = $this->authorizeMatch($request, $match);
-        $data = $request->validate([
-            'out_slot' => ['required', 'integer', 'min:1', 'max:10'],
-            'player_id' => ['required', 'integer'],
-        ]);
 
-        $player = Player::query()->where('user_id', $user->id)
-            ->where('id', $data['player_id'])->firstOrFail();
-        $substitute->handle($match, $data['out_slot'], $player);
+        $player = Player::query()->selectableFor($user->id)
+            ->where('id', $request->integer('player_id'))->firstOrFail();
+        $substitute->handle($match, $request->integer('out_slot'), $player);
 
         return response()->json(['subsRemaining' => $match->subs_remaining]);
     }
 
-    public function mentality(Request $request, LiveMatch $match, SetMentality $setMentality): JsonResponse
+    public function mentality(SetMentalityRequest $request, LiveMatch $match, SetMentality $setMentality): JsonResponse
     {
         $this->authorizeMatch($request, $match);
-        $data = $request->validate(['mentality' => ['required', 'string']]);
+        $mentality = $request->mentality();
 
-        $setMentality->handle($match, $data['mentality']);
+        $setMentality->handle($match, $mentality);
 
-        return response()->json(['mentality' => $data['mentality']]);
+        return response()->json(['mentality' => $mentality->value]);
     }
 
     private function authorizeMatch(Request $request, LiveMatch $match): User

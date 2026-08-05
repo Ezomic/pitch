@@ -157,3 +157,77 @@ it('does not resume someone else\'s match', function () {
         ->postJson(route('play.advance', $mine), ['ticks' => 30])
         ->assertForbidden();
 });
+
+it('refuses to bring on a player who is already on the pitch', function () {
+    $user = User::factory()->create();
+
+    $matchId = $this->actingAs($user)->get(route('play.show'))
+        ->viewData('page')['props']['matchId'];
+
+    $match = LiveMatch::query()->findOrFail($matchId);
+    $onPitch = collect($match->players)->firstWhere('pid', '!=', null);
+
+    $this->actingAs($user)
+        ->postJson(route('play.sub', $matchId), [
+            'out_slot' => $onPitch['slot'] === 1 ? 2 : 1,
+            'player_id' => $onPitch['pid'],
+        ])
+        ->assertStatus(422)
+        ->assertJsonValidationErrors('player_id');
+
+    expect(LiveMatch::query()->findOrFail($matchId)->subs_remaining)->toBe(5);
+});
+
+it('records who came off when a substitution is made', function () {
+    $user = User::factory()->create();
+
+    $props = $this->actingAs($user)->get(route('play.show'))->viewData('page')['props'];
+    $matchId = $props['matchId'];
+    $incoming = $props['bench'][0]['id'];
+
+    $before = LiveMatch::query()->findOrFail($matchId);
+    $starter = collect($before->players)->firstWhere(fn (array $p): bool => $p['s'] === 0 && $p['slot'] === 1);
+
+    $this->actingAs($user)
+        ->postJson(route('play.sub', $matchId), ['out_slot' => 1, 'player_id' => $incoming])
+        ->assertOk()
+        ->assertJson(['subsRemaining' => 4]);
+
+    $after = LiveMatch::query()->findOrFail($matchId);
+    $sub = collect($after->moments)->firstWhere('kind', 'sub');
+
+    // The player who came off used to be overwritten and lost entirely.
+    expect($sub)->not->toBeNull()
+        ->and($sub['text'])->toContain($starter['name'])
+        ->and(collect($after->players)->firstWhere('slot', 1)['pid'])->toBe($incoming);
+});
+
+it('rejects a mentality that is not one of the three', function () {
+    $user = User::factory()->create();
+    $matchId = $this->actingAs($user)->get(route('play.show'))
+        ->viewData('page')['props']['matchId'];
+
+    // This used to return 200 echoing the requested value while changing nothing.
+    $this->actingAs($user)
+        ->postJson(route('play.mentality', $matchId), ['mentality' => 'gegenpress'])
+        ->assertStatus(422)
+        ->assertJsonValidationErrors('mentality');
+
+    expect(LiveMatch::query()->findOrFail($matchId)->pitch_state['homeMentality'])->toBe('balanced');
+});
+
+it('does not let someone else substitute into your match', function () {
+    $user = User::factory()->create();
+    $other = User::factory()->create();
+
+    $matchId = $this->actingAs($user)->get(route('play.show'))
+        ->viewData('page')['props']['matchId'];
+
+    $this->actingAs($other)
+        ->postJson(route('play.sub', $matchId), ['out_slot' => 1, 'player_id' => 1])
+        ->assertForbidden();
+
+    $this->actingAs($other)
+        ->postJson(route('play.mentality', $matchId), ['mentality' => 'attacking'])
+        ->assertForbidden();
+});
