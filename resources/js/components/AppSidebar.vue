@@ -2,14 +2,14 @@
 import { Link } from '@inertiajs/vue3';
 import {
     ArrowRightLeft,
-    BookOpen,
     Clapperboard,
-    Gamepad2,
-    FolderGit2,
     Dumbbell,
+    FlaskConical,
+    Gamepad2,
     LayoutGrid,
     Medal,
     Newspaper,
+    Scale,
     Shirt,
     Sprout,
     Telescope,
@@ -32,9 +32,14 @@ import { dashboard } from '@/routes';
 import { show as cupShow } from '@/routes/cup';
 import { show as matchShow } from '@/routes/match';
 import { index as newsIndex } from '@/routes/news';
+import { show as playShow } from '@/routes/play';
 import { index as scoutsIndex } from '@/routes/scouts';
 import { show as seasonShow } from '@/routes/season';
-import { edit as squadEdit } from '@/routes/squad';
+import {
+    compare as squadCompare,
+    edit as squadEdit,
+    whatIf as squadWhatIf,
+} from '@/routes/squad';
 import { index as trainingIndex } from '@/routes/training';
 import { index as transfersIndex } from '@/routes/transfers';
 import { index as youthIndex } from '@/routes/youth';
@@ -93,21 +98,21 @@ const mainNavItems: NavItem[] = [
     },
     {
         title: 'Play',
-        href: '/play',
+        href: playShow(),
         icon: Gamepad2,
     },
 ];
 
 const footerNavItems: NavItem[] = [
     {
-        title: 'Repository',
-        href: 'https://github.com/laravel/vue-starter-kit',
-        icon: FolderGit2,
+        title: 'Squad comparison',
+        href: squadCompare(),
+        icon: Scale,
     },
     {
-        title: 'Documentation',
-        href: 'https://laravel.com/docs/starter-kits#vue',
-        icon: BookOpen,
+        title: 'What if',
+        href: squadWhatIf(),
+        icon: FlaskConical,
     },
 ];
 </script>
