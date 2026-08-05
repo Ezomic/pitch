@@ -18,6 +18,10 @@
         </include>
     </source>
     <php>
+        <!-- The engine suites simulate whole matches in memory (the golden master
+             holds a match's frames while it hashes them), which overruns the 128M
+             default part-way through a full run. -->
+        <ini name="memory_limit" value="512M"/>
         <env name="APP_ENV" value="testing"/>
         <env name="APP_MAINTENANCE_DRIVER" value="file"/>
         <env name="BCRYPT_ROUNDS" value="4"/>
