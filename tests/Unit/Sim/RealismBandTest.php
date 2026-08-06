@@ -20,16 +20,16 @@ const REALISM_SEEDS = 40;
 
 /**
  * How far outside its band each metric sits today, as measured at PITCH-145.
- * Delete an entry when its ticket lands; never raise one to make a run pass.
+ * Delete an entry when its ticket lands, and tighten one whenever a change
+ * brings a metric closer in. Never raise one to make a run pass.
  *
  * @var array<string, float>
  */
 const REALISM_KNOWN_OFF = [
-    'Shots on target' => 2.10,      // 13.1 against a 7.5 to 11 band
-    'Pass completion %' => 2.70,    // 67.3 against a 70 to 88 band, see PITCH-152
-    'Crosses' => 3.30,              // 10.7 against a 14 to 42 band
-    'Fouls' => 10.50,               // 7.5 against an 18 to 28 band, see PITCH-126 and PITCH-127
-    'Final-third time %' => 10.10,  // 40.1 against a 12 to 30 band, see PITCH-152
+    'Shots on target' => 0.90,   // 11.9 against a 7.5 to 11 band, was out by 2.10
+    'Pass completion %' => 1.70, // 68.3 against a 70 to 88 band, was out by 2.70
+    'Crosses' => 1.00,           // 13.0 against a 14 to 42 band, was out by 3.30
+    'Fouls' => 7.40,             // 10.6 against an 18 to 28 band, see PITCH-126 and PITCH-127
 ];
 
 /** How far outside its band a metric sits, or zero when it is inside. */

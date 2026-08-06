@@ -43,7 +43,7 @@ final class PositionalEngine
 
     private const float SHOT_SPEED = 0.55;
 
-    private const float SHOOT_RANGE = 0.16;      // distance to goal a shot is viable from (calibrated: shots ~26/match)
+    private const float SHOOT_RANGE = 0.20;      // distance to goal a shot is viable from (calibrated: shots ~24/match)
 
     private const float MAX_PASS = 0.55;          // longest pass a player attempts
 
@@ -54,6 +54,34 @@ final class PositionalEngine
     private const float MARK_RADIUS = 0.05;       // an opponent this close counts as marking
 
     private const float MARK = 0.45;              // how hard a defender shades onto its man
+
+    // How far the out-of-possession block drops off the ball toward its own goal.
+    // Lower means it engages higher up the pitch.
+    private const float BLOCK_RETREAT = 0.30;
+
+    // How far a player in the block travels from its formation anchor toward
+    // that line. Higher means the shape actually gets there.
+    private const float BLOCK_STEP = 0.75;
+
+    // How readily a carrier plays the ball forward rather than recycling it.
+    // Real build-up circulates a great deal more than it progresses.
+    private const float PROGRESS_FREE = 0.88;
+
+    private const float PROGRESS_PRESSED = 0.62;
+
+    // How far the whole block steps up the pitch behind the ball in possession.
+    private const float PUSH_SCALE = 0.85;
+
+    // How wide a carrier must be, and how willingly they whip it in from there.
+    private const float CROSS_WIDTH = 0.18;
+
+    private const float CROSS_CHANCE = 0.80;
+
+    // How much of a striker's finishing carries into an attempt on goal.
+    private const float SHOT_SKILL = 0.68;
+
+    // How much of the keeper's ability is worth against an attempt on goal.
+    private const float KEEPER_SAVE = 0.20;
 
     private const float LANE_RADIUS = 0.04;       // a defender this near a pass lane can cut it
 
@@ -380,7 +408,7 @@ final class PositionalEngine
                 $seen = $state->laggedBall($this->reactionLag($player));
                 $bias = $this->mentalityBias($state, $player->side);
                 $ballAdvance = $player->side === 0 ? $seen->x : 1.0 - $seen->x;
-                $push = max(0.0, $ballAdvance - 0.15) * (1.0 + 0.22 * $bias);
+                $push = max(0.0, $ballAdvance - 0.15) * (1.0 + 0.22 * $bias) * self::PUSH_SCALE;
                 $dir = $player->side === 0 ? 1.0 : -1.0;
 
                 if ($player->position === Position::Forward) {
@@ -458,9 +486,9 @@ final class PositionalEngine
             // build-up; that is deferred to the off-ball-runs stage.
             $seen = $state->laggedBall($this->reactionLag($player));
             $ownGoalX = $player->side === 0 ? 0.0 : 1.0;
-            $blockX = $seen->x + ($ownGoalX - $seen->x) * 0.45;
+            $blockX = $seen->x + ($ownGoalX - $seen->x) * self::BLOCK_RETREAT;
             $base = new Vec2(
-                $player->anchor->x + ($blockX - $player->anchor->x) * 0.5,
+                $player->anchor->x + ($blockX - $player->anchor->x) * self::BLOCK_STEP,
                 $player->anchor->y + ($seen->y - 0.5) * 0.3 * $this->shadeFactor($player),
             );
 
@@ -677,9 +705,9 @@ final class PositionalEngine
 
         // Wide and advanced: whip a cross into the box instead of cutting inside.
         // Wing play is a real route to goal, not just a way back into the middle.
-        if ($distToGoal < 0.5 && abs($carrier->pos->y - 0.5) > 0.24) {
+        if ($distToGoal < 0.5 && abs($carrier->pos->y - 0.5) > self::CROSS_WIDTH) {
             $target = $this->crossTarget($state, $carrier, $goal);
-            if ($target !== null && $rng->next() < 0.65) {
+            if ($target !== null && $rng->next() < self::CROSS_CHANCE) {
                 $this->cross($state, $events, $rng, $minute, $carrier, $target);
 
                 return;
@@ -766,7 +794,7 @@ final class PositionalEngine
         $pressed = $this->pressed($state);
         $forward = $this->bestPassTarget($state, $carrier, $goal, $distToGoal, minProgress: 0.03);
 
-        if ($forward !== null && $rng->next() < ($pressed ? 0.62 : 0.88)) {
+        if ($forward !== null && $rng->next() < ($pressed ? self::PROGRESS_PRESSED : self::PROGRESS_FREE)) {
             $this->pass($state, $events, $rng, $minute, $carrier, $forward);
 
             return;
@@ -1179,7 +1207,7 @@ final class PositionalEngine
 
         $this->attemptOnGoal(
             $state, $events, $rng, $minute, $carrier, $goal,
-            EventType::Shot, $this->shotQuality($state, $carrier, $goal, $distToGoal), 0.60,
+            EventType::Shot, $this->shotQuality($state, $carrier, $goal, $distToGoal), self::SHOT_SKILL,
         );
     }
 
@@ -1206,7 +1234,7 @@ final class PositionalEngine
     private function attemptOnGoal(PitchState $state, array &$events, Rng $rng, int $minute, PlayerState $carrier, Vec2 $goal, EventType $type, float $quality, float $skill): void
     {
         $keeper = $state->players[PlayerState::id(1 - $carrier->side, 0)] ?? null;
-        $keeperSave = $keeper !== null ? $keeper->attributes->tackling / 100 * 0.33 : 0.0;
+        $keeperSave = $keeper !== null ? $keeper->attributes->tackling / 100 * self::KEEPER_SAVE : 0.0;
         $attribute = $carrier->attributes->finishing / 100 * $quality * $skill;
         $threshold = max(0.02, min(0.5, $attribute - $keeperSave));
         $draw = $rng->next();
