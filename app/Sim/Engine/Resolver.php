@@ -15,6 +15,11 @@ final class Resolver
 
     private const float PRESSURE_WEIGHT = 0.30;
 
+    // How much of a striker's finishing carries into an attempt on goal.
+    private const float SHOT_ACCURACY = 0.9;
+
+    private const float HEADER_ACCURACY = 0.78;
+
     public function resolve(Option $option, Zone $ballZone, Attributes $actor, Defense $defense, Rng $rng, float $attackBias = 1.0): ResolveOutcome
     {
         return match ($option->type) {
@@ -105,7 +110,7 @@ final class Resolver
     private function resolveShot(EventType $type, Zone $ballZone, Attributes $actor, Defense $defense, Rng $rng, float $attackBias): ResolveOutcome
     {
         // Headers are harder to convert than a shot off the deck.
-        $accuracy = $type === EventType::Header ? 0.78 : 0.9;
+        $accuracy = $type === EventType::Header ? self::HEADER_ACCURACY : self::SHOT_ACCURACY;
         $skill = $actor->finishing / self::SKILL_SCALE * $attackBias;
         $threshold = $this->clamp($skill * $accuracy - $defense->shotSuppression($ballZone), 0.05, 0.75);
         $draw = $rng->next();
