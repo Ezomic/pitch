@@ -95,8 +95,8 @@ final class LivePitch
     public function moments(array $events, array $names): array
     {
         $moments = [];
-        foreach ($events as $index => $event) {
-            $moment = $this->commentary->moment($event, $index, $names);
+        foreach ($events as $event) {
+            $moment = $this->commentary->moment($event, $names);
             if ($moment !== null) {
                 $moments[] = [
                     'minute' => $moment->minute,

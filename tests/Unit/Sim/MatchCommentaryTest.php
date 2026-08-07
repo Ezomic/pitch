@@ -61,7 +61,7 @@ it('never leaves a name placeholder unfilled', function () {
 it('does not repeat the label when the opposition passes among itself', function () {
     $names = [101 => 'Opposition', 102 => 'Opposition'];
 
-    $moment = (new MatchCommentary)->moment(throughBall(101, 102), 0, $names);
+    $moment = (new MatchCommentary)->moment(throughBall(101, 102), $names);
 
     expect($moment)->not->toBeNull()
         ->and($moment->kind)->toBe('chance')
@@ -72,17 +72,19 @@ it('does not repeat the label when the opposition passes among itself', function
 it('still names both players for a home through ball', function () {
     $names = [1 => 'Alice', 2 => 'Bob'];
 
-    $moment = (new MatchCommentary)->moment(throughBall(1, 2), 0, $names);
+    $moment = (new MatchCommentary)->moment(throughBall(1, 2), $names);
 
     expect($moment->text)->toContain('Alice')->toContain('Bob');
 });
 
-it('produces the same opposition line for the same event and index', function () {
+it('produces the same line for the same event, wherever it appears', function () {
     $names = [101 => 'Opposition', 102 => 'Opposition'];
     $commentary = new MatchCommentary;
 
-    $first = $commentary->moment(throughBall(101, 102), 4, $names);
-    $second = $commentary->moment(throughBall(101, 102), 4, $names);
+    // The line is now a function of the event alone, so it no longer depends on
+    // where in a generated batch the event happened to sit.
+    $first = $commentary->moment(throughBall(101, 102), $names);
+    $second = $commentary->moment(throughBall(101, 102), $names);
 
     expect($first->text)->toBe($second->text);
 });
