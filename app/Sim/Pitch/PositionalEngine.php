@@ -36,10 +36,6 @@ final class PositionalEngine
 
     private const int DECIDE_TICKS = 5;           // the carrier acts about once a second
 
-    private const float PASS_SPEED = 0.34;        // ball speed in flight, per second
-
-    private const float SHOT_SPEED = 0.55;
-
     private const float SHOOT_RANGE = 0.20;      // distance to goal a shot is viable from (calibrated: shots ~24/match)
 
     private const float MAX_PASS = 0.55;          // longest pass a player attempts
@@ -82,19 +78,14 @@ final class PositionalEngine
 
     private const float BLOCK_CHANCE = 0.55;      // how often a defender right in the way gets a block in
 
-    private const int DEADBALL_TICKS = 7;         // pause while a set piece is taken
-
     private const float FOUL_CHANCE = 0.035;      // a mistimed tackle is sometimes a foul
 
     private const float THROW_CHANCE = 0.2;       // an errant pass that runs out for a throw
 
-    private const float FREE_KICK_RANGE = 0.32;   // a foul this close to goal is a direct free kick
-
-    private const float PENALTY_CONVERSION = 0.78;
-
     public function __construct(
         private readonly KickOff $kickOff = new KickOff,
         private readonly Movement $movement = new Movement,
+        private readonly Restarts $restarts = new Restarts,
     ) {}
 
     /**
@@ -249,7 +240,7 @@ final class PositionalEngine
             $spot = $state->pendingSpot;
             $state->pendingType = null;
             $state->pendingSpot = null;
-            $this->awardRestart($state, $events, $minute, $type, $side, $spot);
+            $this->restarts->awardRestart($state, $events, $minute, $type, $side, $spot);
 
             return -1;
         }
@@ -305,7 +296,7 @@ final class PositionalEngine
             // restart: a penalty in the box, a direct free kick just outside it, or
             // a possession free kick anywhere else.
             if ($rng->next() < self::FOUL_CHANCE) {
-                $this->foul($state, $events, $rng, $minute, $carrier, $defender);
+                $this->restarts->foul($state, $events, $rng, $minute, $carrier, $defender);
 
                 return true;
             }
@@ -316,7 +307,7 @@ final class PositionalEngine
         $type = $carrier->pos->distanceTo(Geometry::goalOf($defender->side)) < 0.35
             ? EventType::Clearance
             : EventType::Tackle;
-        $events[] = $this->event($minute, $type, $defender, null, $carrier->pos, null, true);
+        $events[] = Events::of($minute, $type, $defender, null, $carrier->pos, null, true);
 
         $state->carrierId = $defender->id;
         $state->possessing = $defender->side;
@@ -588,12 +579,12 @@ final class PositionalEngine
 
         $decision = $this->buildDecision($state, $carrier, Geometry::danger($dest, $carrier->side));
         $roll = new Roll(0.55, $carrier->attributes->passing / 100 * 0.38, $pressure + $laneRisk, $threshold, $draw);
-        $events[] = $this->event($minute, EventType::Pass, $carrier, $target->id, $carrier->pos, $dest, $success, $decision, $roll);
+        $events[] = Events::of($minute, EventType::Pass, $carrier, $target->id, $carrier->pos, $dest, $success, $decision, $roll);
 
         // An errant ball sometimes runs out of play for a throw-in to the other side.
         if (! $success && $rng->next() < self::THROW_CHANCE) {
             $spot = new Vec2(min(0.97, max(0.03, $dest->x)), $dest->y < 0.5 ? 0.02 : 0.98);
-            $this->awardRestart($state, $events, $minute, EventType::ThrowIn, 1 - $carrier->side, $spot);
+            $this->restarts->awardRestart($state, $events, $minute, EventType::ThrowIn, 1 - $carrier->side, $spot);
 
             return;
         }
@@ -604,13 +595,13 @@ final class PositionalEngine
             $type = $carrier->pos->distanceTo(Geometry::goalOf($interceptor->side)) < 0.35
                 ? EventType::Clearance
                 : EventType::Interception;
-            $events[] = $this->event($minute, $type, $interceptor, null, $dest, null, true);
+            $events[] = Events::of($minute, $type, $interceptor, null, $dest, null, true);
         }
 
         $state->carrierId = PitchState::NO_CARRIER;
         $state->crossPending = false;
         $state->ballKind = 'pass';
-        $state->ballSpeed = self::PASS_SPEED;
+        $state->ballSpeed = Ball::PASS_SPEED;
 
         if ($success) {
             // The receiver runs onto the ball (their feet, or the space in behind).
@@ -769,11 +760,11 @@ final class PositionalEngine
     private function cross(PitchState $state, array &$events, Rng $rng, int $minute, PlayerState $carrier, PlayerState $target): void
     {
         $success = $rng->next() < 0.45;
-        $events[] = $this->event($minute, EventType::Cross, $carrier, $target->id, $carrier->pos, $target->pos, $success);
+        $events[] = Events::of($minute, EventType::Cross, $carrier, $target->id, $carrier->pos, $target->pos, $success);
 
         $state->carrierId = PitchState::NO_CARRIER;
         $state->ballKind = 'pass';
-        $state->ballSpeed = self::PASS_SPEED;
+        $state->ballSpeed = Ball::PASS_SPEED;
 
         if ($success) {
             $state->ballTarget = $target->pos;
@@ -785,7 +776,7 @@ final class PositionalEngine
 
         $defender = Geometry::nearestOpponent($state, $target->pos, $target->side);
         if ($defender !== null) {
-            $events[] = $this->event($minute, EventType::Clearance, $defender, null, $target->pos, null, true);
+            $events[] = Events::of($minute, EventType::Clearance, $defender, null, $target->pos, null, true);
             $state->ballTarget = $defender->pos;
             $state->ballTo = $defender->id;
 
@@ -858,12 +849,12 @@ final class PositionalEngine
 
         $decision = $this->buildDecision($state, $carrier, $quality);
         $roll = new Roll(0.0, $attribute, $keeperSave, $threshold, $draw);
-        $events[] = $this->event($minute, $type, $carrier, null, $carrier->pos, null, $goalScored, $decision, $roll);
+        $events[] = Events::of($minute, $type, $carrier, null, $carrier->pos, null, $goalScored, $decision, $roll);
 
         $state->carrierId = PitchState::NO_CARRIER;
         $state->crossPending = false;
         $state->ballKind = 'shot';
-        $state->ballSpeed = self::SHOT_SPEED;
+        $state->ballSpeed = Ball::SHOT_SPEED;
         $state->ballTarget = $goal;
         $state->ballGoal = $goalScored;
 
@@ -878,20 +869,20 @@ final class PositionalEngine
         $roll = $rng->next();
         if ($roll < 0.4 && $keeper !== null) {
             // Saved and held: the keeper claims it and plays on.
-            $events[] = $this->event($minute, EventType::Save, $keeper, null, $goal, null, true);
+            $events[] = Events::of($minute, EventType::Save, $keeper, null, $goal, null, true);
             $state->ballTo = $keeper->id;
             $state->ballTarget = $keeper->pos;
         } elseif ($roll < 0.85) {
             // Deflected behind for a corner to the attacking side.
             $state->pendingType = EventType::Corner;
             $state->pendingSide = $carrier->side;
-            $state->pendingSpot = $this->cornerSpot($carrier->side, $carrier->pos->y);
+            $state->pendingSpot = $this->restarts->cornerSpot($carrier->side, $carrier->pos->y);
             $state->ballTo = PitchState::NO_CARRIER;
         } else {
             // Off target: a goal kick to the defending side.
             $state->pendingType = EventType::GoalKick;
             $state->pendingSide = 1 - $carrier->side;
-            $state->pendingSpot = $this->goalKickSpot(1 - $carrier->side);
+            $state->pendingSpot = $this->restarts->goalKickSpot(1 - $carrier->side);
             $state->ballTo = PitchState::NO_CARRIER;
         }
     }
@@ -915,12 +906,12 @@ final class PositionalEngine
             return false;
         }
 
-        $events[] = $this->event($minute, EventType::Block, $blocker, null, $blocker->pos, null, true);
+        $events[] = Events::of($minute, EventType::Block, $blocker, null, $blocker->pos, null, true);
 
         $state->carrierId = PitchState::NO_CARRIER;
         $state->crossPending = false;
         $state->ballKind = 'shot';
-        $state->ballSpeed = self::SHOT_SPEED;
+        $state->ballSpeed = Ball::SHOT_SPEED;
         $state->ballGoal = false;
 
         if ($rng->next() < 0.55) {
@@ -928,7 +919,7 @@ final class PositionalEngine
             $state->ballTarget = $goal;
             $state->pendingType = EventType::Corner;
             $state->pendingSide = $carrier->side;
-            $state->pendingSpot = $this->cornerSpot($carrier->side, $carrier->pos->y);
+            $state->pendingSpot = $this->restarts->cornerSpot($carrier->side, $carrier->pos->y);
             $state->ballTo = PitchState::NO_CARRIER;
 
             return true;
@@ -965,195 +956,8 @@ final class PositionalEngine
         return $dist >= self::MARK_RADIUS ? 0.0 : (self::MARK_RADIUS - $dist) / self::MARK_RADIUS * 0.35;
     }
 
-    /**
-     * Award a set piece: emit its event, place the ball at the restart spot with a
-     * taker of the awarded side on it, and hold play for a beat so it reads as a
-     * dead ball. A goal kick is taken by the keeper, everything else by the nearest
-     * team-mate to the spot.
-     *
-     * @param  list<MatchEvent>  $events
-     */
-    private function awardRestart(PitchState $state, array &$events, int $minute, EventType $type, int $side, Vec2 $spot, ?PlayerState $creditActor = null): void
-    {
-        $taker = $type === EventType::GoalKick
-            ? ($state->players[PlayerState::id($side, 0)] ?? null)
-            : $this->nearestTeammateTo($state, $side, $spot);
-
-        if ($taker === null) {
-            return;
-        }
-
-        $events[] = $this->event($minute, $type, $creditActor ?? $taker, null, $spot, null, true);
-
-        $taker->pos = $spot;
-        $state->carrierId = $taker->id;
-        $state->possessing = $side;
-        $state->ball = $spot;
-        $state->ballTarget = null;
-        $state->ballTo = PitchState::NO_CARRIER;
-        $state->ballKind = 'idle';
-        $state->ballGoal = false;
-        $state->holdTicks = 0;
-        $state->deadBall = self::DEADBALL_TICKS;
-        $state->teleported = true; // the ball is placed at the restart spot
-    }
-
-    private function nearestTeammateTo(PitchState $state, int $side, Vec2 $spot): ?PlayerState
-    {
-        $best = null;
-        $bestDist = INF;
-
-        foreach ($state->players as $player) {
-            if ($player->side !== $side || $player->isGoalkeeper()) {
-                continue;
-            }
-
-            $dist = $player->pos->distanceTo($spot);
-            if ($dist < $bestDist) {
-                $bestDist = $dist;
-                $best = $player;
-            }
-        }
-
-        return $best;
-    }
-
     /** The corner flag on the attacking side, on the near touchline to the shot. */
-    private function cornerSpot(int $attackingSide, float $y): Vec2
-    {
-        return new Vec2($attackingSide === 0 ? 0.99 : 0.01, $y < 0.5 ? 0.02 : 0.98);
-    }
-
     /** In front of the defending side's own goal, where its keeper restarts. */
-    private function goalKickSpot(int $defendingSide): Vec2
-    {
-        return new Vec2($defendingSide === 0 ? 0.08 : 0.92, 0.5);
-    }
-
-    /**
-     * Resolve a foul by where it happened: a penalty inside the box, a direct free
-     * kick within range of goal, or a possession free kick anywhere else.
-     *
-     * @param  list<MatchEvent>  $events
-     */
-    private function foul(PitchState $state, array &$events, Rng $rng, int $minute, PlayerState $carrier, PlayerState $defender): void
-    {
-        $goal = Geometry::goalOf($carrier->side);
-
-        if (Geometry::inPenaltyBox($carrier->pos, $carrier->side)) {
-            $this->penalty($state, $events, $rng, $minute, $carrier);
-
-            return;
-        }
-
-        if ($carrier->pos->distanceTo($goal) < self::FREE_KICK_RANGE) {
-            $events[] = $this->event($minute, EventType::Foul, $defender, null, $carrier->pos, null, true);
-            $this->freeKickShot($state, $events, $rng, $minute, $carrier, $goal);
-
-            return;
-        }
-
-        $this->awardRestart($state, $events, $minute, EventType::Foul, $carrier->side, $carrier->pos, $defender);
-    }
-
-    /**
-     * A penalty: taken from the spot, converted at a high fixed rate, saved by the
-     * keeper otherwise.
-     *
-     * @param  list<MatchEvent>  $events
-     */
-    private function penalty(PitchState $state, array &$events, Rng $rng, int $minute, PlayerState $winner): void
-    {
-        $side = $winner->side;
-        $spot = Geometry::penaltySpot($side);
-        $taker = $this->nearestTeammateTo($state, $side, $spot) ?? $winner;
-        $goal = Geometry::goalOf($side);
-        $keeper = $state->players[PlayerState::id(1 - $side, 0)] ?? null;
-
-        $events[] = $this->event($minute, EventType::Penalty, $taker, null, $spot, null, true);
-
-        $scored = $rng->next() < self::PENALTY_CONVERSION;
-        $events[] = $this->event($minute, EventType::Shot, $taker, null, $spot, null, $scored);
-
-        $taker->pos = $spot;
-        $state->carrierId = PitchState::NO_CARRIER;
-        $state->possessing = $side;
-        $state->ball = $spot;
-        $state->ballKind = 'shot';
-        $state->ballSpeed = self::SHOT_SPEED;
-        $state->ballGoal = $scored;
-
-        if ($scored || $keeper === null) {
-            $state->ballTarget = $goal;
-            $state->ballTo = PitchState::NO_CARRIER;
-
-            return;
-        }
-
-        $events[] = $this->event($minute, EventType::Save, $keeper, null, $goal, null, true);
-        $state->ballTarget = $keeper->pos;
-        $state->ballTo = $keeper->id;
-    }
-
-    /**
-     * A direct free kick at goal: hard to score past a set keeper and a wall, and
-     * a miss becomes a save or a goal kick.
-     *
-     * @param  list<MatchEvent>  $events
-     */
-    private function freeKickShot(PitchState $state, array &$events, Rng $rng, int $minute, PlayerState $winner, Vec2 $goal): void
-    {
-        $side = $winner->side;
-        $spot = $winner->pos;
-        $keeper = $state->players[PlayerState::id(1 - $side, 0)] ?? null;
-
-        $scored = $rng->next() < max(0.03, $winner->attributes->finishing / 100 * 0.12);
-        $events[] = $this->event($minute, EventType::Shot, $winner, null, $spot, null, $scored);
-
-        $state->carrierId = PitchState::NO_CARRIER;
-        $state->possessing = $side;
-        $state->ball = $spot;
-        $state->ballKind = 'shot';
-        $state->ballSpeed = self::SHOT_SPEED;
-        $state->ballGoal = $scored;
-
-        if ($scored) {
-            $state->ballTarget = $goal;
-            $state->ballTo = PitchState::NO_CARRIER;
-
-            return;
-        }
-
-        if ($rng->next() < 0.5 && $keeper !== null) {
-            $events[] = $this->event($minute, EventType::Save, $keeper, null, $goal, null, true);
-            $state->ballTarget = $keeper->pos;
-            $state->ballTo = $keeper->id;
-
-            return;
-        }
-
-        $state->pendingType = EventType::GoalKick;
-        $state->pendingSide = 1 - $side;
-        $state->pendingSpot = $this->goalKickSpot(1 - $side);
-        $state->ballTarget = $goal;
-        $state->ballTo = PitchState::NO_CARRIER;
-    }
-
-    private function event(int $minute, EventType $type, PlayerState $actor, ?int $targetId, Vec2 $from, ?Vec2 $to, bool $success, ?Decision $decision = null, ?Roll $roll = null): MatchEvent
-    {
-        return new MatchEvent(
-            $minute,
-            $type,
-            $actor->id,
-            $targetId,
-            Geometry::zone($from, $actor->side),
-            $to !== null ? Geometry::zone($to, $actor->side) : null,
-            $success,
-            $decision,
-            $roll,
-        );
-    }
-
     /**
      * A record of what the carrier could see and how the chosen action compared:
      * how many team-mates were reachable, how many had a clear lane, the threat of
