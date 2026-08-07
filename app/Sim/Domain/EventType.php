@@ -15,6 +15,7 @@ enum EventType: string
     // Defensive actions that stop an attack, crediting the defending side.
     case Interception = 'interception';
     case Tackle = 'tackle';
+    case SlideTackle = 'slide_tackle';
     case Clearance = 'clearance';
     case Save = 'save';
     case Block = 'block';
@@ -32,9 +33,15 @@ enum EventType: string
     public function isDefensive(): bool
     {
         return match ($this) {
-            self::Interception, self::Tackle, self::Clearance, self::Save, self::Block => true,
+            self::Interception, self::Tackle, self::SlideTackle, self::Clearance, self::Save, self::Block => true,
             default => false,
         };
+    }
+
+    /** Whether this is a challenge for the ball, standing or committed. */
+    public function isTackle(): bool
+    {
+        return $this === self::Tackle || $this === self::SlideTackle;
     }
 
     /** Whether this is an attempt on goal (open-play shot or a header). */

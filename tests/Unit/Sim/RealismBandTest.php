@@ -27,9 +27,9 @@ const REALISM_SEEDS = 40;
  */
 const REALISM_KNOWN_OFF = [
     'Shots on target' => 0.90,   // 11.9 against a 7.5 to 11 band, was out by 2.10
-    'Pass completion %' => 1.70, // 68.3 against a 70 to 88 band, was out by 2.70
-    'Crosses' => 1.00,           // 13.0 against a 14 to 42 band, was out by 3.30
-    'Fouls' => 7.40,             // 10.6 against an 18 to 28 band, see PITCH-126 and PITCH-127
+    'Pass completion %' => 1.60, // 68.4 against a 70 to 88 band, was out by 2.70
+    'Crosses' => 0.70,           // 13.3 against a 14 to 42 band, was out by 3.30
+    'Fouls' => 6.10,             // 11.9 against an 18 to 28 band, see PITCH-126
 ];
 
 /** How far outside its band a metric sits, or zero when it is inside. */

@@ -40,7 +40,7 @@ final class MatchCommentary
             EventType::Cross => $event->success
                 ? new MatchMoment($event->minute, 'chance', $this->fill(self::CROSSES, $actor, $target, $key, self::CROSSES_SOLO))
                 : null,
-            EventType::Tackle, EventType::Interception, EventType::Clearance => $this->defensiveMoment($event, $key),
+            EventType::Tackle, EventType::SlideTackle, EventType::Interception, EventType::Clearance => $this->defensiveMoment($event, $key),
             EventType::Pass => $this->passMoment($event, $actor, $target, $key),
             default => null,
         };
@@ -68,6 +68,7 @@ final class MatchCommentary
             EventType::Block => 'Blocked!',
             EventType::Interception => 'Intercepted',
             EventType::Tackle => 'Tackled',
+            EventType::SlideTackle => 'Slide tackle!',
             EventType::Clearance => 'Cleared',
             EventType::Foul => 'Free-kick won',
             EventType::Corner => 'Corner',
@@ -110,6 +111,7 @@ final class MatchCommentary
         }
 
         $pool = match ($event->type) {
+            EventType::SlideTackle => self::SLIDE_TACKLES,
             EventType::Tackle => self::TACKLES,
             EventType::Interception => self::INTERCEPTIONS,
             default => self::CLEARANCES,
@@ -267,6 +269,14 @@ final class MatchCommentary
         '{actor} work an opening between the lines.',
         '{actor} knock it to the edge of the box.',
         '{actor} work it into the final third.',
+    ];
+
+    /** @var list<string> */
+    private const SLIDE_TACKLES = [
+        'A full-blooded sliding challenge takes the ball.',
+        'He goes to ground and gets every bit of the ball.',
+        'A perfectly timed slide, and the danger is gone.',
+        'He commits, slides in, and comes away with it.',
     ];
 
     /** @var list<string> */

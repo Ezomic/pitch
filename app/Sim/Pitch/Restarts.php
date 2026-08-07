@@ -94,7 +94,7 @@ final class Restarts
      *
      * @param  list<MatchEvent>  $events
      */
-    public function foul(PitchState $state, array &$events, Rng $rng, int $minute, PlayerState $carrier, PlayerState $defender): void
+    public function foul(PitchState $state, array &$events, Rng $rng, int $minute, PlayerState $carrier, PlayerState $defender, bool $slide = false): void
     {
         $goal = Geometry::goalOf($carrier->side);
 

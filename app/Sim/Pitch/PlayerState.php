@@ -24,6 +24,13 @@ final class PlayerState
 
     public bool $hasBall = false;
 
+    /**
+     * Ticks left on the floor after a sliding tackle that missed. A committed
+     * challenge that does not win the ball takes the defender out of the play,
+     * which is the whole risk of going to ground.
+     */
+    public int $grounded = 0;
+
     public function __construct(
         public readonly int $id,
         public readonly int $side,
@@ -70,6 +77,7 @@ final class PlayerState
             'p' => $this->pos->pair(),
             't' => $this->target->pair(),
             'hb' => $this->hasBall,
+            'gr' => $this->grounded,
         ];
     }
 
@@ -91,6 +99,8 @@ final class PlayerState
         );
         $player->target = Vec2::fromPair($s['t']);
         $player->hasBall = (bool) $s['hb'];
+        // Absent from matches saved before sliding tackles existed.
+        $player->grounded = (int) ($s['gr'] ?? 0);
 
         return $player;
     }
