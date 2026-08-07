@@ -51,7 +51,7 @@ final class MatchNarrator
         $moments = [];
 
         foreach ($attack->events as $index => $event) {
-            $moment = $this->commentary->moment($event, $index, $names);
+            $moment = $this->commentary->moment($event, $names);
 
             if ($moment !== null) {
                 $moments[] = $moment;

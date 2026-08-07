@@ -90,8 +90,8 @@ final class PitchReplay
     private function feed(array $events, array $names): array
     {
         $moments = [];
-        foreach ($events as $index => $event) {
-            $moment = $this->commentary->moment($event, $index, $names);
+        foreach ($events as $event) {
+            $moment = $this->commentary->moment($event, $names);
             if ($moment !== null) {
                 $moments[] = $moment;
             }
@@ -111,12 +111,12 @@ final class PitchReplay
     private function captions(array $events, array $names): array
     {
         $byMinute = [];
-        foreach ($events as $index => $event) {
+        foreach ($events as $event) {
             $actor = $names[$event->actorId] ?? null;
             $target = $event->targetId !== null ? ($names[$event->targetId] ?? null) : null;
             $goal = $event->type->isShot() && $event->success;
             $byMinute[$event->minute] = $this->commentary->label(
-                $event->type, $event->success, $goal, $actor, $target, $this->commentary->key($event, $index),
+                $event->type, $event->success, $goal, $actor, $target, $this->commentary->key($event),
             );
         }
 

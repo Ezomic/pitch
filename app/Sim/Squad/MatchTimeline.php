@@ -253,7 +253,7 @@ final class MatchTimeline
         $startsPossession = true;
 
         foreach ($result->events as $index => $event) {
-            $key = $this->commentary->key($event, $index);
+            $key = $this->commentary->key($event);
 
             if ($event->type->isDefensive()) {
                 $frames[] = $this->defensiveFrame($event, $side, $mirror, $key);

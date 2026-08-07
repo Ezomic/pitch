@@ -22,11 +22,11 @@ final class MatchCommentary
      *
      * @param  array<int, string>  $names  slot id => player name
      */
-    public function moment(MatchEvent $event, int $index, array $names): ?MatchMoment
+    public function moment(MatchEvent $event, array $names): ?MatchMoment
     {
         $actor = $names[$event->actorId] ?? "Player {$event->actorId}";
         $target = $event->targetId !== null ? ($names[$event->targetId] ?? "Player {$event->targetId}") : null;
-        $key = $this->key($event, $index);
+        $key = $this->key($event);
 
         return match ($event->type) {
             EventType::Header, EventType::Shot => $event->success
@@ -149,14 +149,44 @@ final class MatchCommentary
         return $pool[$key % count($pool)];
     }
 
-    public function key(MatchEvent $event, int $index): int
+    /**
+     * The phrasing key for an event, derived only from the event itself.
+     *
+     * This used to fold in the event's position within the batch it happened to
+     * be generated in. A live match is simulated a slice at a time and the
+     * client chooses the slice size, so the same event could come out with a
+     * different key depending on where a chunk boundary fell. Because the gates
+     * above sample on that key, an event could be narrated in one run of the
+     * same match and silent in another.
+     */
+    public function key(MatchEvent $event): int
     {
-        return $this->keyFor($event->minute, $event->actorId, $index);
+        return $this->keyFor($event->minute, $event->actorId, $this->shape($event));
     }
 
     public function keyFor(int $minute, int $actorId, int $index): int
     {
         return ($minute * 131 + $actorId * 17 + $index * 7) & 0x7FFFFFFF;
+    }
+
+    /**
+     * What separates two events that share a minute and an actor, so a pass and
+     * the shot that follows it do not read identically. Every part of it is
+     * intrinsic to what happened: who it was aimed at, what kind of action it
+     * was, where it started and ended, and whether it came off.
+     *
+     * The type is hashed by name rather than by its position in the enum, so
+     * reordering the cases cannot quietly rewrite every line in the game.
+     */
+    private function shape(MatchEvent $event): int
+    {
+        $to = $event->to;
+
+        return (int) (crc32($event->type->value) % 101) * 13
+            + ($event->targetId ?? 0) * 29
+            + ($event->success ? 5 : 0)
+            + $event->from->x * 3 + $event->from->y * 7
+            + ($to->x ?? 0) * 11 + ($to->y ?? 0) * 2;
     }
 
     /** @var list<string> */
