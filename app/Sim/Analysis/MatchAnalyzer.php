@@ -53,7 +53,7 @@ final class MatchAnalyzer
                 EventType::ThrowIn => $throwIns++,
                 EventType::GoalKick => $goalKicks++,
                 EventType::Penalty => $penalties++,
-                EventType::Tackle, EventType::Interception, EventType::Clearance => $defensive++,
+                EventType::Tackle, EventType::SlideTackle, EventType::Interception, EventType::Clearance => $defensive++,
                 default => null,
             };
         }

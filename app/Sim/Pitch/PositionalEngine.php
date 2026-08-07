@@ -78,7 +78,21 @@ final class PositionalEngine
 
     private const float BLOCK_CHANCE = 0.55;      // how often a defender right in the way gets a block in
 
-    private const float FOUL_CHANCE = 0.035;      // a mistimed tackle is sometimes a foul
+    // A jockey that mistimes it concedes now and then; a lunge that misses concedes
+    // far more often. Fouls come out of what the defender chose to do, rather than
+    // one flat chance for every challenge.
+    private const float STAND_FOUL_CHANCE = 0.035;
+
+    private const float SLIDE_FOUL_CHANCE = 0.20;
+
+    /** How much more often a committed challenge wins the ball than a jockey. */
+    private const float SLIDE_WIN = 1.5;
+
+    /** Ticks a defender spends on the floor after a slide that missed. */
+    private const int SLIDE_RECOVERY = 5;
+
+    /** A carrier this close to goal is worth going to ground to stop. */
+    private const float SLIDE_DANGER = 0.12;
 
     private const float THROW_CHANCE = 0.2;       // an errant pass that runs out for a throw
 
@@ -160,6 +174,14 @@ final class PositionalEngine
 
         $state->justScored = -1;
         $minute = (int) min(89, $tick / self::TOTAL_TICKS * 90);
+
+        // Anyone who went to ground and missed gets back to his feet in his own
+        // time; until then he is out of the play.
+        foreach ($state->players as $player) {
+            if ($player->grounded > 0) {
+                $player->grounded--;
+            }
+        }
 
         // Remember where the ball has been, so off-ball players can react to it with
         // their own delay rather than all turning the instant it moves.
@@ -271,6 +293,42 @@ final class PositionalEngine
     }
 
     /**
+     * Whether this defender commits to a sliding challenge rather than staying on
+     * his feet. He goes to ground when there is no one behind him to cover, or
+     * when the carrier is close enough to goal that letting him run is worse than
+     * the risk of missing.
+     */
+    private function commitsToSlide(PitchState $state, PlayerState $carrier, PlayerState $defender): bool
+    {
+        $goal = Geometry::goalOf($carrier->side);
+
+        if ($carrier->pos->distanceTo($goal) < self::SLIDE_DANGER) {
+            return true;
+        }
+
+        return $this->isLastMan($state, $defender, $carrier);
+    }
+
+    /** No team-mate of this defender is between him and his own goal. */
+    private function isLastMan(PitchState $state, PlayerState $defender, PlayerState $carrier): bool
+    {
+        $ownGoal = Geometry::goalOf($carrier->side);
+        $defenderToGoal = $defender->pos->distanceTo($ownGoal);
+
+        foreach ($state->players as $player) {
+            if ($player->side !== $defender->side || $player->id === $defender->id || $player->isGoalkeeper()) {
+                continue;
+            }
+
+            if ($player->pos->distanceTo($ownGoal) < $defenderToGoal) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
      * A defender who reaches the carrier contests the ball. Returns true when
      * possession turns over on the tackle.
      *
@@ -284,19 +342,37 @@ final class PositionalEngine
         }
 
         $defender = Geometry::nearestOpponent($state, $carrier->pos, $carrier->side);
-        if ($defender === null || $carrier->pos->distanceTo($defender->pos) > self::TACKLE_RADIUS) {
+        if ($defender === null || $carrier->pos->distanceTo($defender->pos) > self::TACKLE_RADIUS
+            || $defender->grounded > 0) {
             return false;
         }
 
-        // A tackle is a low-probability attempt each tick a defender is on the
-        // carrier, so a possession has time to breathe and pass out of pressure.
-        $win = $rng->next() < 0.05 + max(0.0, $defender->attributes->tackling - $carrier->attributes->dribbling) / 400;
+        // Stand up or go to ground. A slide is the committed option: it wins the
+        // ball more often, but it gives away more fouls and leaves the defender on
+        // the floor when it misses. Worth it when he is the last man or the carrier
+        // is close to goal, not worth it in midfield with cover behind.
+        $slide = $this->commitsToSlide($state, $carrier, $defender);
+
+        $skill = 0.05 + max(0.0, $defender->attributes->tackling - $carrier->attributes->dribbling) / 400;
+        $threshold = $slide ? $skill * self::SLIDE_WIN : $skill;
+        $draw = $rng->next();
+        $win = $draw < $threshold;
+
+        // Recorded so a challenge can be inspected like any other decision: what
+        // the defender was worth, what the carrier was worth, and the draw.
+        $roll = new Roll(0.0, $skill, $slide ? self::SLIDE_WIN : 1.0, $threshold, $draw);
+
         if (! $win) {
-            // A mistimed challenge is sometimes a foul. Where it happens decides the
-            // restart: a penalty in the box, a direct free kick just outside it, or
-            // a possession free kick anywhere else.
-            if ($rng->next() < self::FOUL_CHANCE) {
-                $this->restarts->foul($state, $events, $rng, $minute, $carrier, $defender);
+            if ($slide) {
+                $defender->grounded = self::SLIDE_RECOVERY;
+            }
+
+            // A mistimed challenge is sometimes a foul, and a lunge far more often
+            // than a jockey. Where it happens decides the restart: a penalty in the
+            // box, a direct free kick just outside it, a possession free kick
+            // anywhere else.
+            if ($rng->next() < ($slide ? self::SLIDE_FOUL_CHANCE : self::STAND_FOUL_CHANCE)) {
+                $this->restarts->foul($state, $events, $rng, $minute, $carrier, $defender, $slide);
 
                 return true;
             }
@@ -304,10 +380,12 @@ final class PositionalEngine
             return false;
         }
 
-        $type = $carrier->pos->distanceTo(Geometry::goalOf($defender->side)) < 0.35
-            ? EventType::Clearance
-            : EventType::Tackle;
-        $events[] = Events::of($minute, $type, $defender, null, $carrier->pos, null, true);
+        $type = match (true) {
+            $carrier->pos->distanceTo(Geometry::goalOf($defender->side)) < 0.35 => EventType::Clearance,
+            $slide => EventType::SlideTackle,
+            default => EventType::Tackle,
+        };
+        $events[] = Events::of($minute, $type, $defender, null, $carrier->pos, null, true, null, $roll);
 
         $state->carrierId = $defender->id;
         $state->possessing = $defender->side;
