@@ -104,6 +104,7 @@ const props = defineProps<{
             outcome: string;
         }[];
     } | null;
+    ratings: { name: string; rating: number; motm: boolean }[] | null;
 }>();
 
 // A replay arrives whole: the match was re-simulated from its seed on the
@@ -831,6 +832,41 @@ onBeforeUnmount(() => {
 
         <!-- Management -->
         <div class="flex w-full flex-col gap-4 md:w-80">
+            <div
+                v-if="ratings && ratings.length"
+                class="rounded-xl border border-border p-3"
+            >
+                <h3 class="mb-2 text-sm font-semibold">Ratings</h3>
+                <ul class="flex flex-col gap-1">
+                    <li
+                        v-for="r in ratings"
+                        :key="r.name"
+                        class="flex items-center justify-between gap-2 text-xs"
+                    >
+                        <span class="truncate">
+                            {{ r.name }}
+                            <span
+                                v-if="r.motm"
+                                class="ml-1 rounded bg-primary/15 px-1 py-0.5 text-[10px] font-semibold text-primary"
+                                >MOTM</span
+                            >
+                        </span>
+                        <span
+                            class="font-mono tabular-nums"
+                            :class="
+                                r.rating >= 7.5
+                                    ? 'text-primary'
+                                    : r.rating < 5.5
+                                      ? 'text-destructive'
+                                      : 'text-muted-foreground'
+                            "
+                        >
+                            {{ r.rating.toFixed(1) }}
+                        </span>
+                    </li>
+                </ul>
+            </div>
+
             <div v-if="summary" class="rounded-xl border border-border p-3">
                 <h3 class="mb-2 text-sm font-semibold">Match stats</h3>
                 <div class="flex flex-col gap-1">

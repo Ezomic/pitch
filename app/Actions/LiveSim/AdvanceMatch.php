@@ -72,7 +72,7 @@ class AdvanceMatch
             'scorers' => [...$match->scorers ?? [], ...$scorers],
             // Tallied per slice and added on, because the events and frames behind
             // it are gone the moment this advance returns.
-            'summary' => $this->summary->merge($match->summary, $this->summary->ofSlice($result->events, $result->frames)),
+            'summary' => $this->summary->merge($match->summary, $this->summary->ofSlice($result->events, $result->frames, $this->identity($match))),
             'status' => $finished ? LiveMatch::FINISHED : LiveMatch::LIVE,
         ]);
 
@@ -107,6 +107,27 @@ class AdvanceMatch
             'tick' => $match->current_tick,
             'finished' => true,
         ];
+    }
+
+    /**
+     * Who each shirt belongs to for this slice: the manager's players by their
+     * squad id, the opposition by shirt. A substitution arrives as its own
+     * request and so always falls between slices, which is what lets a slice be
+     * attributed wholly to whoever was on the pitch for it.
+     *
+     * @return array<int, int|string>
+     */
+    private function identity(LiveMatch $match): array
+    {
+        $identity = [];
+        foreach ($match->players as $player) {
+            $id = (int) $player['s'] * 100 + (int) $player['slot'];
+            $identity[$id] = (int) $player['s'] === 0 && ($player['pid'] ?? null) !== null
+                ? (int) $player['pid']
+                : $id;
+        }
+
+        return $identity;
     }
 
     /**

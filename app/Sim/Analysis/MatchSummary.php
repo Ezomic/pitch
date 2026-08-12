@@ -29,18 +29,26 @@ final class MatchSummary
 
     /** The per-player counters a summary carries. */
     private const PLAYER_KEYS = [
-        'goals', 'shots', 'passes', 'passesCompleted', 'crosses',
+        'ticks', 'goals', 'shots', 'passes', 'passesCompleted', 'crosses',
         'tackles', 'interceptions', 'clearances', 'fouls', 'saves',
     ];
 
     /**
      * Tally one slice of a match.
      *
+     * A substitution always lands between slices, because it arrives as its own
+     * request, so every slice belongs wholly to one set of occupants. That is
+     * what makes it safe to attribute a slice's work to whoever was on the pitch
+     * for it: pass $identity to key a slot's contribution by the squad player in
+     * it, rather than by the shirt, which would credit a substitute's goals to
+     * the man he came on for.
+     *
      * @param  list<MatchEvent>  $events
      * @param  list<array{m: int, b: array{float, float}, c: int, s: int, p: list<array{float, float}>, j: bool, goal: int}>  $frames
+     * @param  array<int, int|string>  $identity  actor id => who that was, this slice
      * @return array<string, mixed>
      */
-    public function ofSlice(array $events, array $frames): array
+    public function ofSlice(array $events, array $frames, array $identity = []): array
     {
         $summary = self::empty();
 
@@ -52,11 +60,18 @@ final class MatchSummary
         foreach ($events as $index => $event) {
             $side = $event->actorId >= 100 ? 1 : 0;
             $this->countTeam($summary, $side, $event);
-            $this->countPlayer($summary, $event);
+            $this->countPlayer($summary, $identity[$event->actorId] ?? $event->actorId, $event);
 
             if ($event->type->isShot()) {
                 $summary['shots'][] = $this->shot($event, $side, $events, $index);
             }
+        }
+
+        // Time on the pitch, for everyone who was on it this slice. Without it a
+        // substitute could not be told apart from a starter who did nothing.
+        foreach ($identity as $who) {
+            $summary['players'][$who] ??= array_fill_keys(self::PLAYER_KEYS, 0);
+            $summary['players'][$who]['ticks'] += count($frames);
         }
 
         return $summary;
@@ -132,11 +147,10 @@ final class MatchSummary
     /**
      * @param  array<string, mixed>  $summary
      */
-    private function countPlayer(array &$summary, MatchEvent $event): void
+    private function countPlayer(array &$summary, int|string $who, MatchEvent $event): void
     {
-        $id = $event->actorId;
-        $summary['players'][$id] ??= array_fill_keys(self::PLAYER_KEYS, 0);
-        $player = &$summary['players'][$id];
+        $summary['players'][$who] ??= array_fill_keys(self::PLAYER_KEYS, 0);
+        $player = &$summary['players'][$who];
 
         match (true) {
             $event->type->isShot() => [$player['shots']++, $event->success ? $player['goals']++ : null],
