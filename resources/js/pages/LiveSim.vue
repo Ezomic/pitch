@@ -50,6 +50,19 @@ interface Moment {
     text: string;
     why?: MomentWhy | null;
 }
+interface TeamStats {
+    possession: number;
+    shots: number;
+    onTarget: number;
+    goals: number;
+    passes: number;
+    passAccuracy: number;
+    crosses: number;
+    fouls: number;
+    corners: number;
+    tackles: number;
+    saves: number;
+}
 interface BenchPlayer {
     id: number;
     name: string;
@@ -80,6 +93,17 @@ const props = defineProps<{
         awayGoals: number;
     } | null;
     replayUrl: string | null;
+    summary: {
+        teams: TeamStats[];
+        shots: {
+            minute: number;
+            side: 0 | 1;
+            actor: number;
+            x: number;
+            y: number;
+            outcome: string;
+        }[];
+    } | null;
 }>();
 
 // A replay arrives whole: the match was re-simulated from its seed on the
@@ -295,6 +319,19 @@ function watchReplay(): void {
     pause();
     router.get(props.replayUrl);
 }
+
+const STAT_ROWS: { key: keyof TeamStats; label: string; suffix?: string }[] = [
+    { key: 'possession', label: 'Possession', suffix: '%' },
+    { key: 'shots', label: 'Shots' },
+    { key: 'onTarget', label: 'On target' },
+    { key: 'passes', label: 'Passes' },
+    { key: 'passAccuracy', label: 'Pass accuracy', suffix: '%' },
+    { key: 'crosses', label: 'Crosses' },
+    { key: 'corners', label: 'Corners' },
+    { key: 'tackles', label: 'Tackles' },
+    { key: 'fouls', label: 'Fouls' },
+    { key: 'saves', label: 'Saves' },
+];
 
 function xsrf(): string {
     const m = document.cookie.match(/XSRF-TOKEN=([^;]+)/);
@@ -794,6 +831,29 @@ onBeforeUnmount(() => {
 
         <!-- Management -->
         <div class="flex w-full flex-col gap-4 md:w-80">
+            <div v-if="summary" class="rounded-xl border border-border p-3">
+                <h3 class="mb-2 text-sm font-semibold">Match stats</h3>
+                <div class="flex flex-col gap-1">
+                    <div
+                        v-for="row in STAT_ROWS"
+                        :key="row.key"
+                        class="grid grid-cols-[3rem_1fr_3rem] items-center gap-2 text-xs"
+                    >
+                        <span class="text-right font-mono tabular-nums">
+                            {{ summary.teams[0][row.key]
+                            }}{{ row.suffix ?? '' }}
+                        </span>
+                        <span class="text-center text-muted-foreground">{{
+                            row.label
+                        }}</span>
+                        <span class="font-mono tabular-nums">
+                            {{ summary.teams[1][row.key]
+                            }}{{ row.suffix ?? '' }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+
             <div class="rounded-xl border border-border p-3">
                 <h3 class="mb-2 text-sm font-semibold">Key moments</h3>
                 <ul class="flex max-h-56 flex-col gap-1 overflow-y-auto">
