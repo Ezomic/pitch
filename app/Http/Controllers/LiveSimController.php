@@ -18,6 +18,7 @@ use App\Models\LiveMatch;
 use App\Models\Player;
 use App\Models\Squad;
 use App\Models\User;
+use App\Sim\Analysis\MatchSummary;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -116,6 +117,9 @@ class LiveSimController extends Controller
             // rather than asking the server for the next slice.
             'replay' => $replay,
             'replayUrl' => $match->status === LiveMatch::FINISHED ? route('play.replay', $match) : null,
+            // What the match produced, tallied as it was played. Null until there
+            // is something to show.
+            'summary' => $match->summary !== null ? MatchSummary::forDisplay($match->summary) : null,
         ]);
     }
 

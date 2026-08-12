@@ -86,6 +86,7 @@ class StartMatch
             'players' => $this->live->players($names),
             'moments' => [],
             'scorers' => [],
+            'summary' => null,
             'interventions' => [],
             'subs_remaining' => 5,
             'status' => LiveMatch::LIVE,

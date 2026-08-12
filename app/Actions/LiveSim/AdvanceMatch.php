@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Actions\LiveSim;
 
 use App\Models\LiveMatch;
+use App\Sim\Analysis\MatchSummary;
 use App\Sim\Engine\Rng;
 use App\Sim\Pitch\LivePitch;
 use App\Sim\Pitch\PitchState;
@@ -21,6 +22,7 @@ class AdvanceMatch
         private readonly PositionalEngine $engine = new PositionalEngine,
         private readonly LivePitch $live = new LivePitch,
         private readonly FinishFixture $finishFixture = new FinishFixture,
+        private readonly MatchSummary $summary = new MatchSummary,
     ) {}
 
     /**
@@ -68,6 +70,9 @@ class AdvanceMatch
             'away_goals' => $result->awayGoals,
             'moments' => array_merge($match->moments, $moments),
             'scorers' => [...$match->scorers ?? [], ...$scorers],
+            // Tallied per slice and added on, because the events and frames behind
+            // it are gone the moment this advance returns.
+            'summary' => $this->summary->merge($match->summary, $this->summary->ofSlice($result->events, $result->frames)),
             'status' => $finished ? LiveMatch::FINISHED : LiveMatch::LIVE,
         ]);
 
