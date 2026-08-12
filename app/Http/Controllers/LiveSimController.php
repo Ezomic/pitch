@@ -18,6 +18,7 @@ use App\Models\LiveMatch;
 use App\Models\Player;
 use App\Models\Squad;
 use App\Models\User;
+use App\Sim\Analysis\MatchRatings;
 use App\Sim\Analysis\MatchSummary;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -120,7 +121,41 @@ class LiveSimController extends Controller
             // What the match produced, tallied as it was played. Null until there
             // is something to show.
             'summary' => $match->summary !== null ? MatchSummary::forDisplay($match->summary) : null,
+            // How everyone did, read off what they contributed.
+            'ratings' => $match->summary !== null ? $this->ratings($match) : null,
         ]);
+    }
+
+    /**
+     * The manager's own players, rated, best first. The opposition is unnamed,
+     * so rating them would say nothing.
+     *
+     * @return list<array{name: string, rating: float, motm: bool}>
+     */
+    private function ratings(LiveMatch $match): array
+    {
+        $names = [];
+        foreach ($match->players as $player) {
+            if ((int) $player['s'] === 0 && ($player['pid'] ?? null) !== null) {
+                $names[(int) $player['pid']] = $player['name'] ?? 'Unknown';
+            }
+        }
+
+        $ratings = new MatchRatings;
+        $best = $ratings->playerOfTheMatch($match->summary ?? [], fn ($who): bool => isset($names[$who]));
+
+        $rows = [];
+        foreach ($ratings->forMatch($match->summary ?? []) as $who => $rating) {
+            if (! isset($names[$who])) {
+                continue;
+            }
+
+            $rows[] = ['name' => $names[$who], 'rating' => $rating, 'motm' => $best !== null && $best['who'] === $who];
+        }
+
+        usort($rows, fn (array $a, array $b): int => $b['rating'] <=> $a['rating']);
+
+        return $rows;
     }
 
     /**
