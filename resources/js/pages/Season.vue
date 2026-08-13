@@ -19,6 +19,19 @@ interface PreseasonMatch {
     opponentGoals: number | null;
 }
 
+interface SeasonReview {
+    position: number;
+    teams: number;
+    verdict: string;
+    topScorers: { name: string; goals: number }[];
+    mostAppearances: { name: string; appearances: number }[];
+    playerOfTheSeason: {
+        name: string;
+        rating: number;
+        appearances: number;
+    } | null;
+}
+
 const props = defineProps<{
     seasonNumber: number;
     division: number;
@@ -40,6 +53,7 @@ const props = defineProps<{
         scoutUrl: string;
     } | null;
     complete: boolean;
+    review: SeasonReview | null;
 }>();
 
 defineOptions({
@@ -144,6 +158,12 @@ const columns: { key: keyof StandingRow; label: string }[] = [
                         You finished {{ userPosition() }} of
                         {{ props.standings.length }}
                     </p>
+                    <p
+                        v-if="props.review"
+                        class="mt-1 text-sm text-muted-foreground"
+                    >
+                        {{ props.review.verdict }}
+                    </p>
                 </div>
 
                 <template v-if="props.liveFixture">
@@ -222,6 +242,71 @@ const columns: { key: keyof StandingRow; label: string }[] = [
                         >{{ match.userGoals }}-{{ match.opponentGoals }}</span
                     >
                     <span v-else class="ml-1 text-muted-foreground">—</span>
+                </div>
+            </div>
+        </div>
+
+        <div
+            v-if="props.review"
+            class="rounded-xl border border-sidebar-border/70 p-4 dark:border-sidebar-border"
+        >
+            <h2 class="mb-3 text-sm font-medium text-muted-foreground">
+                Season {{ props.seasonNumber }} review
+            </h2>
+            <div class="grid gap-4 sm:grid-cols-3">
+                <div>
+                    <h3 class="mb-1 text-xs font-semibold">
+                        Player of the season
+                    </h3>
+                    <p v-if="props.review.playerOfTheSeason" class="text-sm">
+                        {{ props.review.playerOfTheSeason.name }}
+                        <span class="text-muted-foreground">
+                            {{
+                                props.review.playerOfTheSeason.rating.toFixed(1)
+                            }}
+                            over
+                            {{ props.review.playerOfTheSeason.appearances }}
+                        </span>
+                    </p>
+                    <p v-else class="text-sm text-muted-foreground">
+                        Nobody played enough matches.
+                    </p>
+                </div>
+                <div>
+                    <h3 class="mb-1 text-xs font-semibold">Top scorers</h3>
+                    <ul
+                        v-if="props.review.topScorers.length"
+                        class="flex flex-col gap-0.5 text-sm"
+                    >
+                        <li
+                            v-for="s in props.review.topScorers"
+                            :key="s.name"
+                            class="flex justify-between gap-2"
+                        >
+                            <span class="truncate">{{ s.name }}</span>
+                            <span class="font-mono tabular-nums">{{
+                                s.goals
+                            }}</span>
+                        </li>
+                    </ul>
+                    <p v-else class="text-sm text-muted-foreground">
+                        Nobody scored.
+                    </p>
+                </div>
+                <div>
+                    <h3 class="mb-1 text-xs font-semibold">Most appearances</h3>
+                    <ul class="flex flex-col gap-0.5 text-sm">
+                        <li
+                            v-for="a in props.review.mostAppearances"
+                            :key="a.name"
+                            class="flex justify-between gap-2"
+                        >
+                            <span class="truncate">{{ a.name }}</span>
+                            <span class="font-mono tabular-nums">{{
+                                a.appearances
+                            }}</span>
+                        </li>
+                    </ul>
                 </div>
             </div>
         </div>

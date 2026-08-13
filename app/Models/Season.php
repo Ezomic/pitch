@@ -18,10 +18,11 @@ use Illuminate\Support\Carbon;
  * @property Carbon $starts_on
  * @property Carbon $current_date
  * @property Carbon|null $completed_at
+ * @property array<string, mixed>|null $review
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['user_id', 'career_id', 'number', 'division', 'starts_on', 'current_date', 'completed_at'])]
+#[Fillable(['user_id', 'career_id', 'number', 'division', 'starts_on', 'current_date', 'completed_at', 'review'])]
 class Season extends Model
 {
     /** The campaign always kicks off on this date; matchdays fall one week apart. */
@@ -45,6 +46,7 @@ class Season extends Model
             'division' => 'integer',
             'starts_on' => 'date',
             'current_date' => 'date',
+            'review' => 'array',
             'completed_at' => 'datetime',
         ];
     }

@@ -6,6 +6,7 @@ namespace App\Actions\LiveSim;
 
 use App\Actions\News\RecordNews;
 use App\Actions\Season\ApplyMatchCondition;
+use App\Actions\Season\RecordSeasonContribution;
 use App\Models\Fixture;
 use App\Models\LiveMatch;
 use App\Models\News;
@@ -24,6 +25,7 @@ class FinishFixture
     public function __construct(
         private readonly ApplyMatchCondition $applyMatchCondition = new ApplyMatchCondition,
         private readonly RecordNews $recordNews = new RecordNews,
+        private readonly RecordSeasonContribution $recordContribution = new RecordSeasonContribution,
     ) {}
 
     public function handle(LiveMatch $match): void
@@ -50,6 +52,10 @@ class FinishFixture
         $opponent = Team::find($opponentId);
 
         $this->recordResult($match, $fixture, $opponent instanceof Team ? $opponent->name : 'a rival');
+
+        // Fold this match into the season's record while it still exists: live
+        // matches are pruned a week after they finish.
+        $this->recordContribution->handle($fixture->season, $match);
 
         $this->applyMatchCondition->handle(
             $this->lineup($match),
