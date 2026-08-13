@@ -27,7 +27,7 @@ class Standings
 
         // The academy plays its own age-group league, which the senior star ratings
         // do not describe, so only senior tables carry them.
-        $rated = $youth ? [] : $this->rateClubs->handle(Squad::query()->where('user_id', $season->user_id)->first());
+        $rated = $youth ? [] : $this->rateClubs->handle(Squad::query()->where('career_id', $season->career_id)->first());
 
         $teams = Team::query()->where('is_youth', $youth)->orderBy('id');
 

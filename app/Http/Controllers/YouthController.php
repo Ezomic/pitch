@@ -27,7 +27,7 @@ class YouthController extends Controller
         $season = $ensureSeason->handle($user);
 
         $prospects = Player::query()
-            ->where('user_id', $user->id)
+            ->where('career_id', $user->currentCareerId())
             ->where('is_youth', true)
             ->orderByDesc('potential')
             ->orderByDesc('age')

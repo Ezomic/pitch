@@ -49,7 +49,7 @@ class AdvanceWeek
         }
 
         $this->developPlayers->handle(
-            Player::query()->where('user_id', $season->user_id)->where('is_youth', true)->get()
+            Player::query()->where('career_id', $season->career_id)->where('is_youth', true)->get()
         );
 
         $this->mentorYouth->handle($season);

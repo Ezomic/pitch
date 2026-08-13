@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToCareer;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -13,6 +14,7 @@ use Illuminate\Support\Carbon;
 /**
  * @property int $id
  * @property int $user_id
+ * @property int|null $career_id
  * @property int|null $season_id
  * @property string $category
  * @property string $title
@@ -25,6 +27,8 @@ use Illuminate\Support\Carbon;
 #[Fillable(['user_id', 'career_id', 'season_id', 'category', 'title', 'body', 'payload', 'read_at', 'resolved_at'])]
 class News extends Model
 {
+    use BelongsToCareer;
+
     protected $table = 'news';
 
     public const string RESULT = 'result';

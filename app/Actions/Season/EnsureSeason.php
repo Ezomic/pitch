@@ -35,6 +35,7 @@ class EnsureSeason
 
             $season = Season::create([
                 'user_id' => $user->id,
+                'career_id' => $user->currentCareerId(),
                 'number' => 1,
                 'division' => $squad !== null ? $squad->division : Squad::DEFAULT_DIVISION,
                 'starts_on' => Season::STARTS_ON,

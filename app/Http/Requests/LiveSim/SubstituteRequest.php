@@ -60,7 +60,7 @@ class SubstituteRequest extends FormRequest
 
                 // authorize() has already matched the match to this user, so by
                 // the time these run there is one.
-                $player = Player::query()->selectableFor($this->user()->id)
+                $player = Player::query()->selectableFor($this->user()->currentCareerId())
                     ->find($this->integer('player_id'));
 
                 if (! $player instanceof Player) {

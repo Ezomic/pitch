@@ -29,10 +29,11 @@ class EnsureSquad
         return DB::transaction(function () use ($user): Squad {
             $squad = Squad::create([
                 'user_id' => $user->id,
+                'career_id' => $user->currentCareerId(),
                 'budget' => Squad::DEFAULT_BUDGET,
             ]);
 
-            $pool = Player::query()->selectableFor($user->id)->get()
+            $pool = Player::query()->selectableFor($user->currentCareerId())->get()
                 ->sortBy(fn (Player $p) => $p->value())->values();
             $used = [];
 
@@ -51,11 +52,11 @@ class EnsureSquad
                 ]);
             }
 
-            $keeper = Player::query()->selectableFor($user->id)
+            $keeper = Player::query()->selectableFor($user->currentCareerId())
                 ->where('position', Position::Goalkeeper)
                 ->orderByDesc('handling')->first();
 
-            $taker = Player::query()->selectableFor($user->id)
+            $taker = Player::query()->selectableFor($user->currentCareerId())
                 ->where('position', '!=', Position::Goalkeeper)
                 ->orderByRaw('(passing + finishing) desc')->first();
 

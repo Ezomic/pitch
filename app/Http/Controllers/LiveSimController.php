@@ -73,7 +73,7 @@ class LiveSimController extends Controller
         // Drawn from the same pool the lineup was picked from. Filtering on
         // user_id alone left the bench empty for a default squad, whose players
         // are unowned pool players, so no substitution could ever be made.
-        $bench = Player::query()->selectableFor($user->id)->whereNotIn('id', $lineupIds)
+        $bench = Player::query()->selectableFor($user->currentCareerId())->whereNotIn('id', $lineupIds)
             ->orderBy('position')->orderBy('name')->get()
             ->map(fn (Player $player) => [
                 'id' => $player->id,
@@ -219,7 +219,7 @@ class LiveSimController extends Controller
     {
         $user = $this->authorizeMatch($request, $match);
 
-        $player = Player::query()->selectableFor($user->id)
+        $player = Player::query()->selectableFor($user->currentCareerId())
             ->where('id', $request->integer('player_id'))->firstOrFail();
         $substitute->handle($match, $request->integer('out_slot'), $player);
 

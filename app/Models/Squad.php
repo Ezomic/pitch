@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToCareer;
 use App\Sim\Domain\Attributes;
 use App\Sim\Engine\Formation;
 use App\Sim\Engine\Mentality;
@@ -18,6 +19,7 @@ use Illuminate\Support\Carbon;
 /**
  * @property int $id
  * @property int $user_id
+ * @property int|null $career_id
  * @property string $name
  * @property int $budget
  * @property int $bank
@@ -34,6 +36,8 @@ use Illuminate\Support\Carbon;
 #[Fillable(['user_id', 'career_id', 'name', 'budget', 'bank', 'weekly_income', 'division', 'goalkeeper_id', 'set_piece_taker_id', 'formation', 'mentality', 'custom_formation'])]
 class Squad extends Model
 {
+    use BelongsToCareer;
+
     /** The keeper rating used when no goalkeeper is assigned: a stand-in reserve. */
     public const int DEFAULT_KEEPING = 45;
 

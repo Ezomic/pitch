@@ -19,7 +19,7 @@ class TrainingController extends Controller
         $user = $this->user($request);
 
         $seniors = Player::query()
-            ->where('user_id', $user->id)
+            ->where('career_id', $user->currentCareerId())
             ->where('is_youth', false)
             ->orderByDesc('potential')
             ->orderBy('name')

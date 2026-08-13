@@ -75,7 +75,7 @@ class Fixture extends Model
      */
     public static function dueFor(User $user): ?self
     {
-        $season = Season::query()->where('user_id', $user->id)->whereNull('completed_at')->latest('id')->first();
+        $season = Season::query()->where('career_id', $user->currentCareerId())->whereNull('completed_at')->latest('id')->first();
 
         if (! $season instanceof Season) {
             return null;

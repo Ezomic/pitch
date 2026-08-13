@@ -21,7 +21,7 @@ class ProcessLoans
     public function handle(Season $season): void
     {
         $loaned = Player::query()
-            ->where('user_id', $season->user_id)
+            ->where('career_id', $season->career_id)
             ->where('is_youth', true)
             ->where('on_loan', true)
             ->get();

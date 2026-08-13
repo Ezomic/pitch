@@ -21,7 +21,7 @@ class AssignKeeper
      */
     public function handle(Squad $squad, Player $keeper): void
     {
-        $selectable = Player::query()->selectableFor($squad->user_id)
+        $selectable = Player::query()->selectableFor($squad->career_id)
             ->where('position', Position::Goalkeeper)
             ->whereKey($keeper->id)
             ->exists();

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToCareer;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -13,6 +14,7 @@ use Illuminate\Support\Carbon;
 /**
  * @property int $id
  * @property int $user_id
+ * @property int|null $career_id
  * @property int $number
  * @property int $division
  * @property Carbon $starts_on
@@ -25,6 +27,8 @@ use Illuminate\Support\Carbon;
 #[Fillable(['user_id', 'career_id', 'number', 'division', 'starts_on', 'current_date', 'completed_at', 'review'])]
 class Season extends Model
 {
+    use BelongsToCareer;
+
     /** The campaign always kicks off on this date; matchdays fall one week apart. */
     public const string STARTS_ON = '2025-08-09';
 
