@@ -49,7 +49,7 @@ class StartMatch
         // mark it abandoned rather than leaving a second 'live' row behind: only
         // one match is ever in progress, and the pruner knows what to clear up.
         LiveMatch::query()
-            ->where('user_id', $user->id)
+            ->where('career_id', $user->currentCareerId())
             ->where('status', LiveMatch::LIVE)
             ->update(['status' => LiveMatch::ABANDONED]);
 
@@ -71,6 +71,7 @@ class StartMatch
 
         return LiveMatch::create([
             'user_id' => $user->id,
+            'career_id' => $user->currentCareerId(),
             'fixture_id' => $fixture?->id,
             'seed' => $seed,
             'current_tick' => 0,

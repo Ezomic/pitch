@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToCareer;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -30,6 +31,7 @@ use Illuminate\Support\Carbon;
  * @property array<int, array<string, mixed>> $moments
  * @property array<int, array{minute: int, slot: int}>|null $scorers
  * @property array<string, mixed>|null $summary
+ * @property int|null $career_id
  * @property int|null $fixture_id
  * @property array<string, mixed>|null $kickoff_state
  * @property array<int, array<string, mixed>>|null $interventions
@@ -45,6 +47,8 @@ use Illuminate\Support\Carbon;
 ])]
 class LiveMatch extends Model
 {
+    use BelongsToCareer;
+
     /** Still being played out: the one match a manager can resume. */
     public const string LIVE = 'live';
 
@@ -79,7 +83,7 @@ class LiveMatch extends Model
     public static function inProgressFor(User $user): ?self
     {
         return self::query()
-            ->where('user_id', $user->id)
+            ->where('career_id', $user->currentCareerId())
             ->where('status', self::LIVE)
             ->latest('id')
             ->first();

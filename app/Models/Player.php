@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToCareer;
 use App\Sim\Domain\Attributes;
 use App\Sim\Domain\Position;
 use Database\Factories\PlayerFactory;
@@ -17,6 +18,7 @@ use Illuminate\Support\Carbon;
 /**
  * @property int $id
  * @property int|null $user_id
+ * @property int|null $career_id
  * @property bool $is_free_agent
  * @property string $name
  * @property Position $position
@@ -46,6 +48,8 @@ use Illuminate\Support\Carbon;
 #[Fillable(['user_id', 'career_id', 'is_free_agent', 'name', 'position', 'age', 'potential', 'is_youth', 'training_focus', 'vision', 'passing', 'dribbling', 'finishing', 'tackling', 'pace', 'handling', 'fitness', 'form', 'trait', 'injured_weeks', 'yellow_cards', 'suspended_weeks', 'contract_years', 'on_loan', 'loan_weeks_remaining'])]
 class Player extends Model
 {
+    use BelongsToCareer;
+
     /** @use HasFactory<PlayerFactory> */
     use HasFactory;
 
@@ -128,13 +132,31 @@ class Player extends Model
      *
      * @param  Builder<Player>  $query
      */
-    public function scopeSelectableFor(Builder $query, int $userId): void
+    /**
+     * The players a career can field: its own, and any in its world not yet
+     * claimed by a squad. Scoped by career rather than by user, so one save
+     * cannot pick from another's pool.
+     */
+    /**
+     * @param  Builder<self>  $query
+     */
+    public function scopeSelectableFor(Builder $query, int $careerId): void
     {
         $query->where('is_youth', false)
             ->where('is_free_agent', false)
             ->where('injured_weeks', 0)
             ->where('suspended_weeks', 0)
-            ->where(fn (Builder $scoped) => $scoped->whereNull('user_id')->orWhere('user_id', $userId));
+            ->where(fn (Builder $scoped) => $scoped->whereNull('career_id')->orWhere('career_id', $careerId));
+    }
+
+    /**
+     * Everything belonging to one save, owned or in its pool.
+     *
+     * @param  Builder<self>  $query
+     */
+    public function scopeOfCareer(Builder $query, int $careerId): void
+    {
+        $query->where('career_id', $careerId);
     }
 
     public function attributes(): Attributes

@@ -17,6 +17,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
 
 /**
  * @property int $id
+ * @property int|null $current_career_id
  * @property string $name
  * @property string $email
  * @property Carbon|null $email_verified_at
@@ -29,7 +30,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['name', 'email'])]
+#[Fillable(['name', 'email', 'current_career_id'])]
 #[Hidden(['login_code_hash', 'two_factor_secret', 'two_factor_recovery_codes', 'remember_token'])]
 class User extends Authenticatable implements PasskeyUser
 {
@@ -37,11 +38,48 @@ class User extends Authenticatable implements PasskeyUser
     use HasFactory, Notifiable, PasskeyAuthenticatable, TwoFactorAuthenticatable;
 
     /**
+     * The save being played. A manager can hold several independent careers, so
+     * everything below is scoped to this one rather than to the user: two saves
+     * must never see each other's squad, season or players.
+     *
+     * Resolved lazily and remembered, so a manager who has never started one is
+     * not a special case anywhere else.
+     */
+    public function currentCareer(): Career
+    {
+        $career = $this->current_career_id !== null
+            ? Career::query()->whereKey($this->current_career_id)->where('user_id', $this->id)->first()
+            : null;
+
+        $career ??= $this->careers()->orderBy('id')->first();
+
+        if ($career === null) {
+            $career = $this->careers()->create([
+                'name' => 'My career',
+                'type' => Career::SOLO,
+                'status' => 'active',
+                'last_played_at' => now(),
+            ]);
+        }
+
+        if ($this->current_career_id !== $career->id) {
+            $this->forceFill(['current_career_id' => $career->id])->save();
+        }
+
+        return $career;
+    }
+
+    public function currentCareerId(): int
+    {
+        return $this->currentCareer()->id;
+    }
+
+    /**
      * @return HasOne<Squad, $this>
      */
     public function squad(): HasOne
     {
-        return $this->hasOne(Squad::class);
+        return $this->hasOne(Squad::class)->where('career_id', $this->currentCareerId());
     }
 
     /**
@@ -52,7 +90,9 @@ class User extends Authenticatable implements PasskeyUser
      */
     public function season(): HasOne
     {
-        return $this->hasOne(Season::class)->whereNull('completed_at');
+        return $this->hasOne(Season::class)
+            ->where('career_id', $this->currentCareerId())
+            ->whereNull('completed_at');
     }
 
     /**
@@ -60,7 +100,7 @@ class User extends Authenticatable implements PasskeyUser
      */
     public function seasons(): HasMany
     {
-        return $this->hasMany(Season::class);
+        return $this->hasMany(Season::class)->where('career_id', $this->currentCareerId());
     }
 
     /**
@@ -78,7 +118,7 @@ class User extends Authenticatable implements PasskeyUser
      */
     public function scouts(): HasMany
     {
-        return $this->hasMany(Scout::class);
+        return $this->hasMany(Scout::class)->where('career_id', $this->currentCareerId());
     }
 
     /**

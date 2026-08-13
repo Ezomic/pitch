@@ -21,7 +21,7 @@ class AssignSetPieceTaker
      */
     public function handle(Squad $squad, Player $taker): void
     {
-        $selectable = Player::query()->selectableFor($squad->user_id)
+        $selectable = Player::query()->selectableFor($squad->career_id)
             ->where('position', '!=', Position::Goalkeeper)
             ->whereKey($taker->id)
             ->exists();

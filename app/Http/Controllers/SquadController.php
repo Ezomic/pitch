@@ -225,7 +225,7 @@ class SquadController extends Controller
     {
         $keepers = [];
         foreach (Player::query()
-            ->selectableFor($squad->user_id)
+            ->selectableFor($squad->career_id)
             ->where('position', Position::Goalkeeper)
             ->orderByDesc('handling')
             ->get() as $keeper) {
@@ -252,7 +252,7 @@ class SquadController extends Controller
     {
         $takers = [];
         foreach (Player::query()
-            ->selectableFor($squad->user_id)
+            ->selectableFor($squad->career_id)
             ->where('position', '!=', Position::Goalkeeper)
             ->orderByRaw('(passing + finishing) desc')
             ->get() as $taker) {
@@ -309,7 +309,7 @@ class SquadController extends Controller
         $assignedSlot = $squad->assignments->keyBy('player_id');
 
         $players = Player::query()
-            ->selectableFor($squad->user_id)
+            ->selectableFor($squad->career_id)
             ->where('position', '!=', Position::Goalkeeper)
             ->orderBy('position')
             ->orderBy('name')
@@ -317,7 +317,7 @@ class SquadController extends Controller
 
         // The user's own injured or suspended players are shown too, greyed out.
         $unavailable = Player::query()
-            ->where('user_id', $squad->user_id)
+            ->where('career_id', $squad->career_id)
             ->where('is_youth', false)
             ->where(fn ($query) => $query->where('injured_weeks', '>', 0)->orWhere('suspended_weeks', '>', 0))
             ->orderBy('name')

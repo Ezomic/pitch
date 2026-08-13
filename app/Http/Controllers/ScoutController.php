@@ -34,7 +34,7 @@ class ScoutController extends Controller
         return Inertia::render('Scouting', [
             'budget' => $squad->budget,
             'currentDate' => $season->current_date->toDateString(),
-            'academyCount' => Player::query()->where('user_id', $user->id)->where('is_youth', true)->count(),
+            'academyCount' => Player::query()->where('career_id', $user->currentCareerId())->where('is_youth', true)->count(),
             'staff' => $scouts->whereNotIn('status', [ScoutStatus::Available])->values()
                 ->map(fn (Scout $scout) => $this->scout($scout))->all(),
             'market' => $scouts->where('status', ScoutStatus::Available)->values()

@@ -22,7 +22,7 @@ class DeliverProspects
         $current = CarbonImmutable::parse($season->current_date);
 
         $scouts = Scout::query()
-            ->where('user_id', $season->user_id)
+            ->where('career_id', $season->career_id)
             ->scouting()
             ->whereNotNull('next_delivery_on')
             ->whereDate('next_delivery_on', '<=', $current)
@@ -44,6 +44,7 @@ class DeliverProspects
 
         Player::create([
             'user_id' => $scout->user_id,
+            'career_id' => $scout->career_id,
             'name' => fake()->name(),
             'position' => fake()->randomElement([Position::Defender, Position::Midfielder, Position::Forward]),
             'age' => random_int(12, 18),

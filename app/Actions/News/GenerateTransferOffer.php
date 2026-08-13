@@ -26,7 +26,7 @@ class GenerateTransferOffer
 
     public function handle(Season $season): void
     {
-        if (News::query()->where('user_id', $season->user_id)->openOffers()->exists()) {
+        if (News::query()->where('career_id', $season->career_id)->openOffers()->exists()) {
             return;
         }
 
@@ -38,7 +38,7 @@ class GenerateTransferOffer
         }
 
         $target = Player::query()
-            ->where('user_id', $season->user_id)
+            ->where('career_id', $season->career_id)
             ->where('is_youth', false)
             ->orderByDesc('vision')
             ->first();

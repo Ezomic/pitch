@@ -19,7 +19,7 @@ class NewsController extends Controller
     {
         $user = $this->user($request);
 
-        $items = News::query()->where('user_id', $user->id)
+        $items = News::query()->where('career_id', $user->currentCareerId())
             ->orderByDesc('created_at')->orderByDesc('id')
             ->limit(60)->get();
 
@@ -36,7 +36,7 @@ class NewsController extends Controller
         ])->all();
 
         // Mark everything bar still-open offers as read now they have been seen.
-        News::query()->where('user_id', $user->id)
+        News::query()->where('career_id', $user->currentCareerId())
             ->whereNull('read_at')
             ->where(fn ($query) => $query->where('category', '!=', News::OFFER)->orWhereNotNull('resolved_at'))
             ->update(['read_at' => now()]);

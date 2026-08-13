@@ -26,7 +26,7 @@ class AgePlayers
 
     public function handle(User $user): void
     {
-        foreach (Player::query()->where('user_id', $user->id)->get() as $player) {
+        foreach (Player::query()->where('career_id', $user->currentCareerId())->get() as $player) {
             $age = $player->age + 1;
             $update = ['age' => $age];
 

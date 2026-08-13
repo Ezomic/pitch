@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use App\Enums\ScoutStatus;
+use App\Models\Concerns\BelongsToCareer;
 use Database\Factories\ScoutFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Builder;
@@ -16,6 +17,7 @@ use Illuminate\Support\Carbon;
 /**
  * @property int $id
  * @property int $user_id
+ * @property int|null $career_id
  * @property string $name
  * @property int $rating
  * @property ScoutStatus $status
@@ -26,6 +28,8 @@ use Illuminate\Support\Carbon;
 #[Fillable(['user_id', 'career_id', 'name', 'rating', 'status', 'next_delivery_on'])]
 class Scout extends Model
 {
+    use BelongsToCareer;
+
     /** @use HasFactory<ScoutFactory> */
     use HasFactory;
 

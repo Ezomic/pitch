@@ -53,7 +53,7 @@ class BuildYouthTeam
     private function prospects(User $user): Collection
     {
         return Player::query()
-            ->where('user_id', $user->id)
+            ->where('career_id', $user->currentCareerId())
             ->where('is_youth', true)
             ->where('on_loan', false)
             ->get()

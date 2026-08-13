@@ -23,7 +23,7 @@ class MentorYouth
     public function handle(Season $season): void
     {
         $seniors = Player::query()
-            ->where('user_id', $season->user_id)
+            ->where('career_id', $season->career_id)
             ->where('is_youth', false)
             ->get();
 
@@ -34,7 +34,7 @@ class MentorYouth
         }
 
         $this->developPlayers->handle(
-            Player::query()->where('user_id', $season->user_id)->where('is_youth', true)->get()
+            Player::query()->where('career_id', $season->career_id)->where('is_youth', true)->get()
         );
     }
 }

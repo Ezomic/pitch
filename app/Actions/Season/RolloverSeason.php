@@ -40,6 +40,7 @@ class RolloverSeason
 
             $next = Season::create([
                 'user_id' => $current->user_id,
+                'career_id' => $current->career_id,
                 'number' => $current->number + 1,
                 'division' => $squad->division,
                 'starts_on' => Season::STARTS_ON,

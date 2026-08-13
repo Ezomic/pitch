@@ -18,7 +18,7 @@ class TrainSeniors
     public function handle(Season $season): void
     {
         $seniors = Player::query()
-            ->where('user_id', $season->user_id)
+            ->where('career_id', $season->career_id)
             ->where('is_youth', false)
             ->whereNotNull('training_focus')
             ->where('injured_weeks', 0)

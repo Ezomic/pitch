@@ -16,7 +16,7 @@ class RecoverCondition
 {
     public function handle(Season $season): void
     {
-        $players = Player::query()->where('user_id', $season->user_id)->get();
+        $players = Player::query()->where('career_id', $season->career_id)->get();
 
         foreach ($players as $player) {
             $fitness = min(Player::FITNESS_MAX, $player->fitness + Player::WEEKLY_RECOVERY);

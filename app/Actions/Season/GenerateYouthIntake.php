@@ -21,6 +21,7 @@ class GenerateYouthIntake
         for ($i = 0; $i < self::COUNT; $i++) {
             Player::create([
                 'user_id' => $user->id,
+                'career_id' => $user->currentCareerId(),
                 'name' => fake()->name(),
                 'position' => fake()->randomElement([Position::Defender, Position::Midfielder, Position::Forward]),
                 'age' => random_int(15, 17),
