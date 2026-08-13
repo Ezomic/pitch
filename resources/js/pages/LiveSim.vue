@@ -3,6 +3,7 @@ import { Head, router } from '@inertiajs/vue3';
 import { Pause, Play, Repeat, RotateCcw, Trophy } from '@lucide/vue';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import ClubStars from '@/components/ClubStars.vue';
+import MatchShotMap from '@/components/match/MatchShotMap.vue';
 import {
     advance,
     mentality as mentalityRoute,
@@ -865,6 +866,18 @@ onBeforeUnmount(() => {
                         </span>
                     </li>
                 </ul>
+            </div>
+
+            <div
+                v-if="summary && summary.shots.length"
+                class="rounded-xl border border-border p-3"
+            >
+                <h3 class="mb-2 text-sm font-semibold">Shot map</h3>
+                <MatchShotMap
+                    :shots="summary.shots"
+                    :home-name="homeName"
+                    :away-name="awayName"
+                />
             </div>
 
             <div v-if="summary" class="rounded-xl border border-border p-3">
