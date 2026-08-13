@@ -7,6 +7,7 @@ import {
     FlaskConical,
     Gamepad2,
     LayoutGrid,
+    Library,
     Medal,
     Newspaper,
     Scale,
@@ -29,6 +30,7 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
+import { index as careersIndex } from '@/routes/careers';
 import { show as cupShow } from '@/routes/cup';
 import { show as matchShow } from '@/routes/match';
 import { index as newsIndex } from '@/routes/news';
@@ -50,6 +52,11 @@ const mainNavItems: NavItem[] = [
         title: 'Dashboard',
         href: dashboard(),
         icon: LayoutGrid,
+    },
+    {
+        title: 'Careers',
+        href: careersIndex(),
+        icon: Library,
     },
     {
         title: 'Squad',
