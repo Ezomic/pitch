@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace App\Actions\LiveSim;
 
 use App\Models\LiveMatch;
+use App\Sim\Domain\Zone;
+use App\Sim\Engine\Formation;
 use App\Sim\Engine\Rng;
+use App\Sim\Pitch\KickOff;
 use App\Sim\Pitch\LivePitch;
 use App\Sim\Pitch\PitchState;
 use App\Sim\Pitch\PositionalEngine;
@@ -36,6 +39,7 @@ class ReplayMatch
     public function __construct(
         private readonly PositionalEngine $engine = new PositionalEngine,
         private readonly LivePitch $live = new LivePitch,
+        private readonly KickOff $kickOff = new KickOff,
     ) {}
 
     /**
@@ -108,6 +112,33 @@ class ReplayMatch
     }
 
     /**
+     * Put the manager's side into a shape, the way SetFormation does to the
+     * stored state: anchors and nominal positions only, so nobody is moved.
+     */
+    private function reshape(PitchState $state, Formation $formation): PitchState
+    {
+        $anchors = [];
+        foreach ($formation->layout as $slot => [$zone, $position]) {
+            $anchors[$slot] = [
+                $this->kickOff->anchor(0, $zone->x / Zone::MAX_X, $zone->y / Zone::MAX_Y)->pair(),
+                $position->value,
+            ];
+        }
+
+        $snapshot = $state->toSnapshot();
+        foreach ($snapshot['players'] as &$player) {
+            $slot = (int) $player['slot'];
+
+            if ((int) $player['side'] === 0 && isset($anchors[$slot])) {
+                [$player['anchor'], $player['pos']] = $anchors[$slot];
+            }
+        }
+        unset($player);
+
+        return PitchState::fromSnapshot($snapshot);
+    }
+
+    /**
      * A player's attributes are readonly on PlayerState, so a substitution is
      * applied to the snapshot and the state rebuilt from it. That is exactly
      * what the live Substitute action does to the stored state, which is why
@@ -121,6 +152,10 @@ class ReplayMatch
             $state->homeMentality = (string) $intervention['value'];
 
             return $state;
+        }
+
+        if ($intervention['type'] === 'formation') {
+            return $this->reshape($state, Formation::fromId((string) $intervention['value']));
         }
 
         $slot = (int) $intervention['slot'];

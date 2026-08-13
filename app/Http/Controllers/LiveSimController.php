@@ -6,11 +6,13 @@ namespace App\Http\Controllers;
 
 use App\Actions\LiveSim\AdvanceMatch;
 use App\Actions\LiveSim\ReplayMatch;
+use App\Actions\LiveSim\SetFormation;
 use App\Actions\LiveSim\SetMentality;
 use App\Actions\LiveSim\StartMatch;
 use App\Actions\LiveSim\Substitute;
 use App\Actions\Season\RateClubs;
 use App\Actions\Squad\EnsureSquad;
+use App\Http\Requests\LiveSim\SetFormationRequest;
 use App\Http\Requests\LiveSim\SetMentalityRequest;
 use App\Http\Requests\LiveSim\SubstituteRequest;
 use App\Models\Fixture;
@@ -20,6 +22,7 @@ use App\Models\Squad;
 use App\Models\User;
 use App\Sim\Analysis\MatchRatings;
 use App\Sim\Analysis\MatchSummary;
+use App\Sim\Engine\Formation;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -109,6 +112,11 @@ class LiveSimController extends Controller
             'awayGoals' => $match->away_goals,
             'moments' => $match->moments,
             'mentality' => $match->pitch_state['homeMentality'] ?? 'balanced',
+            'formation' => $this->currentFormation($match, $squad),
+            'formations' => array_map(
+                fn (Formation $f): array => ['id' => $f->id, 'name' => $f->name],
+                array_values(Formation::all()),
+            ),
             // A league match counts: the score is written onto the fixture at
             // full time. A friendly does not.
             'competitive' => $match->fixture_id !== null,
@@ -171,6 +179,21 @@ class LiveSimController extends Controller
     }
 
     /**
+     * The shape the side is in: whatever it was last changed to during the
+     * match, or the one the squad started in.
+     */
+    private function currentFormation(LiveMatch $match, Squad $squad): string
+    {
+        foreach (array_reverse($match->interventions ?? []) as $intervention) {
+            if (($intervention['type'] ?? null) === 'formation') {
+                return (string) $intervention['value'];
+            }
+        }
+
+        return $squad->setup()->formation->id;
+    }
+
+    /**
      * The manager's own league fixture when one is due, so playing it out is
      * what /play does by default; a friendly otherwise. The league match used to
      * be played in a different engine entirely, at a different URL.
@@ -211,6 +234,16 @@ class LiveSimController extends Controller
         $setMentality->handle($match, $mentality);
 
         return response()->json(['mentality' => $mentality->value]);
+    }
+
+    public function formation(SetFormationRequest $request, LiveMatch $match, SetFormation $setFormation): JsonResponse
+    {
+        $this->authorizeMatch($request, $match);
+        $formation = $request->formation();
+
+        $setFormation->handle($match, $formation);
+
+        return response()->json(['formation' => $formation->id]);
     }
 
     private function authorizeMatch(Request $request, LiveMatch $match): User
