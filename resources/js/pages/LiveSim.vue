@@ -6,6 +6,7 @@ import ClubStars from '@/components/ClubStars.vue';
 import MatchShotMap from '@/components/match/MatchShotMap.vue';
 import {
     advance,
+    formation as formationRoute,
     mentality as mentalityRoute,
     show as playShow,
     store as startNewMatch,
@@ -86,6 +87,8 @@ const props = defineProps<{
     awayGoals: number;
     moments: Moment[];
     mentality: 'attacking' | 'balanced' | 'defensive';
+    formation: string;
+    formations: { id: string; name: string }[];
     competitive: boolean;
     seasonUrl: string;
     replay: {
@@ -138,6 +141,7 @@ const score = ref(
 const celebratedGoals = new Set<number>();
 const subsLeft = ref(props.subsRemaining);
 const mentality = ref<'attacking' | 'balanced' | 'defensive'>(props.mentality);
+const shape = ref(props.formation);
 
 const playhead = ref(0);
 const playing = ref(false);
@@ -558,6 +562,21 @@ async function setMentality(
     }
 }
 
+// Chasing a game, the thing you want is a different shape, not just a different
+// instruction. Rejected changes revert, the same way mentality does.
+async function setFormation(id: string): Promise<void> {
+    const previous = shape.value;
+    shape.value = id;
+
+    const res = (await postJson(formationRoute(props.matchId).url, {
+        formation: id,
+    })) as { formation?: string };
+
+    if (res.formation !== id) {
+        shape.value = previous;
+    }
+}
+
 const benchList = ref<BenchPlayer[]>(props.bench.map((b) => ({ ...b })));
 const onPitchList = ref(props.onPitch.map((p) => ({ ...p })));
 
@@ -955,6 +974,25 @@ onBeforeUnmount(() => {
             </div>
 
             <div class="rounded-xl border border-border p-3">
+                <h3 class="mb-2 text-sm font-semibold">Shape</h3>
+                <div class="mb-3 grid grid-cols-3 gap-1">
+                    <button
+                        v-for="f in formations"
+                        :key="f.id"
+                        type="button"
+                        class="rounded-md border px-2 py-1.5 font-mono text-xs transition-colors"
+                        :class="
+                            shape === f.id
+                                ? 'border-primary bg-primary/10 text-primary'
+                                : 'border-border text-muted-foreground hover:text-foreground'
+                        "
+                        :disabled="finished"
+                        @click="setFormation(f.id)"
+                    >
+                        {{ f.name }}
+                    </button>
+                </div>
+
                 <h3 class="mb-2 text-sm font-semibold">Mentality</h3>
                 <div class="grid grid-cols-3 gap-1">
                     <button
