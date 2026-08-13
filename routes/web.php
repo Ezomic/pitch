@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Auth\LoginCodeController;
+use App\Http\Controllers\CareerController;
 use App\Http\Controllers\CupController;
 use App\Http\Controllers\LiveSimController;
 use App\Http\Controllers\MatchController;
@@ -27,6 +28,12 @@ Route::middleware('guest')->group(function () {
 
 Route::middleware(['auth'])->group(function () {
     Route::inertia('dashboard', 'Dashboard')->name('dashboard');
+
+    Route::get('careers', [CareerController::class, 'index'])->name('careers.index');
+    Route::post('careers', [CareerController::class, 'store'])->name('careers.store');
+    Route::post('careers/{career}/switch', [CareerController::class, 'switch'])->name('careers.switch');
+    Route::patch('careers/{career}', [CareerController::class, 'rename'])->name('careers.rename');
+    Route::delete('careers/{career}', [CareerController::class, 'destroy'])->name('careers.destroy');
 
     Route::get('squad', [SquadController::class, 'edit'])->name('squad.edit');
     Route::get('squad/what-if', [SquadController::class, 'whatIf'])->name('squad.what-if');
