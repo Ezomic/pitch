@@ -144,3 +144,22 @@ it('leaves the seeded world pool shared until a squad claims from it', function 
     expect(Player::query()->whereNull('career_id')->count())->toBeGreaterThan(0)
         ->and(Player::query()->selectableFor($career->id)->count())->toBeGreaterThan(10);
 });
+
+it('lets a brand new save field a side', function () {
+    $user = User::factory()->create();
+    $user->currentCareer();
+    app(EnsureSquad::class)->handle($user);
+
+    $second = $user->careers()->create([
+        'name' => 'Second', 'type' => Career::SOLO, 'status' => 'active', 'last_played_at' => now(),
+    ]);
+    switchTo($user, $second);
+
+    // The first save claimed eleven players. What is left of the world pool has
+    // to be enough for a second save to put a team out, or starting one gives a
+    // manager an empty club.
+    $squad = app(EnsureSquad::class)->handle($user);
+
+    expect($squad->career_id)->toBe($second->id)
+        ->and($squad->assignments()->count())->toBeGreaterThan(0);
+});
