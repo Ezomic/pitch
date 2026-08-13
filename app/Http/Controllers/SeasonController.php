@@ -9,6 +9,7 @@ use App\Actions\Season\EnsureSeason;
 use App\Actions\Season\PlayPreseason;
 use App\Actions\Season\RolloverSeason;
 use App\Actions\Season\ScoutOpponent;
+use App\Actions\Season\SeasonReview;
 use App\Actions\Season\Standings;
 use App\Actions\Squad\EnsureSquad;
 use App\Actions\Squad\SimulateMatch;
@@ -25,6 +26,10 @@ use Inertia\Response;
 
 class SeasonController extends Controller
 {
+    public function __construct(
+        private readonly SeasonReview $seasonReview = new SeasonReview,
+    ) {}
+
     public function show(Request $request, EnsureSeason $ensureSeason, Standings $standings): Response
     {
         $season = $ensureSeason->handle($this->user($request))
@@ -38,6 +43,8 @@ class SeasonController extends Controller
 
         $table = $standings->handle($season);
 
+        $objective = $this->objective($table, $current === null);
+
         return Inertia::render('Season', [
             'seasonNumber' => $season->number,
             'division' => $season->division,
@@ -45,7 +52,9 @@ class SeasonController extends Controller
             'relegates' => $season->division < Squad::BOTTOM_DIVISION,
             'history' => $this->history($this->user($request), $standings),
             'preseason' => $this->preseason($season, $teams),
-            'objective' => $this->objective($table, $current === null),
+            'objective' => $objective,
+            // How the campaign went, once there is a campaign to look back on.
+            'review' => $current === null ? $this->seasonReview->handle($season, $table, $objective) : null,
             'standings' => $table,
             'matchdays' => $this->matchdays($season, $teams),
             'currentMatchday' => $current,
