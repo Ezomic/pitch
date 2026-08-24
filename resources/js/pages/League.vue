@@ -62,6 +62,33 @@ interface Choice {
     name: string;
 }
 
+interface TableRow {
+    teamId: number;
+    name: string;
+    manager: string | null;
+    played: number;
+    won: number;
+    drawn: number;
+    lost: number;
+    goalsFor: number;
+    goalsAgainst: number;
+    goalDifference: number;
+    points: number;
+}
+
+interface FeedItem {
+    fixtureId: number;
+    matchday: number;
+    home: string | null;
+    away: string | null;
+    homeGoals: number;
+    awayGoals: number;
+    homeManager: string | null;
+    awayManager: string | null;
+    duel: boolean;
+    upset: boolean;
+}
+
 const props = defineProps<{
     career: { id: number; name: string; roundHours: number };
     isOwner: boolean;
@@ -72,6 +99,8 @@ const props = defineProps<{
     round: Round | null;
     formations: Choice[];
     mentalities: Choice[];
+    table: TableRow[];
+    feed: FeedItem[];
 }>();
 
 defineOptions({
@@ -437,6 +466,106 @@ function kick(member: Member): void {
                             </span>
                         </span>
                         <Button size="sm" @click="take(club)">Take over</Button>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="grid gap-4 lg:grid-cols-2">
+            <div
+                class="overflow-x-auto rounded-xl border border-sidebar-border/70 p-4 dark:border-sidebar-border"
+            >
+                <h2 class="mb-3 text-sm font-medium text-muted-foreground">
+                    Table
+                </h2>
+                <table class="w-full text-sm">
+                    <thead
+                        class="text-left text-xs text-muted-foreground [&_th]:pb-1 [&_th]:font-normal"
+                    >
+                        <tr>
+                            <th>Club</th>
+                            <th class="text-right">P</th>
+                            <th class="text-right">W</th>
+                            <th class="text-right">D</th>
+                            <th class="text-right">L</th>
+                            <th class="text-right">GD</th>
+                            <th class="text-right">Pts</th>
+                        </tr>
+                    </thead>
+                    <tbody
+                        class="[&_td]:py-1 [&_td:not(:first-child)]:text-right [&_td:not(:first-child)]:font-mono [&_td:not(:first-child)]:tabular-nums"
+                    >
+                        <tr
+                            v-for="row in props.table"
+                            :key="row.teamId"
+                            :class="
+                                row.teamId === props.yourTeamId
+                                    ? 'bg-primary/10'
+                                    : ''
+                            "
+                        >
+                            <td class="max-w-0 truncate pr-2">
+                                {{ row.name }}
+                                <span
+                                    v-if="row.manager"
+                                    class="text-xs text-muted-foreground"
+                                >
+                                    {{ row.manager }}
+                                </span>
+                            </td>
+                            <td>{{ row.played }}</td>
+                            <td>{{ row.won }}</td>
+                            <td>{{ row.drawn }}</td>
+                            <td>{{ row.lost }}</td>
+                            <td>{{ row.goalDifference }}</td>
+                            <td class="font-medium">{{ row.points }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div
+                class="rounded-xl border border-sidebar-border/70 p-4 dark:border-sidebar-border"
+            >
+                <h2 class="mb-3 text-sm font-medium text-muted-foreground">
+                    Results
+                </h2>
+                <p
+                    v-if="!props.feed.length"
+                    class="text-sm text-muted-foreground"
+                >
+                    Nothing has been played yet.
+                </p>
+                <ul v-else class="flex max-h-96 flex-col gap-1 overflow-y-auto">
+                    <li
+                        v-for="item in props.feed"
+                        :key="item.fixtureId"
+                        class="flex items-center gap-2 rounded-md px-2 py-1 text-sm"
+                    >
+                        <span
+                            class="w-8 shrink-0 font-mono text-xs text-muted-foreground"
+                        >
+                            MD{{ item.matchday }}
+                        </span>
+                        <span class="min-w-0 flex-1 truncate">
+                            {{ item.home }}
+                            <span class="font-mono tabular-nums">
+                                {{ item.homeGoals }}-{{ item.awayGoals }}
+                            </span>
+                            {{ item.away }}
+                        </span>
+                        <span
+                            v-if="item.duel"
+                            class="shrink-0 rounded bg-primary/15 px-1.5 py-0.5 text-xs text-primary"
+                        >
+                            Duel
+                        </span>
+                        <span
+                            v-if="item.upset"
+                            class="shrink-0 rounded border border-border px-1.5 py-0.5 text-xs"
+                        >
+                            Upset
+                        </span>
                     </li>
                 </ul>
             </div>

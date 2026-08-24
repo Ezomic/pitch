@@ -9,6 +9,9 @@ use App\Actions\Career\InviteToLeague;
 use App\Actions\Career\JoinLeague;
 use App\Actions\Career\RemoveMember;
 use App\Actions\League\CurrentRound;
+use App\Actions\League\EnsureLeagueSeason;
+use App\Actions\League\LeagueFeed;
+use App\Actions\League\LeagueTable;
 use App\Actions\League\ResolveRound;
 use App\Actions\League\SubmitOrder;
 use App\Http\Requests\League\StoreOrderRequest;
@@ -29,8 +32,12 @@ use Inertia\Response;
 
 class LeagueController extends Controller
 {
+    public function __construct(
+        private readonly EnsureLeagueSeason $ensureSeason = new EnsureLeagueSeason,
+    ) {}
+
     /** The lobby: who is in, which club they run, and what is still free. */
-    public function show(Request $request, Career $career, CurrentRound $currentRound, ResolveRound $resolve): Response
+    public function show(Request $request, Career $career, CurrentRound $currentRound, ResolveRound $resolve, LeagueTable $table, LeagueFeed $feed): Response
     {
         $user = $this->user($request);
         $seat = $this->seat($career, $user);
@@ -43,10 +50,13 @@ class LeagueController extends Controller
             $round = $currentRound->handle($career);
         }
 
+        $season = $this->ensureSeason->handle($career);
         $memberships = $career->memberships()->with(['user', 'team'])->orderBy('id')->get();
         $taken = $memberships->pluck('team_id')->filter()->all();
 
         return Inertia::render('League', [
+            'table' => $table->handle($career, $season),
+            'feed' => $feed->handle($career, $season),
             'round' => $round instanceof LeagueRound ? $this->round($round, $seat, $memberships) : null,
             'formations' => array_values(array_map(
                 fn (Formation $f): array => ['id' => $f->id, 'name' => $f->name],
