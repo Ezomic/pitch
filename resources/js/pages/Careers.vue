@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { Head, router, usePage } from '@inertiajs/vue3';
-import { Check, Pencil, Play, Trash2 } from '@lucide/vue';
+import { Check, Pencil, Play, Trash2, Users } from '@lucide/vue';
 import { computed, ref } from 'vue';
 import { Button } from '@/components/ui/button';
 import { destroy, index, rename, store, switchMethod } from '@/routes/careers';
+import { show as lobby } from '@/routes/league';
 
 interface CareerRow {
     id: number;
@@ -32,6 +33,7 @@ const error = computed(
 );
 
 const newName = ref('');
+const newIsLeague = ref(false);
 const renamingId = ref<number | null>(null);
 const renameTo = ref('');
 
@@ -45,8 +47,17 @@ function create(): void {
         return;
     }
 
-    router.post(store().url, { name }, { preserveScroll: true });
+    router.post(
+        store().url,
+        { name, type: newIsLeague.value ? 'league' : 'solo' },
+        { preserveScroll: true },
+    );
     newName.value = '';
+    newIsLeague.value = false;
+}
+
+function openLobby(career: CareerRow): void {
+    router.get(lobby(career.id).url);
 }
 
 function play(career: CareerRow): void {
@@ -111,6 +122,12 @@ function remove(career: CareerRow): void {
                         class="w-48 rounded-md border border-border bg-transparent px-2 py-1.5 text-sm"
                         @keyup.enter="create"
                     />
+                </label>
+                <label
+                    class="flex items-center gap-1.5 pb-1.5 text-xs text-muted-foreground"
+                >
+                    <input v-model="newIsLeague" type="checkbox" />
+                    League
                 </label>
                 <Button :disabled="!newName.trim()" @click="create">
                     Start
@@ -188,6 +205,14 @@ function remove(career: CareerRow): void {
                         @click="play(career)"
                     >
                         <Play class="size-3.5" /> Play
+                    </Button>
+                    <Button
+                        v-if="career.type === 'league'"
+                        size="sm"
+                        variant="outline"
+                        @click="openLobby(career)"
+                    >
+                        <Users class="size-3.5" /> Lobby
                     </Button>
                     <Button
                         size="sm"

@@ -62,6 +62,30 @@ class Career extends Model
         return $this->hasMany(Season::class);
     }
 
+    /**
+     * The managers holding a seat in this league.
+     *
+     * @return HasMany<CareerMembership, $this>
+     */
+    public function memberships(): HasMany
+    {
+        return $this->hasMany(CareerMembership::class);
+    }
+
+    /**
+     * @return HasMany<CareerInvitation, $this>
+     */
+    public function invitations(): HasMany
+    {
+        return $this->hasMany(CareerInvitation::class);
+    }
+
+    /** The seat this manager holds, if they hold one. */
+    public function seatFor(User $user): ?CareerMembership
+    {
+        return $this->memberships()->where('user_id', $user->id)->first();
+    }
+
     public function isLeague(): bool
     {
         return $this->type === self::LEAGUE;

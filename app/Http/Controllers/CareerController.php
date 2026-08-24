@@ -33,7 +33,7 @@ class CareerController extends Controller
 
     public function store(StoreCareerRequest $request, CreateCareer $create): RedirectResponse
     {
-        $create->handle($this->user($request), $request->careerName());
+        $create->handle($this->user($request), $request->careerName(), $request->careerType());
 
         return to_route('careers.index');
     }

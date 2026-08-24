@@ -3,6 +3,7 @@
 use App\Http\Controllers\Auth\LoginCodeController;
 use App\Http\Controllers\CareerController;
 use App\Http\Controllers\CupController;
+use App\Http\Controllers\LeagueController;
 use App\Http\Controllers\LiveSimController;
 use App\Http\Controllers\MatchController;
 use App\Http\Controllers\NewsController;
@@ -34,6 +35,13 @@ Route::middleware(['auth'])->group(function () {
     Route::post('careers/{career}/switch', [CareerController::class, 'switch'])->name('careers.switch');
     Route::patch('careers/{career}', [CareerController::class, 'rename'])->name('careers.rename');
     Route::delete('careers/{career}', [CareerController::class, 'destroy'])->name('careers.destroy');
+
+    Route::get('leagues/{career}', [LeagueController::class, 'show'])->name('league.show');
+    Route::post('leagues/{career}/invitations', [LeagueController::class, 'invite'])->name('league.invite');
+    Route::get('leagues/join/{token}', [LeagueController::class, 'join'])->name('league.join');
+    Route::post('leagues/{career}/clubs/{team}', [LeagueController::class, 'claim'])->name('league.claim');
+    Route::delete('leagues/{career}/club', [LeagueController::class, 'release'])->name('league.release');
+    Route::delete('leagues/{career}/members/{member}', [LeagueController::class, 'remove'])->name('league.remove');
 
     Route::get('squad', [SquadController::class, 'edit'])->name('squad.edit');
     Route::get('squad/what-if', [SquadController::class, 'whatIf'])->name('squad.what-if');
