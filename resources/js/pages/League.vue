@@ -1,10 +1,17 @@
 <script setup lang="ts">
 import { Head, router, usePage } from '@inertiajs/vue3';
-import { Copy, Crown, UserMinus } from '@lucide/vue';
+import { Check, Copy, Crown, UserMinus } from '@lucide/vue';
 import { computed, ref } from 'vue';
 import { Button } from '@/components/ui/button';
 import { index } from '@/routes/careers';
-import { claim, invite, release, remove } from '@/routes/league';
+import {
+    cadence,
+    claim,
+    invite,
+    order,
+    release,
+    remove,
+} from '@/routes/league';
 
 interface Member {
     id: number;
@@ -27,13 +34,44 @@ interface Invitation {
     expiresAt: string | null;
 }
 
+interface RoundFixture {
+    id: number;
+    home: string | null;
+    away: string | null;
+    homeGoals: number | null;
+    awayGoals: number | null;
+    played: boolean;
+    duel: boolean;
+    yours: boolean;
+}
+
+interface Round {
+    matchday: number;
+    deadlineAt: string | null;
+    waitingOn: string[];
+    yourOrder: {
+        formation: string;
+        mentality: string;
+        ready: boolean;
+    } | null;
+    fixtures: RoundFixture[];
+}
+
+interface Choice {
+    id: string;
+    name: string;
+}
+
 const props = defineProps<{
-    career: { id: number; name: string };
+    career: { id: number; name: string; roundHours: number };
     isOwner: boolean;
     yourTeamId: number | null;
     members: Member[];
     availableClubs: Club[];
     invitations: Invitation[];
+    round: Round | null;
+    formations: Choice[];
+    mentalities: Choice[];
 }>();
 
 defineOptions({
@@ -44,10 +82,44 @@ const page = usePage();
 const error = computed(() => {
     const errors = (page.props.errors ?? {}) as Record<string, string>;
 
-    return errors.club ?? errors.member ?? null;
+    return (
+        errors.club ?? errors.member ?? errors.order ?? errors.formation ?? null
+    );
 });
 
 const copied = ref<number | null>(null);
+
+const formation = ref(props.round?.yourOrder?.formation ?? '442');
+const mentality = ref(props.round?.yourOrder?.mentality ?? 'balanced');
+const hours = ref(props.career.roundHours);
+
+const deadline = computed(() => {
+    const at = props.round?.deadlineAt;
+
+    return at === null || at === undefined
+        ? null
+        : new Date(at).toLocaleString();
+});
+
+function submit(ready: boolean): void {
+    router.post(
+        order(props.career.id).url,
+        { formation: formation.value, mentality: mentality.value, ready },
+        { preserveScroll: true },
+    );
+}
+
+function setCadence(): void {
+    router.post(
+        cadence(props.career.id).url,
+        { hours: hours.value },
+        { preserveScroll: true },
+    );
+}
+
+function score(fixture: RoundFixture): string {
+    return fixture.played ? `${fixture.homeGoals} - ${fixture.awayGoals}` : 'v';
+}
 
 function invited(): void {
     router.post(invite(props.career.id).url, {}, { preserveScroll: true });
@@ -112,6 +184,131 @@ function kick(member: Member): void {
         >
             {{ error }}
         </p>
+
+        <div
+            v-if="props.round"
+            class="rounded-xl border border-sidebar-border/70 p-4 dark:border-sidebar-border"
+        >
+            <div
+                class="mb-3 flex flex-wrap items-baseline justify-between gap-2"
+            >
+                <h2 class="text-sm font-medium">
+                    Matchday {{ props.round.matchday }}
+                </h2>
+                <p class="text-xs text-muted-foreground">
+                    <template v-if="props.round.waitingOn.length">
+                        Waiting on
+                        {{ props.round.waitingOn.join(', ') }}
+                    </template>
+                    <template v-else>Everyone is ready.</template>
+                    <template v-if="deadline">
+                        Plays without them after {{ deadline }}.
+                    </template>
+                </p>
+            </div>
+
+            <div class="grid gap-4 lg:grid-cols-2">
+                <div v-if="props.yourTeamId" class="flex flex-col gap-2">
+                    <div class="flex flex-wrap items-end gap-2">
+                        <label class="flex flex-col gap-1">
+                            <span class="text-xs text-muted-foreground"
+                                >Shape</span
+                            >
+                            <select
+                                v-model="formation"
+                                class="rounded-md border border-border bg-transparent px-2 py-1.5 text-sm"
+                            >
+                                <option
+                                    v-for="f in props.formations"
+                                    :key="f.id"
+                                    :value="f.id"
+                                >
+                                    {{ f.name }}
+                                </option>
+                            </select>
+                        </label>
+                        <label class="flex flex-col gap-1">
+                            <span class="text-xs text-muted-foreground"
+                                >Mentality</span
+                            >
+                            <select
+                                v-model="mentality"
+                                class="rounded-md border border-border bg-transparent px-2 py-1.5 text-sm"
+                            >
+                                <option
+                                    v-for="m in props.mentalities"
+                                    :key="m.id"
+                                    :value="m.id"
+                                >
+                                    {{ m.name }}
+                                </option>
+                            </select>
+                        </label>
+                        <Button @click="submit(true)">
+                            <Check class="size-3.5" /> Ready
+                        </Button>
+                        <Button variant="outline" @click="submit(false)">
+                            Save only
+                        </Button>
+                    </div>
+                    <p class="text-xs text-muted-foreground">
+                        <template v-if="props.round.yourOrder?.ready">
+                            Your team sheet is in. The matchday plays as soon as
+                            the last manager is ready.
+                        </template>
+                        <template v-else>
+                            Nothing handed in yet. Miss the deadline and your
+                            club plays the way it always plays.
+                        </template>
+                    </p>
+                </div>
+                <p v-else class="text-sm text-muted-foreground">
+                    Take a club below and you can name a side for this matchday.
+                </p>
+
+                <ul class="flex flex-col gap-1">
+                    <li
+                        v-for="fixture in props.round.fixtures"
+                        :key="fixture.id"
+                        class="flex items-center justify-between gap-2 rounded-md px-2 py-1 text-sm"
+                        :class="fixture.yours ? 'bg-primary/10' : ''"
+                    >
+                        <span class="truncate">{{ fixture.home }}</span>
+                        <span
+                            class="shrink-0 font-mono tabular-nums"
+                            :class="
+                                fixture.duel
+                                    ? 'text-primary'
+                                    : 'text-muted-foreground'
+                            "
+                        >
+                            {{ score(fixture) }}
+                        </span>
+                        <span class="truncate text-right">{{
+                            fixture.away
+                        }}</span>
+                    </li>
+                </ul>
+            </div>
+
+            <div v-if="props.isOwner" class="mt-4 flex items-end gap-2">
+                <label class="flex flex-col gap-1">
+                    <span class="text-xs text-muted-foreground"
+                        >Hours per round</span
+                    >
+                    <input
+                        v-model.number="hours"
+                        type="number"
+                        min="1"
+                        max="336"
+                        class="w-24 rounded-md border border-border bg-transparent px-2 py-1.5 text-sm"
+                    />
+                </label>
+                <Button size="sm" variant="outline" @click="setCadence">
+                    Set cadence
+                </Button>
+            </div>
+        </div>
 
         <div class="grid flex-1 gap-4 lg:grid-cols-2">
             <div

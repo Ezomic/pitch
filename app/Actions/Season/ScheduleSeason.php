@@ -15,24 +15,47 @@ use Carbon\CarbonImmutable;
  */
 class ScheduleSeason
 {
+    /**
+     * A bye: an odd number of sides needs an extra chair at the table, and
+     * whoever is drawn against it sits the matchday out.
+     */
+    private const int BYE = -1;
+
     public function handle(Season $season): void
     {
         $teamIds = array_values(array_map('intval', Team::query()
             ->where('is_youth', false)
             ->where('division', $season->division)
             ->orderBy('id')->pluck('id')->all()));
-        $this->generateSchedule($season, $teamIds);
+        $this->generateSchedule($season, array_merge([null], $teamIds));
 
         $youthTeamIds = array_values(array_map('intval', Team::query()->where('is_youth', true)->orderBy('id')->pluck('id')->all()));
         $this->generateYouthSchedule($season, $youthTeamIds);
     }
 
     /**
-     * @param  list<int>  $teamIds
+     * A league's fixture list: every senior club in the world plays every other
+     * home and away. Nobody is the null side here, because a league has several
+     * managers and each of them runs a real club.
      */
-    private function generateSchedule(Season $season, array $teamIds): void
+    public function handleLeague(Season $season): void
     {
-        $participants = array_merge([null], $teamIds);
+        $teamIds = array_values(array_map('intval', Team::query()
+            ->where('is_youth', false)
+            ->orderBy('id')->pluck('id')->all()));
+
+        if (count($teamIds) % 2 === 1) {
+            $teamIds[] = self::BYE;
+        }
+
+        $this->generateSchedule($season, $teamIds);
+    }
+
+    /**
+     * @param  list<int|null>  $participants
+     */
+    private function generateSchedule(Season $season, array $participants): void
+    {
         $count = count($participants);
         $rounds = $count - 1;
         $half = intdiv($count, 2);
@@ -71,6 +94,12 @@ class ScheduleSeason
 
     private function createFixture(Season $season, int $matchday, ?int $home, ?int $away, int $index): void
     {
+        // Drawn against the bye: no fixture, but the seed index still moves on so
+        // every other match keeps the seed it would have had.
+        if ($home === self::BYE || $away === self::BYE) {
+            return;
+        }
+
         $season->fixtures()->create([
             'matchday' => $matchday,
             'scheduled_on' => CarbonImmutable::parse($season->starts_on)->addWeeks($matchday),

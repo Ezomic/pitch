@@ -22,11 +22,12 @@ use Illuminate\Support\Carbon;
  * @property string $name
  * @property string $type
  * @property string $status
+ * @property int $round_hours
  * @property Carbon|null $last_played_at
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['user_id', 'name', 'type', 'status', 'last_played_at'])]
+#[Fillable(['user_id', 'name', 'type', 'status', 'round_hours', 'last_played_at'])]
 class Career extends Model
 {
     /** @use HasFactory<CareerFactory> */
@@ -37,6 +38,18 @@ class Career extends Model
 
     /** Shared with other managers, each running their own club. */
     public const string LEAGUE = 'league';
+
+    /** How long a league waits on a manager before playing the round without them. */
+    public const int DEFAULT_ROUND_HOURS = 24;
+
+    /**
+     * Mirrors the column default so a freshly created career carries the cadence
+     * without being read back: a round's deadline is set from it the moment the
+     * league opens, which is often the same request.
+     *
+     * @var array<string, mixed>
+     */
+    protected $attributes = ['round_hours' => self::DEFAULT_ROUND_HOURS];
 
     /**
      * @return BelongsTo<User, $this>
@@ -78,6 +91,14 @@ class Career extends Model
     public function invitations(): HasMany
     {
         return $this->hasMany(CareerInvitation::class);
+    }
+
+    /**
+     * @return HasMany<LeagueRound, $this>
+     */
+    public function rounds(): HasMany
+    {
+        return $this->hasMany(LeagueRound::class)->orderBy('matchday');
     }
 
     /** The seat this manager holds, if they hold one. */

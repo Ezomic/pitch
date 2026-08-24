@@ -8,29 +8,55 @@ use App\Actions\Career\ClaimClub;
 use App\Actions\Career\InviteToLeague;
 use App\Actions\Career\JoinLeague;
 use App\Actions\Career\RemoveMember;
+use App\Actions\League\CurrentRound;
+use App\Actions\League\ResolveRound;
+use App\Actions\League\SubmitOrder;
+use App\Http\Requests\League\StoreOrderRequest;
 use App\Models\Career;
 use App\Models\CareerInvitation;
 use App\Models\CareerMembership;
+use App\Models\Fixture;
+use App\Models\LeagueRound;
 use App\Models\Team;
 use App\Models\User;
+use App\Sim\Engine\Formation;
+use App\Sim\Engine\Mentality;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Inertia\Inertia;
 use Inertia\Response;
 
 class LeagueController extends Controller
 {
     /** The lobby: who is in, which club they run, and what is still free. */
-    public function show(Request $request, Career $career): Response
+    public function show(Request $request, Career $career, CurrentRound $currentRound, ResolveRound $resolve): Response
     {
         $user = $this->user($request);
         $seat = $this->seat($career, $user);
+
+        // A deadline is only real if something enforces it. Every visit to the
+        // lobby is a chance to notice one has passed and play the round.
+        $round = $currentRound->handle($career);
+
+        if ($round instanceof LeagueRound && $resolve->handle($round)) {
+            $round = $currentRound->handle($career);
+        }
 
         $memberships = $career->memberships()->with(['user', 'team'])->orderBy('id')->get();
         $taken = $memberships->pluck('team_id')->filter()->all();
 
         return Inertia::render('League', [
-            'career' => ['id' => $career->id, 'name' => $career->name],
+            'round' => $round instanceof LeagueRound ? $this->round($round, $seat, $memberships) : null,
+            'formations' => array_values(array_map(
+                fn (Formation $f): array => ['id' => $f->id, 'name' => $f->name],
+                Formation::all(),
+            )),
+            'mentalities' => array_map(
+                fn (Mentality $m): array => ['id' => $m->value, 'name' => ucfirst($m->value)],
+                Mentality::cases(),
+            ),
+            'career' => ['id' => $career->id, 'name' => $career->name, 'roundHours' => $career->round_hours],
             'isOwner' => $seat->isOwner(),
             'yourTeamId' => $seat->team_id,
             'members' => $memberships->map(fn (CareerMembership $m): array => [
@@ -122,6 +148,79 @@ class LeagueController extends Controller
         }
 
         return to_route('league.show', $career);
+    }
+
+    /** Hand in a team sheet, and play the round the moment it is the last one. */
+    public function order(StoreOrderRequest $request, Career $career, SubmitOrder $submit, CurrentRound $currentRound, ResolveRound $resolve): RedirectResponse
+    {
+        $seat = $this->seat($career, $this->user($request));
+        $round = $currentRound->handle($career);
+
+        if (! $round instanceof LeagueRound) {
+            return to_route('league.show', $career);
+        }
+
+        if ($submit->handle($round, $seat, $request->formation(), $request->mentality(), $request->isReady()) === null) {
+            return to_route('league.show', $career)->withErrors([
+                'order' => 'You need a club before you can name a team.',
+            ]);
+        }
+
+        $resolve->handle($round);
+
+        return to_route('league.show', $career);
+    }
+
+    /** How long the league waits on a manager before playing without them. */
+    public function cadence(Request $request, Career $career): RedirectResponse
+    {
+        abort_unless($this->seat($career, $this->user($request))->isOwner(), 403);
+
+        $hours = (int) $request->integer('hours');
+        abort_unless($hours >= 1 && $hours <= 336, 422);
+
+        $career->forceFill(['round_hours' => $hours])->save();
+
+        return to_route('league.show', $career);
+    }
+
+    /**
+     * @param  Collection<int, CareerMembership>  $memberships
+     * @return array<string, mixed>
+     */
+    private function round(LeagueRound $round, CareerMembership $seat, Collection $memberships): array
+    {
+        $orders = $round->orders()->get()->keyBy('career_membership_id');
+        $mine = $orders->get($seat->id);
+        $names = $memberships->pluck('team.name', 'team_id');
+
+        return [
+            'matchday' => $round->matchday,
+            'deadlineAt' => $round->deadline_at?->toIso8601String(),
+            'waitingOn' => $memberships->whereNotNull('team_id')
+                ->filter(fn (CareerMembership $m): bool => $orders->get($m->id)?->ready !== true)
+                ->pluck('user.name')->values()->all(),
+            'yourOrder' => $mine === null ? null : [
+                'formation' => $mine->formation,
+                'mentality' => $mine->mentality,
+                'ready' => $mine->ready,
+            ],
+            'fixtures' => $round->season->fixtures()
+                ->where('youth', false)->where('matchday', $round->matchday)
+                ->with(['homeTeam', 'awayTeam'])->get()
+                ->map(fn (Fixture $f): array => [
+                    'id' => $f->id,
+                    'home' => $f->homeTeam?->name,
+                    'away' => $f->awayTeam?->name,
+                    'homeGoals' => $f->home_goals,
+                    'awayGoals' => $f->away_goals,
+                    'played' => $f->played,
+                    // A duel is the fixture two managers both have a stake in.
+                    'duel' => $names->has($f->home_team_id) && $names->has($f->away_team_id),
+                    'yours' => $seat->team_id !== null
+                        && ($f->home_team_id === $seat->team_id || $f->away_team_id === $seat->team_id),
+                ])->all(),
+        ];
     }
 
     /** Only a seated manager sees a league, and only their own. */
