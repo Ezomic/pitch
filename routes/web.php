@@ -42,6 +42,8 @@ Route::middleware(['auth'])->group(function () {
     Route::post('leagues/{career}/clubs/{team}', [LeagueController::class, 'claim'])->name('league.claim');
     Route::delete('leagues/{career}/club', [LeagueController::class, 'release'])->name('league.release');
     Route::delete('leagues/{career}/members/{member}', [LeagueController::class, 'remove'])->name('league.remove');
+    Route::post('leagues/{career}/orders', [LeagueController::class, 'order'])->name('league.order');
+    Route::post('leagues/{career}/cadence', [LeagueController::class, 'cadence'])->name('league.cadence');
 
     Route::get('squad', [SquadController::class, 'edit'])->name('squad.edit');
     Route::get('squad/what-if', [SquadController::class, 'whatIf'])->name('squad.what-if');
