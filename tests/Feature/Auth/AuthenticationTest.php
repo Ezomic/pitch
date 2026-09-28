@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Mail\LoginCodeMail;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
 use PragmaRX\Google2FA\Google2FA;
@@ -40,6 +41,30 @@ it('authenticates a user with an emailed login code', function () {
         'email' => $user->email,
         'code' => $code,
     ])->assertRedirect(route('dashboard', absolute: false));
+
+    $this->assertAuthenticatedAs($user);
+});
+
+it('signs the user back in from the remember-me cookie once the session is gone', function () {
+    $user = User::factory()->create();
+    $code = sendAndCaptureCode($user);
+    $recaller = Auth::guard('web')->getRecallerName();
+
+    $cookie = $this->post(route('login.code.verify'), [
+        'email' => $user->email,
+        'code' => $code,
+    ])->getCookie($recaller);
+
+    expect($cookie)->not->toBeNull();
+
+    // A browser coming back after its session expired, carrying nothing but
+    // the remember-me cookie.
+    Auth::forgetGuards();
+    $this->flushSession();
+
+    $this->withCookie($recaller, (string) $cookie->getValue())
+        ->get(route('dashboard'))
+        ->assertOk();
 
     $this->assertAuthenticatedAs($user);
 });
