@@ -122,6 +122,16 @@ class User extends Authenticatable implements PasskeyUser
     }
 
     /**
+     * Users sign in with emailed codes or passkeys and have no password column. Since
+     * Laravel 13.32 the guard refuses a remember-me cookie when this is not a string,
+     * so the inherited null ended every sign-in with its session (PITCH-172).
+     */
+    public function getAuthPassword(): string
+    {
+        return '';
+    }
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>
