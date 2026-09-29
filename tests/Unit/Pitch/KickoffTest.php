@@ -6,6 +6,7 @@ use App\Sim\Domain\Attributes;
 use App\Sim\Engine\Roster;
 use App\Sim\Pitch\PositionalEngine;
 use App\Sim\Pitch\Vec2;
+use App\Sim\Squad\TeamSetup;
 
 function insideCentreCircle(Vec2 $pos): bool
 {
@@ -35,6 +36,32 @@ it('leaves no defending player inside the centre circle at kickoff', function ()
     foreach ($defenders as $defender) {
         expect(insideCentreCircle($defender->pos))->toBeFalse();
     }
+});
+
+it('keeps both sides\' mentality through the kickoff after a goal', function () {
+    $engine = new PositionalEngine;
+
+    [$state, $rng] = $engine->start(TeamSetup::baseline()->attackers(), TeamSetup::baseline()->attackers(), 42);
+    $state->homeMentality = 'defensive';
+    $state->awayMentality = 'attacking';
+
+    $state = $engine->resume($state, $rng, 0, 5)->state;
+
+    expect($state->homeMentality)->toBe('defensive')
+        ->and($state->awayMentality)->toBe('attacking');
+
+    // A goal on the previous tick owes a kickoff, which the next tick takes on a
+    // fresh state. A goal restarts play, not the match.
+    $state->homeGoals = 1;
+    $state->pendingKickoff = 1;
+
+    $kickoff = $engine->resume($state, $rng, 5, 6)->state;
+
+    expect($kickoff)->not->toBe($state)
+        ->and($kickoff->pendingKickoff)->toBeNull()
+        ->and($kickoff->homeGoals)->toBe(1)
+        ->and($kickoff->homeMentality)->toBe('defensive')
+        ->and($kickoff->awayMentality)->toBe('attacking');
 });
 
 it('puts the kicking-off side on the ball at the centre spot', function () {
