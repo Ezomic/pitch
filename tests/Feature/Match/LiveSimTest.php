@@ -109,6 +109,13 @@ it('hands the resumed match its score, feed and mentality', function () {
         ->viewData('page')['props']['matchId'];
 
     $this->actingAs($user)->postJson(route('play.mentality', $matchId), ['mentality' => 'defensive']);
+
+    // A friendly's seed is random, so whether a goal fell inside this slice was
+    // down to chance, and a goal used to reset the mentality to balanced. Owing
+    // a kickoff puts a goal restart in the slice every time.
+    $match = LiveMatch::query()->findOrFail($matchId);
+    $match->update(['pitch_state' => [...$match->pitch_state, 'pendingKickoff' => 1]]);
+
     $this->actingAs($user)->postJson(route('play.advance', $matchId), ['ticks' => 120]);
 
     $match = LiveMatch::query()->findOrFail($matchId);

@@ -164,9 +164,14 @@ final class PositionalEngine
         // A goal on the previous tick left the ball in the net for that frame and
         // owes a kickoff; take it now so the restart is its own frame.
         if ($state->pendingKickoff !== null) {
+            // A goal restarts play, not the match: the score and each side's
+            // mentality carry over. Formation and substitutions live on the
+            // players, which the restart keeps.
             $restart = $this->kickOff->restart($state->players, side: $state->pendingKickoff);
             $restart->homeGoals = $state->homeGoals;
             $restart->awayGoals = $state->awayGoals;
+            $restart->homeMentality = $state->homeMentality;
+            $restart->awayMentality = $state->awayMentality;
             $state = $restart; // kickOff marks this frame as a placed-ball (teleported) restart
         } else {
             $state->teleported = false;
