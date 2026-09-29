@@ -33,6 +33,20 @@
         <link rel="icon" href="/favicon.ico" sizes="any">
         <link rel="icon" href="/favicon.svg" type="image/svg+xml">
         <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+        <link rel="manifest" href="/manifest.json">
+        <meta name="theme-color" content="#16A34A">
+        <meta name="mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-title" content="Pitch">
+
+        {{-- No build to version the worker by while Vite runs hot, so none is registered. --}}
+        @if ($serviceWorkerVersion = Vite::manifestHash())
+            <script>
+                if ('serviceWorker' in navigator) {
+                    window.addEventListener('load', () => navigator.serviceWorker.register('/sw.js?v={{ $serviceWorkerVersion }}'));
+                }
+            </script>
+        @endif
 
         @fonts
 
