@@ -38,6 +38,14 @@ final readonly class MatchMetrics
         return new self(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0.0);
     }
 
+    /**
+     * @param  list<self>  $matches
+     */
+    public static function sum(array $matches): self
+    {
+        return array_reduce($matches, fn (self $total, self $match): self => $total->add($match), self::zero());
+    }
+
     public function add(self $o): self
     {
         return new self(

@@ -23,14 +23,25 @@ final class RealismHarness
 
     public function run(int $matches, int $rating = 72): MatchMetrics
     {
-        $total = MatchMetrics::zero();
+        return MatchMetrics::sum($this->perSeed($matches, $rating));
+    }
+
+    /**
+     * Each seed's own metrics, so a later run can be compared with this one seed
+     * by seed.
+     *
+     * @return list<MatchMetrics>
+     */
+    public function perSeed(int $matches, int $rating = 72): array
+    {
+        $perSeed = [];
 
         for ($seed = 1; $seed <= $matches; $seed++) {
             $result = $this->engine->simulate($this->team($rating), $this->team($rating), $seed);
-            $total = $total->add($this->analyzer->analyze($result));
+            $perSeed[] = $this->analyzer->analyze($result);
         }
 
-        return $total;
+        return $perSeed;
     }
 
     /**
