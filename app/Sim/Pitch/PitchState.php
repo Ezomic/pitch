@@ -71,6 +71,9 @@ final class PitchState
      */
     public array $bookings = [];
 
+    /** The interval has been taken. Persisted, so a match paused at half-time comes back to it. */
+    public bool $secondHalf = false;
+
     /** Ticks left of a dead-ball pause after a set piece is awarded. */
     public int $deadBall = 0;
 
@@ -171,6 +174,7 @@ final class PitchState
             'ballTrail' => array_map(fn (Vec2 $p): array => $p->pair(), $this->ballTrail),
             'deadBall' => $this->deadBall,
             'bookings' => $this->bookings,
+            'secondHalf' => $this->secondHalf,
             'pendingType' => $this->pendingType?->value,
             'pendingSide' => $this->pendingSide,
             'pendingSpot' => $this->pendingSpot?->pair(),
@@ -209,6 +213,7 @@ final class PitchState
         $trail = $s['ballTrail'] ?? [];
         $state->ballTrail = array_map(fn (array $p): Vec2 => Vec2::fromPair($p), $trail);
         $state->deadBall = (int) $s['deadBall'];
+        $state->secondHalf = (bool) ($s['secondHalf'] ?? false);
         /** @var array<int, int> $bookings */
         $bookings = $s['bookings'] ?? [];
         $state->bookings = array_map(intval(...), $bookings);

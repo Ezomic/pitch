@@ -70,6 +70,10 @@ final class LivePitch
                 continue;
             }
 
+            if ($startTick + $i >= PositionalEngine::HALF_TICK) {
+                $frame = Geometry::swapEnds($frame);
+            }
+
             $out[] = [
                 'm' => $frame['m'],
                 'b' => $frame['b'],

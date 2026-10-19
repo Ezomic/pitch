@@ -238,3 +238,38 @@ it('does not let someone else substitute into your match', function () {
         ->postJson(route('play.mentality', $matchId), ['mentality' => 'attacking'])
         ->assertForbidden();
 });
+
+it('stops on the half-time whistle and starts the second half on the next advance', function () {
+    $user = User::factory()->create();
+    $matchId = $this->actingAs($user)->get(route('play.show'))
+        ->viewData('page')['props']['matchId'];
+
+    $body = [];
+    for ($i = 0; $i < 20 && ($body['interval'] ?? false) === false; $i++) {
+        $body = $this->actingAs($user)
+            ->postJson(route('play.advance', $matchId), ['ticks' => 300])
+            ->assertOk()->json();
+    }
+
+    expect($body['interval'])->toBeTrue()
+        ->and($body['tick'])->toBe(1350)
+        ->and($body['finished'])->toBeFalse();
+
+    // Reopening the page at the whistle comes back to the break, not past it.
+    $this->actingAs($user)->get(route('play.show'))
+        ->assertInertia(fn (Assert $page) => $page->where('atInterval', true)->where('currentTick', 1350));
+
+    // Changes made in the interval land before the second half starts.
+    $this->actingAs($user)
+        ->postJson(route('play.mentality', $matchId), ['mentality' => 'attacking'])->assertOk();
+
+    $next = $this->actingAs($user)
+        ->postJson(route('play.advance', $matchId), ['ticks' => 300])
+        ->assertOk()->json();
+
+    expect($next['interval'])->toBeFalse()
+        ->and($next['tick'])->toBeGreaterThan(1350);
+
+    $this->actingAs($user)->get(route('play.show'))
+        ->assertInertia(fn (Assert $page) => $page->where('atInterval', false)->where('mentality', 'attacking'));
+});

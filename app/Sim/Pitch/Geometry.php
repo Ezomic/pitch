@@ -166,4 +166,24 @@ final class Geometry
 
         return true;
     }
+
+    /**
+     * Turn a recorded frame through half a revolution about the centre spot, so
+     * the sides attack the opposite goals. The engine always plays side 0 toward
+     * x = 1, which keeps the simulation and every metric read off it independent
+     * of direction; the second half is swapped here, where positions are only
+     * drawn.
+     *
+     * @param  array{m: int, b: array{float, float}, c: int, s: int, p: list<array{float, float}>, j: bool, goal: int}  $frame
+     * @return array{m: int, b: array{float, float}, c: int, s: int, p: list<array{float, float}>, j: bool, goal: int}
+     */
+    public static function swapEnds(array $frame): array
+    {
+        $turn = fn (array $point): array => [1.0 - $point[0], 1.0 - $point[1]];
+
+        $frame['b'] = $turn($frame['b']);
+        $frame['p'] = array_map($turn, $frame['p']);
+
+        return $frame;
+    }
 }

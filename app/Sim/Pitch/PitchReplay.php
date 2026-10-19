@@ -173,6 +173,10 @@ final class PitchReplay
                 continue;
             }
 
+            if ($tick >= PositionalEngine::HALF_TICK) {
+                $frame = Geometry::swapEnds($frame);
+            }
+
             $out[] = [
                 'm' => $frame['m'],
                 'b' => $frame['b'],
