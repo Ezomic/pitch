@@ -69,6 +69,7 @@ interface BenchPlayer {
     id: number;
     name: string;
     position: string;
+    fitness: number;
 }
 
 const props = defineProps<{
@@ -85,6 +86,7 @@ const props = defineProps<{
     currentTick: number;
     atInterval: boolean;
     halfTick: number;
+    energy: Record<number, number>;
     homeGoals: number;
     awayGoals: number;
     moments: Moment[];
@@ -156,6 +158,10 @@ const serverTick = ref(isReplay ? props.totalTicks : props.currentTick);
 // atInterval means the buffered first half has played out and the break is on
 // screen. A match reopened at the whistle has nothing buffered, so both start
 // true.
+// What is left in each of the manager's outfielders' legs, by slot, as the
+// server last reported it. It runs ahead of the playhead by the buffered
+// frames, which is close enough to choose who to take off.
+const energy = ref<Record<number, number>>({ ...props.energy });
 const heldAtInterval = ref(!isReplay && props.atInterval);
 const atInterval = ref(!isReplay && props.atInterval);
 const resumed = !isReplay && props.currentTick > 0;
@@ -394,6 +400,7 @@ async function fetchNext(): Promise<void> {
             tick: number;
             finished: boolean;
             interval: boolean;
+            energy: Record<number, number>;
         };
         frames.value.push(...res.frames);
 
@@ -402,6 +409,10 @@ async function fetchNext(): Promise<void> {
         }
 
         serverTick.value = res.tick;
+
+        if (Object.keys(res.energy).length > 0) {
+            energy.value = res.energy;
+        }
 
         if (res.interval) {
             heldAtInterval.value = true;
@@ -651,6 +662,8 @@ async function makeSub(): Promise<void> {
         if (m) {
             m.name = incoming.name;
         }
+
+        energy.value = { ...energy.value, [slot]: incoming.fitness };
 
         const op = onPitchList.value.find((x) => x.slot === slot);
 
@@ -1089,7 +1102,7 @@ onBeforeUnmount(() => {
                     >
                 </div>
                 <label class="mb-1 block text-xs text-muted-foreground"
-                    >Off</label
+                    >Off (energy left)</label
                 >
                 <select
                     v-model="outSlot"
@@ -1102,10 +1115,13 @@ onBeforeUnmount(() => {
                         :value="p.slot"
                     >
                         {{ p.slot }} · {{ p.name }}
+                        <template v-if="energy[p.slot] !== undefined">
+                            · {{ energy[p.slot] }}%
+                        </template>
                     </option>
                 </select>
                 <label class="mb-1 block text-xs text-muted-foreground"
-                    >On</label
+                    >On (fitness)</label
                 >
                 <select
                     v-model="inPlayer"
@@ -1113,7 +1129,7 @@ onBeforeUnmount(() => {
                 >
                     <option :value="null">Select player</option>
                     <option v-for="b in benchList" :key="b.id" :value="b.id">
-                        {{ b.position }} · {{ b.name }}
+                        {{ b.position }} · {{ b.name }} · {{ b.fitness }}%
                     </option>
                 </select>
                 <p

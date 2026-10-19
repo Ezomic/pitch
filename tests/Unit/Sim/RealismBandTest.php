@@ -35,7 +35,6 @@ const REALISM_SIGMAS = 3.0;
  */
 const REALISM_KNOWN_OFF = [
     'Shots on target' => 1.40,   // 12.4 against a 7.5 to 11 band
-    'Pass completion %' => 2.30, // 67.7 against a 70 to 88 band
     'Crosses' => 0.10,           // 13.9 against a 14 to 42 band
     'Fouls' => 6.40,             // 11.6 against an 18 to 28 band, see PITCH-126
 ];

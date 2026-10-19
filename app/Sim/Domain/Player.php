@@ -12,10 +12,11 @@ final readonly class Player
         public Position $position,
         public Zone $zone,
         public Attributes $attributes,
+        public int $fitness = 100,
     ) {}
 
     public function withAttributes(Attributes $attributes): self
     {
-        return new self($this->id, $this->name, $this->position, $this->zone, $attributes);
+        return new self($this->id, $this->name, $this->position, $this->zone, $attributes, $this->fitness);
     }
 }

@@ -80,6 +80,7 @@ class LiveSimController extends Controller
                 'id' => $player->id,
                 'name' => $player->name,
                 'position' => $player->position->value,
+                'fitness' => $player->fitness,
             ])->values()->all();
 
         $onPitch = [];
@@ -115,6 +116,7 @@ class LiveSimController extends Controller
                 && $match->current_tick === PositionalEngine::HALF_TICK
                 && ! ($match->pitch_state['secondHalf'] ?? false),
             'halfTick' => PositionalEngine::HALF_TICK,
+            'energy' => $this->energy($match),
             'homeGoals' => $match->home_goals,
             'awayGoals' => $match->away_goals,
             'moments' => $match->moments,
@@ -139,6 +141,24 @@ class LiveSimController extends Controller
             // How everyone did, read off what they contributed.
             'ratings' => $match->summary !== null ? $this->ratings($match) : null,
         ]);
+    }
+
+    /**
+     * What is left in each of the manager's outfielders' legs, by slot, so a
+     * match picked up mid-way shows who is tired.
+     *
+     * @return array<int, int>
+     */
+    private function energy(LiveMatch $match): array
+    {
+        $energy = [];
+        foreach ($match->pitch_state['players'] ?? [] as $player) {
+            if ((int) $player['side'] === 0 && (int) $player['slot'] !== 0) {
+                $energy[(int) $player['slot']] = (int) round(((float) ($player['st'] ?? 1.0)) * 100);
+            }
+        }
+
+        return $energy;
     }
 
     /**

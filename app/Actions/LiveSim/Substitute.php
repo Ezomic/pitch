@@ -6,6 +6,7 @@ namespace App\Actions\LiveSim;
 
 use App\Models\LiveMatch;
 use App\Models\Player;
+use App\Sim\Pitch\KickOff;
 
 /**
  * Bring a fresh player on for one already on the pitch. The incoming player
@@ -23,10 +24,15 @@ class Substitute
             return;
         }
 
+        // A substitute comes on with the legs his season fitness gives him, not the
+        // ones the man he replaces has run down.
+        $stamina = KickOff::startingStamina($in->fitness);
+
         $state = $match->pitch_state;
         foreach ($state['players'] as &$player) {
             if ((int) $player['id'] === $outSlot && (int) $player['side'] === 0) {
                 $player['attr'] = [$in->vision, $in->passing, $in->dribbling, $in->finishing, $in->tackling, $in->pace];
+                $player['st'] = $stamina;
             }
         }
         unset($player);
@@ -55,6 +61,7 @@ class Substitute
                 'pid' => $in->id,
                 'name' => $in->name,
                 'attr' => [$in->vision, $in->passing, $in->dribbling, $in->finishing, $in->tackling, $in->pace],
+                'st' => $stamina,
                 'off' => $off,
             ]],
             'subs_remaining' => $match->subs_remaining - 1,
