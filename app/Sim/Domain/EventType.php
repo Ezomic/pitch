@@ -29,6 +29,10 @@ enum EventType: string
     case GoalKick = 'goal_kick';
     case Penalty = 'penalty';
 
+    // Discipline.
+    case YellowCard = 'yellow_card';
+    case RedCard = 'red_card';
+
     /** Whether this is a defending action, shown on the defending side. */
     public function isDefensive(): bool
     {
@@ -36,6 +40,12 @@ enum EventType: string
             self::Interception, self::Tackle, self::SlideTackle, self::Clearance, self::Save, self::Block => true,
             default => false,
         };
+    }
+
+    /** Whether this is a booking of any colour. */
+    public function isCard(): bool
+    {
+        return $this === self::YellowCard || $this === self::RedCard;
     }
 
     /** Whether this is a challenge for the ball, standing or committed. */

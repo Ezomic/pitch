@@ -31,6 +31,9 @@ final class PlayerState
      */
     public int $grounded = 0;
 
+    /** Sent off. He takes no further part, and his side plays the rest a man down. */
+    public bool $sentOff = false;
+
     public function __construct(
         public readonly int $id,
         public readonly int $side,
@@ -47,6 +50,12 @@ final class PlayerState
     public static function id(int $side, int $slot): int
     {
         return $side * 100 + $slot;
+    }
+
+    /** Still part of the match: on the pitch and not sent off. */
+    public function isPlaying(): bool
+    {
+        return ! $this->sentOff;
     }
 
     public function isGoalkeeper(): bool
@@ -78,6 +87,7 @@ final class PlayerState
             't' => $this->target->pair(),
             'hb' => $this->hasBall,
             'gr' => $this->grounded,
+            'so' => $this->sentOff,
         ];
     }
 
@@ -101,6 +111,7 @@ final class PlayerState
         $player->hasBall = (bool) $s['hb'];
         // Absent from matches saved before sliding tackles existed.
         $player->grounded = (int) ($s['gr'] ?? 0);
+        $player->sentOff = (bool) ($s['so'] ?? false);
 
         return $player;
     }

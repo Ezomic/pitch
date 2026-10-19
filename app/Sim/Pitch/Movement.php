@@ -43,6 +43,10 @@ final class Movement
         $ballX = $state->ball->x;
 
         foreach ($state->players as $player) {
+            if (! $player->isPlaying()) {
+                continue;
+            }
+
             if ($player->isGoalkeeper()) {
                 $goalX = $player->side === 0 ? 0.03 : 0.97;
                 $player->target = new Vec2($goalX, 0.5 + ($state->ball->y - 0.5) * 0.4);
@@ -235,7 +239,7 @@ final class Movement
     public function spaceFreeAt(PitchState $state, Vec2 $point, int $side): bool
     {
         foreach ($state->players as $player) {
-            if ($player->side === $side || $player->isGoalkeeper()) {
+            if ($player->side === $side || $player->isGoalkeeper() || ! $player->isPlaying()) {
                 continue;
             }
 
@@ -250,6 +254,10 @@ final class Movement
     public function moveAll(PitchState $state): void
     {
         foreach ($state->players as $player) {
+            if (! $player->isPlaying()) {
+                continue;
+            }
+
             $player->pos = $player->pos->moveToward($player->target, $player->speed() * self::TICK)->clampToPitch();
         }
     }
@@ -272,7 +280,7 @@ final class Movement
         $ownerDist = INF;
 
         foreach ($state->players as $other) {
-            if ($other->side !== $defender->side || $other->isGoalkeeper()) {
+            if ($other->side !== $defender->side || $other->isGoalkeeper() || ! $other->isPlaying()) {
                 continue;
             }
 
@@ -307,7 +315,7 @@ final class Movement
         $line = null;
 
         foreach ($state->players as $player) {
-            if ($player->side === $attackingSide || $player->isGoalkeeper()) {
+            if ($player->side === $attackingSide || $player->isGoalkeeper() || ! $player->isPlaying()) {
                 continue;
             }
 

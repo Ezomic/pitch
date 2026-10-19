@@ -81,9 +81,9 @@ final class PositionalEngine
     // A jockey that mistimes it concedes now and then; a lunge that misses concedes
     // far more often. Fouls come out of what the defender chose to do, rather than
     // one flat chance for every challenge.
-    private const float STAND_FOUL_CHANCE = 0.035;
+    private const float STAND_FOUL_CHANCE = 0.04;
 
-    private const float SLIDE_FOUL_CHANCE = 0.20;
+    private const float SLIDE_FOUL_CHANCE = 0.22;
 
     /** How much more often a committed challenge wins the ball than a jockey. */
     private const float SLIDE_WIN = 1.5;
@@ -164,15 +164,11 @@ final class PositionalEngine
         // A goal on the previous tick left the ball in the net for that frame and
         // owes a kickoff; take it now so the restart is its own frame.
         if ($state->pendingKickoff !== null) {
-            // A goal restarts play, not the match: the score and each side's
-            // mentality carry over. Formation and substitutions live on the
+            // A goal restarts play, not the match: the score, mentality and
+            // bookings carry over. Formation and substitutions live on the
             // players, which the restart keeps.
             $restart = $this->kickOff->restart($state->players, side: $state->pendingKickoff);
-            $restart->homeGoals = $state->homeGoals;
-            $restart->awayGoals = $state->awayGoals;
-            $restart->homeMentality = $state->homeMentality;
-            $restart->awayMentality = $state->awayMentality;
-            $state = $restart; // kickOff marks this frame as a placed-ball (teleported) restart
+            $state = $this->carryOver($state, $restart); // kickOff marks this frame as a placed-ball (teleported) restart
         } else {
             $state->teleported = false;
         }
@@ -298,10 +294,31 @@ final class PositionalEngine
     }
 
     /**
+     * Carry the facts about the match, as opposed to the state of play, across a
+     * kickoff. A restart builds a fresh PitchState, so anything that belongs to
+     * the match rather than to this passage of play has to be moved over
+     * deliberately or scoring a goal quietly wipes it.
+     *
+     * Mentality was being lost this way: a manager's instruction reverted to
+     * balanced the moment either side scored, which is exactly when it matters.
+     * Bookings would have gone the same way, letting a booked player start clean.
+     */
+    private function carryOver(PitchState $from, PitchState $restart): PitchState
+    {
+        $restart->homeGoals = $from->homeGoals;
+        $restart->awayGoals = $from->awayGoals;
+        $restart->homeMentality = $from->homeMentality;
+        $restart->awayMentality = $from->awayMentality;
+        $restart->bookings = $from->bookings;
+
+        return $restart;
+    }
+
+    /**
      * Whether this defender commits to a sliding challenge rather than staying on
      * his feet. He goes to ground when there is no one behind him to cover, or
      * when the carrier is close enough to goal that letting him run is worse than
-     * the risk of missing.
+     * the risk of missing, and never once he has been booked.
      */
     private function commitsToSlide(PitchState $state, PlayerState $carrier, PlayerState $defender): bool
     {
@@ -311,26 +328,13 @@ final class PositionalEngine
             return true;
         }
 
-        return $this->isLastMan($state, $defender, $carrier);
-    }
-
-    /** No team-mate of this defender is between him and his own goal. */
-    private function isLastMan(PitchState $state, PlayerState $defender, PlayerState $carrier): bool
-    {
-        $ownGoal = Geometry::goalOf($carrier->side);
-        $defenderToGoal = $defender->pos->distanceTo($ownGoal);
-
-        foreach ($state->players as $player) {
-            if ($player->side !== $defender->side || $player->id === $defender->id || $player->isGoalkeeper()) {
-                continue;
-            }
-
-            if ($player->pos->distanceTo($ownGoal) < $defenderToGoal) {
-                return false;
-            }
+        // A booked man stays on his feet unless the chance is too good to let go.
+        // Going to ground again is how a yellow becomes a red.
+        if (($state->bookings[$defender->id] ?? 0) > 0) {
+            return false;
         }
 
-        return true;
+        return Geometry::isLastMan($state, $defender, $carrier);
     }
 
     /**
@@ -541,7 +545,7 @@ final class PositionalEngine
         $bestScore = -INF;
 
         foreach ($state->players as $mate) {
-            if ($mate->side !== $carrier->side || $mate->id === $carrier->id || $mate->isGoalkeeper()) {
+            if ($mate->side !== $carrier->side || $mate->id === $carrier->id || $mate->isGoalkeeper() || ! $mate->isPlaying()) {
                 continue;
             }
 
@@ -591,7 +595,7 @@ final class PositionalEngine
         $bestScore = -INF;
 
         foreach ($state->players as $mate) {
-            if ($mate->side !== $carrier->side || $mate->id === $carrier->id) {
+            if ($mate->side !== $carrier->side || $mate->id === $carrier->id || ! $mate->isPlaying()) {
                 continue;
             }
 
@@ -629,7 +633,7 @@ final class PositionalEngine
         $carrierToGoal = $carrier->pos->distanceTo($goal);
 
         foreach ($state->players as $opponent) {
-            if ($opponent->side === $carrier->side || $opponent->isGoalkeeper()) {
+            if ($opponent->side === $carrier->side || $opponent->isGoalkeeper() || ! $opponent->isPlaying()) {
                 continue;
             }
 
@@ -712,14 +716,14 @@ final class PositionalEngine
         // offside, so a through-ball to him would not stand.
         $lastLine = INF;
         foreach ($state->players as $defender) {
-            if ($defender->side === $carrier->side || $defender->isGoalkeeper()) {
+            if ($defender->side === $carrier->side || $defender->isGoalkeeper() || ! $defender->isPlaying()) {
                 continue;
             }
             $lastLine = min($lastLine, $defender->pos->distanceTo($goal));
         }
 
         foreach ($state->players as $mate) {
-            if ($mate->side !== $carrier->side || $mate->id === $carrier->id || $mate->isGoalkeeper()) {
+            if ($mate->side !== $carrier->side || $mate->id === $carrier->id || $mate->isGoalkeeper() || ! $mate->isPlaying()) {
                 continue;
             }
 
@@ -765,7 +769,7 @@ final class PositionalEngine
         $bestScore = -INF;
 
         foreach ($state->players as $mate) {
-            if ($mate->side !== $carrier->side || $mate->id === $carrier->id || $mate->isGoalkeeper()) {
+            if ($mate->side !== $carrier->side || $mate->id === $carrier->id || $mate->isGoalkeeper() || ! $mate->isPlaying()) {
                 continue;
             }
 
@@ -801,7 +805,7 @@ final class PositionalEngine
         $bestScore = -INF;
 
         foreach ($state->players as $mate) {
-            if ($mate->side !== $carrier->side || $mate->id === $carrier->id || $mate->isGoalkeeper()) {
+            if ($mate->side !== $carrier->side || $mate->id === $carrier->id || $mate->isGoalkeeper() || ! $mate->isPlaying()) {
                 continue;
             }
 
@@ -1059,7 +1063,7 @@ final class PositionalEngine
         }
 
         foreach ($state->players as $mate) {
-            if ($mate->side !== $carrier->side || $mate->id === $carrier->id || $mate->isGoalkeeper()) {
+            if ($mate->side !== $carrier->side || $mate->id === $carrier->id || $mate->isGoalkeeper() || ! $mate->isPlaying()) {
                 continue;
             }
 

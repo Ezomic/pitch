@@ -267,7 +267,7 @@ const sideName = computed(() =>
 );
 
 // The moments worth reviewing: goals, clear chances, big saves and penalties.
-const MAJOR_KINDS = new Set(['goal', 'chance', 'save']);
+const MAJOR_KINDS = new Set(['goal', 'chance', 'save', 'card']);
 function isMajor(m: Moment): boolean {
     return MAJOR_KINDS.has(m.kind) || /penalt/i.test(m.text);
 }
