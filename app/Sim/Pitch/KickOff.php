@@ -81,7 +81,7 @@ final class KickOff
         // that do out to its edge.
         $defending = 1 - $side;
         foreach ($state->players as $player) {
-            if ($player->side === $defending && ! $player->isGoalkeeper()) {
+            if ($player->side === $defending && ! $player->isGoalkeeper() && $player->isPlaying()) {
                 $this->pushOutsideCentreCircle($player, $defending);
             }
         }
@@ -137,7 +137,7 @@ final class KickOff
         $centre = new Vec2(0.5, 0.5);
         $outfield = [];
         foreach ($state->players as $player) {
-            if ($player->side === $side && ! $player->isGoalkeeper()) {
+            if ($player->side === $side && ! $player->isGoalkeeper() && $player->isPlaying()) {
                 $outfield[] = $player;
             }
         }

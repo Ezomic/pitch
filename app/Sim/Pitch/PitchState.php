@@ -63,6 +63,14 @@ final class PitchState
         return $this->ballTrail[min($lag, count($this->ballTrail) - 1)];
     }
 
+    /**
+     * Yellow cards shown, by player id. A second one is a red, so this has to
+     * survive a pause and reload or a booked player would start clean again.
+     *
+     * @var array<int, int>
+     */
+    public array $bookings = [];
+
     /** Ticks left of a dead-ball pause after a set piece is awarded. */
     public int $deadBall = 0;
 
@@ -162,6 +170,7 @@ final class PitchState
             'holdTicks' => $this->holdTicks,
             'ballTrail' => array_map(fn (Vec2 $p): array => $p->pair(), $this->ballTrail),
             'deadBall' => $this->deadBall,
+            'bookings' => $this->bookings,
             'pendingType' => $this->pendingType?->value,
             'pendingSide' => $this->pendingSide,
             'pendingSpot' => $this->pendingSpot?->pair(),
@@ -200,6 +209,9 @@ final class PitchState
         $trail = $s['ballTrail'] ?? [];
         $state->ballTrail = array_map(fn (array $p): Vec2 => Vec2::fromPair($p), $trail);
         $state->deadBall = (int) $s['deadBall'];
+        /** @var array<int, int> $bookings */
+        $bookings = $s['bookings'] ?? [];
+        $state->bookings = array_map(intval(...), $bookings);
         $state->pendingType = $s['pendingType'] !== null ? EventType::from($s['pendingType']) : null;
         $state->pendingSide = (int) $s['pendingSide'];
         $state->pendingSpot = $s['pendingSpot'] !== null ? Vec2::fromPair($s['pendingSpot']) : null;

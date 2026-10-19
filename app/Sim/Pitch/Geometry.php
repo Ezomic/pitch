@@ -56,7 +56,7 @@ final class Geometry
         $bestDist = INF;
 
         foreach ($state->players as $player) {
-            if ($player->side === $side || $player->isGoalkeeper()) {
+            if ($player->side === $side || $player->isGoalkeeper() || ! $player->isPlaying()) {
                 continue;
             }
 
@@ -82,7 +82,7 @@ final class Geometry
         $bestDist = INF;
 
         foreach ($state->players as $player) {
-            if ($player->side === $side || $player->isGoalkeeper()) {
+            if ($player->side === $side || $player->isGoalkeeper() || ! $player->isPlaying()) {
                 continue;
             }
 
@@ -136,12 +136,31 @@ final class Geometry
         }
 
         foreach ($state->players as $opponent) {
-            if ($opponent->side === $carrier->side || $opponent->isGoalkeeper()) {
+            if ($opponent->side === $carrier->side || $opponent->isGoalkeeper() || ! $opponent->isPlaying()) {
                 continue;
             }
 
             if ($opponent->pos->distanceTo($goal) < $carrierToGoal + 0.05) {
                 return false; // an outfielder is level with or goal-side of the carrier
+            }
+        }
+
+        return true;
+    }
+
+    /** No team-mate of this defender is between him and his own goal. */
+    public static function isLastMan(PitchState $state, PlayerState $defender, PlayerState $carrier): bool
+    {
+        $ownGoal = Geometry::goalOf($carrier->side);
+        $defenderToGoal = $defender->pos->distanceTo($ownGoal);
+
+        foreach ($state->players as $player) {
+            if ($player->side !== $defender->side || $player->id === $defender->id || $player->isGoalkeeper() || ! $player->isPlaying()) {
+                continue;
+            }
+
+            if ($player->pos->distanceTo($ownGoal) < $defenderToGoal) {
+                return false;
             }
         }
 

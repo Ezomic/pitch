@@ -37,6 +37,8 @@ final class MatchCommentary
             EventType::Foul => new MatchMoment($event->minute, 'setpiece', $this->pick(self::FOULS, $key)),
             EventType::Corner => new MatchMoment($event->minute, 'setpiece', $this->pick(self::CORNERS, $key)),
             EventType::Penalty => new MatchMoment($event->minute, 'setpiece', 'Penalty awarded!'),
+            EventType::YellowCard => new MatchMoment($event->minute, 'card', $this->fill(self::YELLOWS, $actor, null, $key)),
+            EventType::RedCard => new MatchMoment($event->minute, 'card', $this->fill(self::REDS, $actor, null, $key)),
             EventType::Cross => $event->success
                 ? new MatchMoment($event->minute, 'chance', $this->fill(self::CROSSES, $actor, $target, $key, self::CROSSES_SOLO))
                 : null,
@@ -75,6 +77,8 @@ final class MatchCommentary
             EventType::ThrowIn => 'Throw-in',
             EventType::GoalKick => 'Goal kick',
             EventType::Penalty => 'Penalty!',
+            EventType::YellowCard => 'Booked',
+            EventType::RedCard => 'SENT OFF',
             EventType::Cross => $target !== null ? "{$who} crosses to {$target}" : "{$who} crosses",
             EventType::Dribble => $ok ? "{$who} drives forward" : "{$who} dispossessed",
             default => $target !== null
@@ -269,6 +273,22 @@ final class MatchCommentary
         '{actor} work an opening between the lines.',
         '{actor} knock it to the edge of the box.',
         '{actor} work it into the final third.',
+    ];
+
+    /** @var list<string> */
+    private const YELLOWS = [
+        'Booked. {actor} goes into the book for that.',
+        'The referee has seen enough: a yellow for {actor}.',
+        'A caution for {actor}, and it was coming.',
+        '{actor} is shown a yellow card.',
+    ];
+
+    /** @var list<string> */
+    private const REDS = [
+        'Red card! {actor} is off, and they are down to ten.',
+        '{actor} is sent off. No argument about that one.',
+        'Straight red for {actor}. He has to go.',
+        'That is a sending off. {actor} walks.',
     ];
 
     /** @var list<string> */
