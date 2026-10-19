@@ -164,6 +164,8 @@ class ReplayMatch
         foreach ($snapshot['players'] as &$player) {
             if ((int) $player['id'] === $slot && (int) $player['side'] === 0) {
                 $player['attr'] = $intervention['attr'];
+                // Matches saved before stamina existed carry none: fresh legs.
+                $player['st'] = $intervention['st'] ?? 1.0;
             }
         }
         unset($player);

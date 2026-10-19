@@ -56,15 +56,16 @@ final class Roster
      * that slot's formation zone.
      *
      * @param  array<int, Attributes>  $bySlot  slot id => attributes
+     * @param  array<int, int>  $fitness  slot id => season fitness, 0..100; a slot not listed is fresh
      * @return array<int, Player>
      */
-    public static function fromAttributes(array $bySlot, ?Formation $formation = null): array
+    public static function fromAttributes(array $bySlot, ?Formation $formation = null, array $fitness = []): array
     {
         $formation ??= Formation::balanced();
 
         $players = [];
         foreach ($formation->layout as $slot => [$zone, $position]) {
-            $players[$slot] = new Player($slot, 'P'.$slot, $position, $zone, $bySlot[$slot]);
+            $players[$slot] = new Player($slot, 'P'.$slot, $position, $zone, $bySlot[$slot], $fitness[$slot] ?? 100);
         }
 
         return $players;

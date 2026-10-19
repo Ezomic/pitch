@@ -58,7 +58,7 @@ final class PositionalEngine
     // How wide a carrier must be, and how willingly they whip it in from there.
     private const float CROSS_WIDTH = 0.18;
 
-    private const float CROSS_CHANCE = 0.80;
+    private const float CROSS_CHANCE = 0.92;
 
     // How much of a striker's finishing carries into an attempt on goal.
     private const float SHOT_SKILL = 0.68;
@@ -96,6 +96,9 @@ final class PositionalEngine
 
     /** A carrier this close to goal is worth going to ground to stop. */
     private const float SLIDE_DANGER = 0.12;
+
+    /** What a completely spent passer loses off his completion chance. */
+    private const float PASS_FATIGUE = 0.08;
 
     private const float THROW_CHANCE = 0.2;       // an errant pass that runs out for a throw
 
@@ -693,12 +696,13 @@ final class PositionalEngine
         $laneRisk = $laneDefender !== null && $laneDist < self::LANE_RADIUS
             ? (self::LANE_RADIUS - $laneDist) / self::LANE_RADIUS * self::LANE_WEIGHT
             : 0.0;
-        $threshold = max(0.1, min(0.97, 0.55 + $carrier->attributes->passing / 100 * 0.38 - $pressure - $laneRisk));
+        $fatigue = $carrier->tiredness() * self::PASS_FATIGUE;
+        $threshold = max(0.1, min(0.97, 0.57 + $carrier->attributes->passing / 100 * 0.38 - $pressure - $laneRisk - $fatigue));
         $draw = $rng->next();
         $success = $draw <= $threshold;
 
         $decision = $this->buildDecision($state, $carrier, Geometry::danger($dest, $carrier->side));
-        $roll = new Roll(0.55, $carrier->attributes->passing / 100 * 0.38, $pressure + $laneRisk, $threshold, $draw);
+        $roll = new Roll(0.57, $carrier->attributes->passing / 100 * 0.38, $pressure + $laneRisk + $fatigue, $threshold, $draw);
         $events[] = Events::of($minute, EventType::Pass, $carrier, $target->id, $carrier->pos, $dest, $success, $decision, $roll);
 
         // An errant ball sometimes runs out of play for a throw-in to the other side.

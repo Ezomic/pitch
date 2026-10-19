@@ -273,3 +273,27 @@ it('stops on the half-time whistle and starts the second half on the next advanc
     $this->actingAs($user)->get(route('play.show'))
         ->assertInertia(fn (Assert $page) => $page->where('atInterval', false)->where('mentality', 'attacking'));
 });
+
+it('brings a substitute on with his own fitness and reports energy', function () {
+    $user = User::factory()->create();
+
+    $props = $this->actingAs($user)->get(route('play.show'))->viewData('page')['props'];
+    $matchId = $props['matchId'];
+    $incoming = $props['bench'][0];
+
+    $body = $this->actingAs($user)->postJson(route('play.advance', $matchId), ['ticks' => 120])->assertOk()->json();
+    expect($body['energy'])->toHaveCount(10)
+        ->and(min($body['energy']))->toBeLessThanOrEqual(100);
+
+    $this->actingAs($user)
+        ->postJson(route('play.sub', $matchId), ['out_slot' => 1, 'player_id' => $incoming['id']])
+        ->assertOk();
+
+    $slot = collect(LiveMatch::query()->findOrFail($matchId)->pitch_state['players'])
+        ->first(fn (array $p): bool => $p['side'] === 0 && $p['slot'] === 1);
+
+    expect($slot['st'])->toBe($incoming['fitness'] / 100);
+
+    $this->actingAs($user)->get(route('play.show'))
+        ->assertInertia(fn (Assert $page) => $page->where('energy.1', $incoming['fitness']));
+});

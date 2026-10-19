@@ -18,6 +18,12 @@ use App\Sim\Domain\Position;
  */
 final class PlayerState
 {
+    /** The reserve below which a player starts to feel it. */
+    private const float TIRING_BELOW = 0.5;
+
+    /** The share of his pace a completely spent player has lost. */
+    private const float PACE_LOSS = 0.15;
+
     public Vec2 $pos;
 
     public Vec2 $target;
@@ -30,6 +36,14 @@ final class PlayerState
      * which is the whole risk of going to ground.
      */
     public int $grounded = 0;
+
+    /**
+     * What is left in his legs, 1.0 fresh to 0.0 spent. Drained by running (see
+     * Movement::moveAll) and set at kickoff from season fitness. Nothing here is
+     * random: it is a pure function of the tick loop, so it is persisted with the
+     * rest of the player or a resumed match would restore fresh legs.
+     */
+    public float $stamina = 1.0;
 
     /** Sent off. He takes no further part, and his side plays the rest a man down. */
     public bool $sentOff = false;
@@ -63,10 +77,20 @@ final class PlayerState
         return $this->position === Position::Goalkeeper;
     }
 
-    /** Top speed in pitch-fractions per second, from pace. */
+    /**
+     * How far into fatigue he is, 0 while the reserve is above half and rising to
+     * 1 when it is spent. Only a depleted player is slowed or loses accuracy, so
+     * a side is not handicapped for running in the first twenty minutes.
+     */
+    public function tiredness(): float
+    {
+        return max(0.0, (self::TIRING_BELOW - $this->stamina) / self::TIRING_BELOW);
+    }
+
+    /** Top speed in pitch-fractions per second, from pace, less what tiredness takes. */
     public function speed(): float
     {
-        return 0.045 + ($this->attributes->pace / 100) * 0.05;
+        return (0.045 + ($this->attributes->pace / 100) * 0.05) * (1.0 - self::PACE_LOSS * $this->tiredness());
     }
 
     /**
@@ -88,6 +112,7 @@ final class PlayerState
             'hb' => $this->hasBall,
             'gr' => $this->grounded,
             'so' => $this->sentOff,
+            'st' => $this->stamina,
         ];
     }
 
@@ -112,6 +137,8 @@ final class PlayerState
         // Absent from matches saved before sliding tackles existed.
         $player->grounded = (int) ($s['gr'] ?? 0);
         $player->sentOff = (bool) ($s['so'] ?? false);
+        // Absent from matches saved before stamina existed: fresh legs.
+        $player->stamina = (float) ($s['st'] ?? 1.0);
 
         return $player;
     }

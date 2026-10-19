@@ -206,6 +206,23 @@ class Squad extends Model
         return $attributes;
     }
 
+    /**
+     * Season fitness of whoever fills each slot, which sets the starting reserve
+     * of stamina for the match.
+     *
+     * @return array<int, int>
+     */
+    public function fitnessBySlot(): array
+    {
+        $fitness = [];
+
+        foreach ($this->assignments()->with('player')->get() as $assignment) {
+            $fitness[(int) $assignment->slot] = $assignment->player->fitness;
+        }
+
+        return $fitness;
+    }
+
     public function setup(): TeamSetup
     {
         return new TeamSetup(
@@ -214,6 +231,7 @@ class Squad extends Model
             Mentality::fromId($this->mentality),
             $this->goalkeeping(),
             $this->setPieceRating(),
+            $this->fitnessBySlot(),
         );
     }
 
@@ -230,8 +248,10 @@ class Squad extends Model
         $roles = $this->assignments()->pluck('role', 'slot');
 
         $bySlot = [];
+        $fitness = [];
         foreach ($lineup as $slot => $playerId) {
             $player = $players->get($playerId);
+            $fitness[(int) $slot] = $player instanceof Player ? $player->fitness : 100;
             $bySlot[(int) $slot] = $player instanceof Player
                 ? $this->slotAttributes($player, (int) $slot, $formation, $roles->get((int) $slot))
                 : new Attributes(50, 50, 50, 50, 50, 50);
@@ -247,6 +267,7 @@ class Squad extends Model
             Mentality::fromId($this->mentality),
             $this->goalkeeping(),
             $this->setPieceRating(),
+            $fitness,
         );
     }
 }

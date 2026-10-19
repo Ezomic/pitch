@@ -110,6 +110,25 @@ final class PitchState
 
     public string $awayMentality = 'balanced';
 
+    /**
+     * What is left in each outfielder's legs on one side, as a whole percentage,
+     * by slot. This is what the manager reads off to decide who to take off.
+     *
+     * @return array<int, int>
+     */
+    public function energy(int $side): array
+    {
+        $energy = [];
+
+        foreach ($this->players as $player) {
+            if ($player->side === $side && ! $player->isGoalkeeper()) {
+                $energy[$player->slot] = (int) round($player->stamina * 100);
+            }
+        }
+
+        return $energy;
+    }
+
     public function mentality(int $side): string
     {
         return $side === 0 ? $this->homeMentality : $this->awayMentality;

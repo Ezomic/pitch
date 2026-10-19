@@ -42,6 +42,7 @@ final class KickOff
                 $anchor = $this->anchor($side, $player->zone->x / Zone::MAX_X, $player->zone->y / Zone::MAX_Y);
                 $id = PlayerState::id($side, $slot);
                 $states[$id] = new PlayerState($id, $side, $slot, $player->position, $anchor, $player->attributes);
+                $states[$id]->stamina = self::startingStamina($player->fitness);
             }
 
             // Every team needs a keeper on its own line; a solid default until the
@@ -55,6 +56,12 @@ final class KickOff
         }
 
         return $states;
+    }
+
+    /** What a player has in his legs at kickoff: his season fitness as a fraction. */
+    public static function startingStamina(int $fitness): float
+    {
+        return max(0.0, min(1.0, $fitness / 100));
     }
 
     /** Place a side-relative anchor (advanced = toward the opponent goal) in pitch space. */

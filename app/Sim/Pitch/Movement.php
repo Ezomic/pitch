@@ -38,6 +38,20 @@ final class Movement
     // How far the whole block steps up the pitch behind the ball in possession.
     private const float PUSH_SCALE = 0.85;
 
+    // Stamina lost per pitch-length run. A fresh player covers around thirty
+    // lengths a match, so this takes most of a reserve over ninety minutes.
+    private const float DRAIN = 0.02;
+
+    // A run longer than this to the player's target is a sprint, and costs more.
+    private const float SPRINT_RUN = 0.1;
+
+    private const float SPRINT_EXTRA = 0.6;
+
+    // A step shorter than this is standing, and earns a little stamina back.
+    private const float IDLE_STEP = 0.002;
+
+    private const float RECOVERY = 0.0002;
+
     public function setTargets(PitchState $state, int $tick): void
     {
         $ballX = $state->ball->x;
@@ -258,8 +272,33 @@ final class Movement
                 continue;
             }
 
-            $player->pos = $player->pos->moveToward($player->target, $player->speed() * self::TICK)->clampToPitch();
+            $from = $player->pos;
+            $run = $from->distanceTo($player->target);
+            $player->pos = $from->moveToward($player->target, $player->speed() * self::TICK)->clampToPitch();
+
+            $this->tire($player, $from->distanceTo($player->pos), $run);
         }
+    }
+
+    /**
+     * Running costs stamina in proportion to the ground covered, and a long run
+     * (closing a carrier down, a forward's burst) costs more than shuffling
+     * about in shape. A player who is barely moving gets a little back.
+     */
+    private function tire(PlayerState $player, float $moved, float $run): void
+    {
+        if ($player->isGoalkeeper()) {
+            return;
+        }
+
+        if ($moved < self::IDLE_STEP) {
+            $player->stamina = min(1.0, $player->stamina + self::RECOVERY);
+
+            return;
+        }
+
+        $effort = $run > self::SPRINT_RUN ? 1.0 + self::SPRINT_EXTRA : 1.0;
+        $player->stamina = max(0.0, $player->stamina - $moved * self::DRAIN * $effort);
     }
 
     /**

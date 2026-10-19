@@ -21,6 +21,7 @@ final readonly class TeamSetup
      * @param  array<int, Attributes>  $bySlot  slot id => attributes
      * @param  int  $goalkeeping  the keeper's shot-stopping, 0..100
      * @param  int  $setPiece  the side's dead-ball strength, 0..100
+     * @param  array<int, int>  $fitness  slot id => season fitness, 0..100, which sets how much is in his legs at kickoff
      */
     public function __construct(
         public array $bySlot,
@@ -28,6 +29,7 @@ final readonly class TeamSetup
         public Mentality $mentality,
         public int $goalkeeping = 55,
         public int $setPiece = 50,
+        public array $fitness = [],
     ) {}
 
     /**
@@ -49,7 +51,7 @@ final readonly class TeamSetup
      */
     public function attackers(): array
     {
-        return Roster::fromAttributes($this->bySlot, $this->formation);
+        return Roster::fromAttributes($this->bySlot, $this->formation, $this->fitness);
     }
 
     public function defence(): Defense

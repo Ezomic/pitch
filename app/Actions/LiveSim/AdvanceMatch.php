@@ -26,7 +26,7 @@ class AdvanceMatch
     ) {}
 
     /**
-     * @return array{frames: list<array<string, mixed>>, moments: list<array<string, mixed>>, goals: list<array{minute: int, side: int}>, homeGoals: int, awayGoals: int, tick: int, finished: bool, interval: bool}
+     * @return array{frames: list<array<string, mixed>>, moments: list<array<string, mixed>>, goals: list<array{minute: int, side: int}>, homeGoals: int, awayGoals: int, tick: int, finished: bool, interval: bool, energy: array<int, int>}
      */
     public function handle(LiveMatch $match, int $chunkTicks = 30): array
     {
@@ -98,11 +98,12 @@ class AdvanceMatch
             'tick' => $to,
             'finished' => $finished,
             'interval' => $to === PositionalEngine::HALF_TICK,
+            'energy' => $result->state?->energy(0) ?? [],
         ];
     }
 
     /**
-     * @return array{frames: list<array<string, mixed>>, moments: list<array<string, mixed>>, goals: list<array{minute: int, side: int}>, homeGoals: int, awayGoals: int, tick: int, finished: bool, interval: bool}
+     * @return array{frames: list<array<string, mixed>>, moments: list<array<string, mixed>>, goals: list<array{minute: int, side: int}>, homeGoals: int, awayGoals: int, tick: int, finished: bool, interval: bool, energy: array<int, int>}
      */
     private function done(LiveMatch $match): array
     {
@@ -115,6 +116,7 @@ class AdvanceMatch
             'tick' => $match->current_tick,
             'finished' => true,
             'interval' => false,
+            'energy' => [],
         ];
     }
 
