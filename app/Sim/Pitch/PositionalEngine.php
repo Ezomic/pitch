@@ -34,6 +34,9 @@ final class PositionalEngine
 {
     private const int TOTAL_TICKS = 2700;         // a match's worth of action
 
+    /** The first tick of the second half: the interval falls just before it. */
+    public const int HALF_TICK = self::TOTAL_TICKS / 2;
+
     private const int DECIDE_TICKS = 5;           // the carrier acts about once a second
 
     private const float SHOOT_RANGE = 0.20;      // distance to goal a shot is viable from (calibrated: shots ~24/match)
@@ -163,7 +166,9 @@ final class PositionalEngine
     {
         // A goal on the previous tick left the ball in the net for that frame and
         // owes a kickoff; take it now so the restart is its own frame.
-        if ($state->pendingKickoff !== null) {
+        if ($tick === self::HALF_TICK && ! $state->secondHalf) {
+            $state = $this->startSecondHalf($state);
+        } elseif ($state->pendingKickoff !== null) {
             // A goal restarts play, not the match: the score, mentality and
             // bookings carry over. Formation and substitutions live on the
             // players, which the restart keeps.
@@ -294,6 +299,33 @@ final class PositionalEngine
     }
 
     /**
+     * The interval is over: everyone is back on his own shape, whatever he was
+     * doing when the whistle went, and the side that did not kick off the match
+     * kicks off the second half. No random draw is taken, so the interval is a
+     * boundary like any other and a match paused at it resumes byte-identically.
+     * The ends swap in presentation only (see LivePitch), which is what keeps the
+     * simulation itself independent of which way anyone is facing.
+     */
+    private function startSecondHalf(PitchState $state): PitchState
+    {
+        foreach ($state->players as $player) {
+            if (! $player->isPlaying()) {
+                continue;
+            }
+
+            $player->pos = $player->anchor;
+            $player->target = $player->anchor;
+            $player->hasBall = false;
+            $player->grounded = 0;
+        }
+
+        $restart = $this->carryOver($state, $this->kickOff->restart($state->players, side: 1));
+        $restart->secondHalf = true;
+
+        return $restart;
+    }
+
+    /**
      * Carry the facts about the match, as opposed to the state of play, across a
      * kickoff. A restart builds a fresh PitchState, so anything that belongs to
      * the match rather than to this passage of play has to be moved over
@@ -310,6 +342,7 @@ final class PositionalEngine
         $restart->homeMentality = $from->homeMentality;
         $restart->awayMentality = $from->awayMentality;
         $restart->bookings = $from->bookings;
+        $restart->secondHalf = $from->secondHalf;
 
         return $restart;
     }

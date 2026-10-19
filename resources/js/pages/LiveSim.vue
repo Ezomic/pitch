@@ -83,6 +83,8 @@ const props = defineProps<{
     onPitch: { slot: number; name: string }[];
     bench: BenchPlayer[];
     currentTick: number;
+    atInterval: boolean;
+    halfTick: number;
     homeGoals: number;
     awayGoals: number;
     moments: Moment[];
@@ -149,6 +151,13 @@ const speed = ref(1);
 // Nothing more will arrive in a replay, so the fetch loop stays shut.
 const finished = ref(isReplay || props.currentTick >= props.totalTicks);
 const serverTick = ref(isReplay ? props.totalTicks : props.currentTick);
+// The server stops each slice on the half-time whistle and holds there until
+// the manager starts the second half. heldAtInterval means no more is fetched;
+// atInterval means the buffered first half has played out and the break is on
+// screen. A match reopened at the whistle has nothing buffered, so both start
+// true.
+const heldAtInterval = ref(!isReplay && props.atInterval);
+const atInterval = ref(!isReplay && props.atInterval);
 const resumed = !isReplay && props.currentTick > 0;
 const resumedMinute = Math.min(
     90,
@@ -250,6 +259,10 @@ const livePlayers = computed<LivePlayer[]>(() => {
 });
 
 const clock = computed(() => {
+    if (atInterval.value && !finished.value) {
+        return '45:00';
+    }
+
     const minute = cur.value?.m ?? 0;
     const secs = Math.floor(frac.value * 60);
 
@@ -380,6 +393,7 @@ async function fetchNext(): Promise<void> {
             goals: { minute: number; side: 0 | 1 }[];
             tick: number;
             finished: boolean;
+            interval: boolean;
         };
         frames.value.push(...res.frames);
 
@@ -388,6 +402,10 @@ async function fetchNext(): Promise<void> {
         }
 
         serverTick.value = res.tick;
+
+        if (res.interval) {
+            heldAtInterval.value = true;
+        }
 
         if (res.finished) {
             finished.value = true;
@@ -490,10 +508,19 @@ function loop(ts: number): void {
 
     if (
         !finished.value &&
+        !heldAtInterval.value &&
         !fetching &&
         count.value - playhead.value < PREFETCH
     ) {
         void fetchNext();
+    }
+
+    if (heldAtInterval.value && playhead.value >= max) {
+        playing.value = false;
+        atInterval.value = true;
+        lastTs = null;
+
+        return;
     }
 
     if (finished.value && playhead.value >= max) {
@@ -506,7 +533,18 @@ function loop(ts: number): void {
     raf = requestAnimationFrame(loop);
 }
 
+async function startSecondHalf(): Promise<void> {
+    heldAtInterval.value = false;
+    atInterval.value = false;
+    await fetchNext();
+    await play();
+}
+
 async function play(): Promise<void> {
+    if (atInterval.value) {
+        return;
+    }
+
     if (finished.value && playhead.value >= count.value - 1) {
         return;
     }
@@ -630,7 +668,7 @@ async function makeSub(): Promise<void> {
 }
 
 onMounted(() => {
-    if (isReplay) {
+    if (isReplay || atInterval.value) {
         return;
     }
 
@@ -787,6 +825,25 @@ onBeforeUnmount(() => {
                     </span>
                 </div>
                 <div
+                    v-if="atInterval && !finished"
+                    class="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/60 text-white"
+                >
+                    <span class="font-mono text-lg"
+                        >Half-time · {{ score.h }} – {{ score.a }}</span
+                    >
+                    <span class="px-4 text-center text-xs text-white/80"
+                        >Change mentality, shape or make a substitution, then
+                        start the second half. The sides swap ends.</span
+                    >
+                    <button
+                        type="button"
+                        class="mt-1 flex items-center gap-1 rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground"
+                        @click="startSecondHalf"
+                    >
+                        <Play class="size-4" /> Start second half
+                    </button>
+                </div>
+                <div
                     v-if="finished"
                     class="absolute inset-0 flex items-center justify-center bg-black/50 font-mono text-lg text-white"
                 >
@@ -845,7 +902,15 @@ onBeforeUnmount(() => {
                     class="font-mono text-xs text-muted-foreground"
                     :class="{ 'ml-auto': !resumed || finished }"
                 >
-                    {{ finished ? 'Finished' : playing ? 'Playing' : 'Paused' }}
+                    {{
+                        finished
+                            ? 'Finished'
+                            : atInterval
+                              ? 'Half-time'
+                              : playing
+                                ? 'Playing'
+                                : 'Paused'
+                    }}
                 </span>
             </div>
         </div>

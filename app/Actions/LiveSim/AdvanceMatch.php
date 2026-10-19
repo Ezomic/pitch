@@ -26,7 +26,7 @@ class AdvanceMatch
     ) {}
 
     /**
-     * @return array{frames: list<array<string, mixed>>, moments: list<array<string, mixed>>, goals: list<array{minute: int, side: int}>, homeGoals: int, awayGoals: int, tick: int, finished: bool}
+     * @return array{frames: list<array<string, mixed>>, moments: list<array<string, mixed>>, goals: list<array{minute: int, side: int}>, homeGoals: int, awayGoals: int, tick: int, finished: bool, interval: bool}
      */
     public function handle(LiveMatch $match, int $chunkTicks = 30): array
     {
@@ -39,6 +39,13 @@ class AdvanceMatch
 
         $from = $match->current_tick;
         $to = min($from + $chunkTicks, $match->total_ticks);
+
+        // The interval is where the manager gets his one guaranteed decision, so a
+        // slice never runs across it: it stops on the whistle and the next one
+        // starts the second half.
+        if ($from < PositionalEngine::HALF_TICK && $to > PositionalEngine::HALF_TICK) {
+            $to = PositionalEngine::HALF_TICK;
+        }
         $result = $this->engine->resume($state, $rng, $from, $to);
 
         $names = $this->names($match);
@@ -90,11 +97,12 @@ class AdvanceMatch
             'awayGoals' => $result->awayGoals,
             'tick' => $to,
             'finished' => $finished,
+            'interval' => $to === PositionalEngine::HALF_TICK,
         ];
     }
 
     /**
-     * @return array{frames: list<array<string, mixed>>, moments: list<array<string, mixed>>, goals: list<array{minute: int, side: int}>, homeGoals: int, awayGoals: int, tick: int, finished: bool}
+     * @return array{frames: list<array<string, mixed>>, moments: list<array<string, mixed>>, goals: list<array{minute: int, side: int}>, homeGoals: int, awayGoals: int, tick: int, finished: bool, interval: bool}
      */
     private function done(LiveMatch $match): array
     {
@@ -106,6 +114,7 @@ class AdvanceMatch
             'awayGoals' => $match->away_goals,
             'tick' => $match->current_tick,
             'finished' => true,
+            'interval' => false,
         ];
     }
 

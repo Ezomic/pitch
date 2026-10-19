@@ -23,6 +23,7 @@ use App\Models\User;
 use App\Sim\Analysis\MatchRatings;
 use App\Sim\Analysis\MatchSummary;
 use App\Sim\Engine\Formation;
+use App\Sim\Pitch\PositionalEngine;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -108,6 +109,12 @@ class LiveSimController extends Controller
             // it already played are not persisted, so the action so far is read
             // in the feed rather than re-watched.
             'currentTick' => $match->current_tick,
+            // Held at the whistle: the first half is over and the second has not
+            // started, which is the manager's moment to change things.
+            'atInterval' => $match->status === LiveMatch::LIVE
+                && $match->current_tick === PositionalEngine::HALF_TICK
+                && ! ($match->pitch_state['secondHalf'] ?? false),
+            'halfTick' => PositionalEngine::HALF_TICK,
             'homeGoals' => $match->home_goals,
             'awayGoals' => $match->away_goals,
             'moments' => $match->moments,
