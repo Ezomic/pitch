@@ -99,6 +99,7 @@ final class KickOff
         if ($passer !== null) {
             $passer->pos = new Vec2(0.5, 0.5);
             $state->carrierId = $passer->id;
+            $state->restartTaker = $passer->id;
             $state->ball = $passer->pos;
         }
         if ($receiver !== null) {

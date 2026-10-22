@@ -71,6 +71,13 @@ final class PitchState
      */
     public array $bookings = [];
 
+    /**
+     * The player taking a throw-in, corner, goal kick or kickoff, until he has
+     * played it. A ball received directly from one of these is never offside.
+     * Persisted, because a restart can straddle a slice boundary.
+     */
+    public int $restartTaker = self::NO_CARRIER;
+
     /** The interval has been taken. Persisted, so a match paused at half-time comes back to it. */
     public bool $secondHalf = false;
 
@@ -193,6 +200,7 @@ final class PitchState
             'ballTrail' => array_map(fn (Vec2 $p): array => $p->pair(), $this->ballTrail),
             'deadBall' => $this->deadBall,
             'bookings' => $this->bookings,
+            'restartTaker' => $this->restartTaker,
             'secondHalf' => $this->secondHalf,
             'pendingType' => $this->pendingType?->value,
             'pendingSide' => $this->pendingSide,
@@ -236,6 +244,7 @@ final class PitchState
         /** @var array<int, int> $bookings */
         $bookings = $s['bookings'] ?? [];
         $state->bookings = array_map(intval(...), $bookings);
+        $state->restartTaker = (int) ($s['restartTaker'] ?? self::NO_CARRIER);
         $state->pendingType = $s['pendingType'] !== null ? EventType::from($s['pendingType']) : null;
         $state->pendingSide = (int) $s['pendingSide'];
         $state->pendingSpot = $s['pendingSpot'] !== null ? Vec2::fromPair($s['pendingSpot']) : null;

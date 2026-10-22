@@ -28,6 +28,7 @@ enum EventType: string
     case ThrowIn = 'throw_in';
     case GoalKick = 'goal_kick';
     case Penalty = 'penalty';
+    case Offside = 'offside';
 
     // Discipline.
     case YellowCard = 'yellow_card';
