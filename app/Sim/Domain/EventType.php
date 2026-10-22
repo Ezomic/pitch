@@ -33,6 +33,9 @@ enum EventType: string
     case YellowCard = 'yellow_card';
     case RedCard = 'red_card';
 
+    case Injury = 'injury';
+    case InjuryOff = 'injury_off';
+
     /** Whether this is a defending action, shown on the defending side. */
     public function isDefensive(): bool
     {

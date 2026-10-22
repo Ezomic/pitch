@@ -106,6 +106,7 @@ final class PositionalEngine
         private readonly KickOff $kickOff = new KickOff,
         private readonly Movement $movement = new Movement,
         private readonly Restarts $restarts = new Restarts,
+        private readonly Injuries $injuries = new Injuries,
     ) {}
 
     /**
@@ -135,7 +136,10 @@ final class PositionalEngine
      */
     public function start(array $home, array $away, int $seed): array
     {
-        return [$this->kickOff->restart($this->kickOff->buildStates($home, $away), side: 0), new Rng($seed)];
+        $players = $this->kickOff->buildStates($home, $away);
+        $this->injuries->assign($players, $seed);
+
+        return [$this->kickOff->restart($players, side: 0), new Rng($seed)];
     }
 
     /**
@@ -229,6 +233,8 @@ final class PositionalEngine
                 }
             }
         }
+
+        $this->injuries->resolve($state, $events, $minute);
 
         $frames[] = $this->snapshot($state, $minute);
 
@@ -345,6 +351,8 @@ final class PositionalEngine
         $restart->homeMentality = $from->homeMentality;
         $restart->awayMentality = $from->awayMentality;
         $restart->bookings = $from->bookings;
+        $restart->subsLeft = $from->subsLeft;
+        $restart->autoSubs = $from->autoSubs;
         $restart->secondHalf = $from->secondHalf;
 
         return $restart;
@@ -397,6 +405,7 @@ final class PositionalEngine
         // the floor when it misses. Worth it when he is the last man or the carrier
         // is close to goal, not worth it in midfield with cover behind.
         $slide = $this->commitsToSlide($state, $carrier, $defender);
+        $this->injuries->tackled($carrier, $slide);
 
         $skill = 0.05 + max(0.0, $defender->attributes->tackling - $carrier->attributes->dribbling) / 400;
         $threshold = $slide ? $skill * self::SLIDE_WIN : $skill;
@@ -417,6 +426,7 @@ final class PositionalEngine
             // box, a direct free kick just outside it, a possession free kick
             // anywhere else.
             if ($rng->next() < ($slide ? self::SLIDE_FOUL_CHANCE : self::STAND_FOUL_CHANCE)) {
+                $this->injuries->tackled($carrier, slide: false, foul: true);
                 $this->restarts->foul($state, $events, $rng, $minute, $carrier, $defender, $slide);
 
                 return true;
@@ -696,7 +706,7 @@ final class PositionalEngine
         $laneRisk = $laneDefender !== null && $laneDist < self::LANE_RADIUS
             ? (self::LANE_RADIUS - $laneDist) / self::LANE_RADIUS * self::LANE_WEIGHT
             : 0.0;
-        $fatigue = $carrier->tiredness() * self::PASS_FATIGUE;
+        $fatigue = $carrier->impairment() * self::PASS_FATIGUE;
         $threshold = max(0.1, min(0.97, 0.57 + $carrier->attributes->passing / 100 * 0.38 - $pressure - $laneRisk - $fatigue));
         $draw = $rng->next();
         $success = $draw <= $threshold;

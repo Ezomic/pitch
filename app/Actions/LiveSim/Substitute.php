@@ -7,6 +7,7 @@ namespace App\Actions\LiveSim;
 use App\Models\LiveMatch;
 use App\Models\Player;
 use App\Sim\Pitch\KickOff;
+use App\Sim\Pitch\PlayerState;
 
 /**
  * Bring a fresh player on for one already on the pitch. The incoming player
@@ -31,11 +32,13 @@ class Substitute
         $state = $match->pitch_state;
         foreach ($state['players'] as &$player) {
             if ((int) $player['id'] === $outSlot && (int) $player['side'] === 0) {
-                $player['attr'] = [$in->vision, $in->passing, $in->dribbling, $in->finishing, $in->tackling, $in->pace];
-                $player['st'] = $stamina;
+                $player = PlayerState::substituted($player, [$in->vision, $in->passing, $in->dribbling, $in->finishing, $in->tackling, $in->pace], $stamina);
             }
         }
         unset($player);
+        if (isset($state['subsLeft'])) {
+            $state['subsLeft'][0] = max(0, (int) $state['subsLeft'][0] - 1);
+        }
 
         $off = $this->nameInSlot($match, $outSlot);
 

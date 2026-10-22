@@ -71,6 +71,24 @@ final class PitchState
      */
     public array $bookings = [];
 
+    /**
+     * Substitutions each side has left to cover a hurt player. A side with none
+     * cannot replace him, so he leaves the pitch and the side plays a man down.
+     * A live match keeps the manager's side in step with every change he makes.
+     *
+     * @var array<int, int>
+     */
+    public array $subsLeft = [5, 5];
+
+    /**
+     * Sides that replace a hurt player themselves, at once and like for like:
+     * every side of a headless match, and the opposition in a live one. Only a
+     * manager's own side is left to make the call.
+     *
+     * @var array<int, bool>
+     */
+    public array $autoSubs = [true, true];
+
     /** The interval has been taken. Persisted, so a match paused at half-time comes back to it. */
     public bool $secondHalf = false;
 
@@ -127,6 +145,25 @@ final class PitchState
         }
 
         return $energy;
+    }
+
+    /**
+     * Which of one side's outfielders are hurt, by slot: 'limping' while he is
+     * still playing and can be replaced, 'off' once he has had to leave.
+     *
+     * @return array<int, string>
+     */
+    public function hurt(int $side): array
+    {
+        $hurt = [];
+
+        foreach ($this->players as $player) {
+            if ($player->side === $side && ! $player->sentOff && ($player->injured || $player->retired)) {
+                $hurt[$player->slot] = $player->retired ? 'off' : 'limping';
+            }
+        }
+
+        return $hurt;
     }
 
     public function mentality(int $side): string
@@ -193,6 +230,8 @@ final class PitchState
             'ballTrail' => array_map(fn (Vec2 $p): array => $p->pair(), $this->ballTrail),
             'deadBall' => $this->deadBall,
             'bookings' => $this->bookings,
+            'subsLeft' => $this->subsLeft,
+            'autoSubs' => $this->autoSubs,
             'secondHalf' => $this->secondHalf,
             'pendingType' => $this->pendingType?->value,
             'pendingSide' => $this->pendingSide,
@@ -236,6 +275,8 @@ final class PitchState
         /** @var array<int, int> $bookings */
         $bookings = $s['bookings'] ?? [];
         $state->bookings = array_map(intval(...), $bookings);
+        $state->subsLeft = array_map(intval(...), $s['subsLeft'] ?? [0, 0]);
+        $state->autoSubs = array_map(boolval(...), $s['autoSubs'] ?? [true, true]);
         $state->pendingType = $s['pendingType'] !== null ? EventType::from($s['pendingType']) : null;
         $state->pendingSide = (int) $s['pendingSide'];
         $state->pendingSpot = $s['pendingSpot'] !== null ? Vec2::fromPair($s['pendingSpot']) : null;
