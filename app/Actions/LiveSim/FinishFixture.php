@@ -10,7 +10,10 @@ use App\Actions\Season\RecordSeasonContribution;
 use App\Models\Fixture;
 use App\Models\LiveMatch;
 use App\Models\News;
+use App\Models\Player;
+use App\Models\SquadPlayer;
 use App\Models\Team;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Blow the full-time whistle on a league match: write the score that was
@@ -32,12 +35,17 @@ class FinishFixture
     {
         $fixture = $match->fixture;
 
-        // Nothing to write back for a friendly, and a fixture already settled is
-        // left alone so a repeated final slice cannot count twice.
+        // A friendly counts for nothing, so it never costs a player weeks out either.
+        // A settled fixture is left alone so a repeated final slice cannot count twice.
         if (! $fixture instanceof Fixture || $fixture->played) {
             return;
         }
 
+        DB::transaction(fn () => $this->settle($match, $fixture));
+    }
+
+    private function settle(LiveMatch $match, Fixture $fixture): void
+    {
         [$homeGoals, $awayGoals] = $fixture->userIsHome()
             ? [$match->home_goals, $match->away_goals]
             : [$match->away_goals, $match->home_goals];
@@ -64,6 +72,26 @@ class FinishFixture
             $this->scorerIds($match),
             $opponent instanceof Team && $opponent->is_derby ? 2 : 1,
         );
+
+        $this->carryInjuries($match);
+    }
+
+    /**
+     * The players hurt in the match miss the weeks it cost them, and drop out of
+     * the XI like any other injured man. A longer absence already running is kept.
+     */
+    private function carryInjuries(LiveMatch $match): void
+    {
+        foreach ($match->injuries ?? [] as $injury) {
+            $player = Player::query()->find($injury['pid']);
+
+            if (! $player instanceof Player) {
+                continue;
+            }
+
+            $player->forceFill(['injured_weeks' => max($player->injured_weeks, $injury['weeks'])])->save();
+            SquadPlayer::query()->where('player_id', $player->id)->delete();
+        }
     }
 
     /**

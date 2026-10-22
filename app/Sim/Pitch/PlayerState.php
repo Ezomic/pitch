@@ -24,6 +24,9 @@ final class PlayerState
     /** The share of his pace a completely spent player has lost. */
     private const float PACE_LOSS = 0.15;
 
+    /** The share of his pace a player hurt in the match has lost, until he is replaced. */
+    private const float INJURED_PACE_LOSS = 0.4;
+
     public Vec2 $pos;
 
     public Vec2 $target;
@@ -48,6 +51,28 @@ final class PlayerState
     /** Sent off. He takes no further part, and his side plays the rest a man down. */
     public bool $sentOff = false;
 
+    /** Hurt in the match and playing on, slower and less accurate, until a substitute replaces him. */
+    public bool $injured = false;
+
+    /** Hurt with no substitution left to cover him: off the pitch, and his side a man down. */
+    public bool $retired = false;
+
+    /**
+     * What has built up against him: legs run empty and heavy challenges (see
+     * Injuries). Like stamina it is a pure function of the tick loop.
+     */
+    public float $strain = 0.0;
+
+    /**
+     * The strain at which he gets hurt, fixed at kickoff from the seed, or null
+     * for a man who cannot be (the goalkeeper, and any match saved before
+     * in-match injuries existed).
+     */
+    public ?float $proneness = null;
+
+    /** How many weeks he would miss if hurt, fixed at kickoff alongside the threshold. */
+    public int $injuryWeeks = 0;
+
     public function __construct(
         public readonly int $id,
         public readonly int $side,
@@ -69,7 +94,7 @@ final class PlayerState
     /** Still part of the match: on the pitch and not sent off. */
     public function isPlaying(): bool
     {
-        return ! $this->sentOff;
+        return ! $this->sentOff && ! $this->retired;
     }
 
     public function isGoalkeeper(): bool
@@ -87,10 +112,21 @@ final class PlayerState
         return max(0.0, (self::TIRING_BELOW - $this->stamina) / self::TIRING_BELOW);
     }
 
-    /** Top speed in pitch-fractions per second, from pace, less what tiredness takes. */
+    /**
+     * How far from his best he is for passing: as spent as a tired man, or as
+     * a hurt one, whichever is worse.
+     */
+    public function impairment(): float
+    {
+        return $this->injured ? 1.0 : $this->tiredness();
+    }
+
+    /** Top speed in pitch-fractions per second, from pace, less what tiredness and injury take. */
     public function speed(): float
     {
-        return (0.045 + ($this->attributes->pace / 100) * 0.05) * (1.0 - self::PACE_LOSS * $this->tiredness());
+        $speed = (0.045 + ($this->attributes->pace / 100) * 0.05) * (1.0 - self::PACE_LOSS * $this->tiredness());
+
+        return $this->injured ? $speed * (1.0 - self::INJURED_PACE_LOSS) : $speed;
     }
 
     /**
@@ -113,6 +149,11 @@ final class PlayerState
             'gr' => $this->grounded,
             'so' => $this->sentOff,
             'st' => $this->stamina,
+            'inj' => $this->injured,
+            'ret' => $this->retired,
+            'sn' => $this->strain,
+            'pr' => $this->proneness,
+            'wk' => $this->injuryWeeks,
         ];
     }
 
@@ -139,7 +180,34 @@ final class PlayerState
         $player->sentOff = (bool) ($s['so'] ?? false);
         // Absent from matches saved before stamina existed: fresh legs.
         $player->stamina = (float) ($s['st'] ?? 1.0);
+        // Absent from matches saved before in-match injuries: nobody can be hurt.
+        $player->injured = (bool) ($s['inj'] ?? false);
+        $player->retired = (bool) ($s['ret'] ?? false);
+        $player->strain = (float) ($s['sn'] ?? 0.0);
+        $player->proneness = isset($s['pr']) ? (float) $s['pr'] : null;
+        $player->injuryWeeks = (int) ($s['wk'] ?? 0);
 
         return $player;
+    }
+
+    /**
+     * A snapshot of the player in a slot after a substitute has taken it: the
+     * newcomer's attributes and legs, and none of the strain or injury of the
+     * man he replaced. The one place this is done, so the live substitution and
+     * the replay of it cannot disagree.
+     *
+     * @param  array<string, mixed>  $snapshot
+     * @param  list<int>  $attributes
+     * @return array<string, mixed>
+     */
+    public static function substituted(array $snapshot, array $attributes, float $stamina): array
+    {
+        $snapshot['attr'] = $attributes;
+        $snapshot['st'] = $stamina;
+        $snapshot['inj'] = false;
+        $snapshot['ret'] = false;
+        $snapshot['sn'] = 0.0;
+
+        return $snapshot;
     }
 }
