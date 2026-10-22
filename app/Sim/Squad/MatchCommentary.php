@@ -39,6 +39,8 @@ final class MatchCommentary
             EventType::Penalty => new MatchMoment($event->minute, 'setpiece', 'Penalty awarded!'),
             EventType::YellowCard => new MatchMoment($event->minute, 'card', $this->fill(self::YELLOWS, $actor, null, $key)),
             EventType::RedCard => new MatchMoment($event->minute, 'card', $this->fill(self::REDS, $actor, null, $key)),
+            EventType::Injury => new MatchMoment($event->minute, 'injury', $this->fill(self::INJURIES, $actor, null, $key)),
+            EventType::InjuryOff => new MatchMoment($event->minute, 'injury', $this->fill(self::INJURIES_OFF, $actor, null, $key)),
             EventType::Cross => $event->success
                 ? new MatchMoment($event->minute, 'chance', $this->fill(self::CROSSES, $actor, $target, $key, self::CROSSES_SOLO))
                 : null,
@@ -79,6 +81,8 @@ final class MatchCommentary
             EventType::Penalty => 'Penalty!',
             EventType::YellowCard => 'Booked',
             EventType::RedCard => 'SENT OFF',
+            EventType::Injury => 'Hurt',
+            EventType::InjuryOff => 'Off injured',
             EventType::Cross => $target !== null ? "{$who} crosses to {$target}" : "{$who} crosses",
             EventType::Dribble => $ok ? "{$who} drives forward" : "{$who} dispossessed",
             default => $target !== null
@@ -289,6 +293,22 @@ final class MatchCommentary
         '{actor} is sent off. No argument about that one.',
         'Straight red for {actor}. He has to go.',
         'That is a sending off. {actor} walks.',
+    ];
+
+    /** @var list<string> */
+    private const INJURIES = [
+        '{actor} pulls up and is clearly hurt.',
+        '{actor} goes down holding his leg and needs treatment.',
+        'Trouble for {actor}, who has picked up a knock.',
+        '{actor} is hurt, and not at his best until he is replaced.',
+    ];
+
+    /** @var list<string> */
+    private const INJURIES_OFF = [
+        '{actor} cannot go on and there is nobody to replace him. A man down.',
+        '{actor} has to come off with no substitute to send on. Down to ten.',
+        'No substitutions left, so {actor} goes off and the side plays on a man short.',
+        '{actor} limps off, and that is one fewer for the rest of the match.',
     ];
 
     /** @var list<string> */

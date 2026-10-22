@@ -65,6 +65,8 @@ interface TeamStats {
     tackles: number;
     saves: number;
 }
+type Hurt = 'limping' | 'off';
+
 interface BenchPlayer {
     id: number;
     name: string;
@@ -87,6 +89,7 @@ const props = defineProps<{
     atInterval: boolean;
     halfTick: number;
     energy: Record<number, number>;
+    hurt: Record<number, Hurt>;
     homeGoals: number;
     awayGoals: number;
     moments: Moment[];
@@ -162,6 +165,12 @@ const serverTick = ref(isReplay ? props.totalTicks : props.currentTick);
 // server last reported it. It runs ahead of the playhead by the buffered
 // frames, which is close enough to choose who to take off.
 const energy = ref<Record<number, number>>({ ...props.energy });
+// Who is hurt, by slot, as the server last reported it: limping on until he is
+// replaced, or off the pitch with no substitution left to cover him.
+const hurt = ref<Record<number, Hurt>>({ ...props.hurt });
+// Bumped by every substitution, so a slice fetched before it cannot bring back
+// the injury it cleared.
+let subsMade = 0;
 const heldAtInterval = ref(!isReplay && props.atInterval);
 const atInterval = ref(!isReplay && props.atInterval);
 const resumed = !isReplay && props.currentTick > 0;
@@ -237,6 +246,7 @@ interface LivePlayer {
     gk: boolean;
     name: string | null;
     ball: boolean;
+    hurt: Hurt | null;
 }
 
 const livePlayers = computed<LivePlayer[]>(() => {
@@ -260,6 +270,7 @@ const livePlayers = computed<LivePlayer[]>(() => {
             gk: m.gk,
             name: m.name,
             ball: a.c === i,
+            hurt: m.s === 0 && !m.gk ? (hurt.value[m.slot] ?? null) : null,
         };
     });
 });
@@ -286,7 +297,7 @@ const sideName = computed(() =>
 );
 
 // The moments worth reviewing: goals, clear chances, big saves and penalties.
-const MAJOR_KINDS = new Set(['goal', 'chance', 'save', 'card']);
+const MAJOR_KINDS = new Set(['goal', 'chance', 'save', 'card', 'injury']);
 function isMajor(m: Moment): boolean {
     return MAJOR_KINDS.has(m.kind) || /penalt/i.test(m.text);
 }
@@ -389,6 +400,7 @@ async function fetchNext(): Promise<void> {
     }
 
     fetching = true;
+    const subsAtRequest = subsMade;
 
     try {
         const res = (await postJson(advance(props.matchId).url, {
@@ -401,6 +413,7 @@ async function fetchNext(): Promise<void> {
             finished: boolean;
             interval: boolean;
             energy: Record<number, number>;
+            hurt: Record<number, Hurt>;
         };
         frames.value.push(...res.frames);
 
@@ -412,6 +425,10 @@ async function fetchNext(): Promise<void> {
 
         if (Object.keys(res.energy).length > 0) {
             energy.value = res.energy;
+        }
+
+        if (subsAtRequest === subsMade) {
+            hurt.value = res.hurt;
         }
 
         if (res.interval) {
@@ -628,6 +645,11 @@ async function setFormation(id: string): Promise<void> {
 
 const benchList = ref<BenchPlayer[]>(props.bench.map((b) => ({ ...b })));
 const onPitchList = ref(props.onPitch.map((p) => ({ ...p })));
+const hurtList = computed(() =>
+    onPitchList.value
+        .filter((p) => hurt.value[p.slot] !== undefined)
+        .map((p) => ({ ...p, state: hurt.value[p.slot] })),
+);
 
 async function makeSub(): Promise<void> {
     if (
@@ -654,6 +676,7 @@ async function makeSub(): Promise<void> {
 
     subError.value = null;
     subsLeft.value = res.subsRemaining;
+    subsMade++;
 
     if (incoming) {
         const slot = outSlot.value;
@@ -664,6 +687,9 @@ async function makeSub(): Promise<void> {
         }
 
         energy.value = { ...energy.value, [slot]: incoming.fitness };
+        hurt.value = Object.fromEntries(
+            Object.entries(hurt.value).filter(([s]) => Number(s) !== slot),
+        );
 
         const op = onPitchList.value.find((x) => x.slot === slot);
 
@@ -772,6 +798,7 @@ onBeforeUnmount(() => {
                                     : p.ball
                                       ? 'size-5 text-[9px] ring-2 ring-black/50'
                                       : 'size-4 text-[7px] ring-1 ring-black/30',
+                                p.hurt && 'ring-2 ring-red-600',
                                 p.s === 0
                                     ? p.gk
                                         ? 'bg-lime-300 text-lime-950'
@@ -1020,10 +1047,12 @@ onBeforeUnmount(() => {
                                     'bg-emerald-500': m.kind === 'goal',
                                     'bg-sky-500': m.kind === 'chance',
                                     'bg-violet-500': m.kind === 'save',
+                                    'bg-orange-500': m.kind === 'injury',
                                     'bg-rose-500':
                                         m.kind !== 'goal' &&
                                         m.kind !== 'chance' &&
-                                        m.kind !== 'save',
+                                        m.kind !== 'save' &&
+                                        m.kind !== 'injury',
                                 }"
                             ></span>
                             <span
@@ -1094,6 +1123,26 @@ onBeforeUnmount(() => {
                 </div>
             </div>
 
+            <div
+                v-if="hurtList.length"
+                class="rounded-xl border border-red-600/50 bg-red-600/10 p-3"
+                role="alert"
+            >
+                <h3 class="mb-1 text-sm font-semibold text-red-600">Injury</h3>
+                <ul class="flex flex-col gap-1 text-xs">
+                    <li v-for="p in hurtList" :key="p.slot">
+                        <span class="font-semibold">{{ p.name }}</span>
+                        <template v-if="p.state === 'limping'">
+                            is hurt, slower and less accurate until he is
+                            replaced.
+                        </template>
+                        <template v-else>
+                            had to leave the pitch. You are a man down.
+                        </template>
+                    </li>
+                </ul>
+            </div>
+
             <div class="rounded-xl border border-border p-3">
                 <div class="mb-2 flex items-center justify-between">
                     <h3 class="text-sm font-semibold">Substitution</h3>
@@ -1118,6 +1167,7 @@ onBeforeUnmount(() => {
                         <template v-if="energy[p.slot] !== undefined">
                             · {{ energy[p.slot] }}%
                         </template>
+                        <template v-if="hurt[p.slot]"> · HURT </template>
                     </option>
                 </select>
                 <label class="mb-1 block text-xs text-muted-foreground"

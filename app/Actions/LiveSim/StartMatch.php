@@ -24,6 +24,9 @@ use App\Sim\Squad\TeamSetup;
  */
 class StartMatch
 {
+    /** Substitutions the manager has in a match. */
+    public const int SUBSTITUTIONS = 5;
+
     public function __construct(
         private readonly PositionalEngine $engine = new PositionalEngine,
         private readonly LivePitch $live = new LivePitch,
@@ -68,6 +71,9 @@ class StartMatch
         // fixture they are. Orientation is applied when the score is written back.
         $seed = $fixture instanceof Fixture ? $fixture->seed : random_int(1, 2_000_000_000);
         [$state, $rng] = $this->engine->start($setup->attackers(), $opponent->attackers(), $seed);
+        // The manager decides his own substitutions; the opposition replaces a hurt man itself.
+        $state->subsLeft = [self::SUBSTITUTIONS, self::SUBSTITUTIONS];
+        $state->autoSubs = [false, true];
 
         return LiveMatch::create([
             'user_id' => $user->id,
@@ -89,7 +95,8 @@ class StartMatch
             'scorers' => [],
             'summary' => null,
             'interventions' => [],
-            'subs_remaining' => 5,
+            'injuries' => [],
+            'subs_remaining' => self::SUBSTITUTIONS,
             'status' => LiveMatch::LIVE,
         ]);
     }

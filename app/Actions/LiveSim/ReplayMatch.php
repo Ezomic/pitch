@@ -11,6 +11,7 @@ use App\Sim\Engine\Rng;
 use App\Sim\Pitch\KickOff;
 use App\Sim\Pitch\LivePitch;
 use App\Sim\Pitch\PitchState;
+use App\Sim\Pitch\PlayerState;
 use App\Sim\Pitch\PositionalEngine;
 
 /**
@@ -163,12 +164,14 @@ class ReplayMatch
         $snapshot = $state->toSnapshot();
         foreach ($snapshot['players'] as &$player) {
             if ((int) $player['id'] === $slot && (int) $player['side'] === 0) {
-                $player['attr'] = $intervention['attr'];
                 // Matches saved before stamina existed carry none: fresh legs.
-                $player['st'] = $intervention['st'] ?? 1.0;
+                $player = PlayerState::substituted($player, $intervention['attr'], $intervention['st'] ?? 1.0);
             }
         }
         unset($player);
+        if (isset($snapshot['subsLeft'])) {
+            $snapshot['subsLeft'][0] = max(0, (int) $snapshot['subsLeft'][0] - 1);
+        }
 
         return PitchState::fromSnapshot($snapshot);
     }
