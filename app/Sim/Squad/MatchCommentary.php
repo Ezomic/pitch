@@ -37,6 +37,7 @@ final class MatchCommentary
             EventType::Foul => new MatchMoment($event->minute, 'setpiece', $this->pick(self::FOULS, $key)),
             EventType::Corner => new MatchMoment($event->minute, 'setpiece', $this->pick(self::CORNERS, $key)),
             EventType::Penalty => new MatchMoment($event->minute, 'setpiece', 'Penalty awarded!'),
+            EventType::Offside => new MatchMoment($event->minute, 'setpiece', $this->fill(self::OFFSIDES, $actor, $target, $key, self::OFFSIDES_SOLO)),
             EventType::YellowCard => new MatchMoment($event->minute, 'card', $this->fill(self::YELLOWS, $actor, null, $key)),
             EventType::RedCard => new MatchMoment($event->minute, 'card', $this->fill(self::REDS, $actor, null, $key)),
             EventType::Cross => $event->success
@@ -77,6 +78,7 @@ final class MatchCommentary
             EventType::ThrowIn => 'Throw-in',
             EventType::GoalKick => 'Goal kick',
             EventType::Penalty => 'Penalty!',
+            EventType::Offside => 'Offside',
             EventType::YellowCard => 'Booked',
             EventType::RedCard => 'SENT OFF',
             EventType::Cross => $target !== null ? "{$who} crosses to {$target}" : "{$who} crosses",
@@ -273,6 +275,21 @@ final class MatchCommentary
         '{actor} work an opening between the lines.',
         '{actor} knock it to the edge of the box.',
         '{actor} work it into the final third.',
+    ];
+
+    /** @var list<string> */
+    private const OFFSIDES = [
+        '{target} plays it through, but {actor} was a yard offside.',
+        'The flag goes up: {actor} is caught offside as {target} threads it.',
+        '{actor} breaks the line too early and is flagged offside.',
+        'Offside! {actor} was beyond the last defender when {target} played it.',
+    ];
+
+    /** @var list<string> */
+    private const OFFSIDES_SOLO = [
+        'They are caught offside as the ball is played in behind.',
+        'The flag goes up: the run was a touch early.',
+        'Offside! The line held and the runner was beyond it.',
     ];
 
     /** @var list<string> */

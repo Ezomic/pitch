@@ -45,7 +45,7 @@ final class Restarts
      *
      * @param  list<MatchEvent>  $events
      */
-    public function awardRestart(PitchState $state, array &$events, int $minute, EventType $type, int $side, Vec2 $spot, ?PlayerState $creditActor = null): void
+    public function awardRestart(PitchState $state, array &$events, int $minute, EventType $type, int $side, Vec2 $spot, ?PlayerState $creditActor = null, ?int $targetId = null): void
     {
         $taker = $type === EventType::GoalKick
             ? ($state->players[PlayerState::id($side, 0)] ?? null)
@@ -55,7 +55,7 @@ final class Restarts
             return;
         }
 
-        $events[] = Events::of($minute, $type, $creditActor ?? $taker, null, $spot, null, true);
+        $events[] = Events::of($minute, $type, $creditActor ?? $taker, $targetId, $spot, null, true);
 
         $taker->pos = $spot;
         $state->carrierId = $taker->id;
@@ -66,8 +66,20 @@ final class Restarts
         $state->ballKind = 'idle';
         $state->ballGoal = false;
         $state->holdTicks = 0;
+        $state->restartTaker = in_array($type, [EventType::ThrowIn, EventType::Corner, EventType::GoalKick], true) ? $taker->id : PitchState::NO_CARRIER;
         $state->deadBall = self::DEADBALL_TICKS;
         $state->teleported = true; // the ball is placed at the restart spot
+    }
+
+    /**
+     * A pass was played to a receiver in an offside position: the defending side
+     * takes an indirect free kick where he stood when the ball was played.
+     *
+     * @param  list<MatchEvent>  $events
+     */
+    public function offside(PitchState $state, array &$events, int $minute, PlayerState $passer, PlayerState $receiver): void
+    {
+        $this->awardRestart($state, $events, $minute, EventType::Offside, 1 - $receiver->side, $receiver->pos, $receiver, $passer->id);
     }
 
     private function nearestTeammateTo(PitchState $state, int $side, Vec2 $spot): ?PlayerState

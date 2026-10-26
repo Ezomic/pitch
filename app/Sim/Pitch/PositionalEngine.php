@@ -56,12 +56,12 @@ final class PositionalEngine
     private const float PROGRESS_PRESSED = 0.62;
 
     // How wide a carrier must be, and how willingly they whip it in from there.
-    private const float CROSS_WIDTH = 0.18;
+    private const float CROSS_WIDTH = 0.15;
 
     private const float CROSS_CHANCE = 0.92;
 
     // How much of a striker's finishing carries into an attempt on goal.
-    private const float SHOT_SKILL = 0.68;
+    private const float SHOT_SKILL = 0.75;
 
     // How much of the keeper's ability is worth against an attempt on goal.
     private const float KEEPER_SAVE = 0.20;
@@ -99,6 +99,13 @@ final class PositionalEngine
 
     /** What a completely spent passer loses off his completion chance. */
     private const float PASS_FATIGUE = 0.08;
+
+    /**
+     * How far past the line a passer will still think a runner is level. Players
+     * look for the offside line and mostly avoid it, but cannot read it to the
+     * yard, and that misjudgement is where the flags come from.
+     */
+    private const float OFFSIDE_JUDGEMENT = 0.01;
 
     private const float THROW_CHANCE = 0.2;       // an errant pass that runs out for a throw
 
@@ -222,10 +229,21 @@ final class PositionalEngine
                 $state->ball = $carrier->pos;
                 $state->holdTicks++;
 
+                if ($state->restartTaker !== $carrier->id) {
+                    $state->restartTaker = PitchState::NO_CARRIER;
+                }
+
                 if (! $this->contest($state, $events, $rng, $minute)
                     && ($state->holdTicks >= self::DECIDE_TICKS || $this->pressed($state))) {
+                    $taker = $state->restartTaker;
                     $this->decide($state, $events, $rng, $minute);
                     $state->holdTicks = 0;
+
+                    // The restart has been played; a new one awarded during the
+                    // decision (a throw-in off a bad pass) keeps its own exemption.
+                    if ($state->restartTaker === $taker) {
+                        $state->restartTaker = PitchState::NO_CARRIER;
+                    }
                 }
             }
         }
@@ -586,7 +604,7 @@ final class PositionalEngine
             }
 
             $reach = $carrier->pos->distanceTo($mate->pos);
-            if ($reach > self::MAX_PASS || $reach < 0.04) {
+            if ($reach > self::MAX_PASS || $reach < 0.04 || $this->seemsOffside($state, $carrier, $mate)) {
                 continue;
             }
 
@@ -615,6 +633,11 @@ final class PositionalEngine
         return $best;
     }
 
+    private function seemsOffside(PitchState $state, PlayerState $carrier, PlayerState $mate): bool
+    {
+        return Offside::flags($state, $carrier, $mate, self::OFFSIDE_JUDGEMENT);
+    }
+
     /**
      * The safest team-mate to keep the ball with, in any direction: the most open
      * man with a clear lane, mildly preferring not to retreat too far toward the
@@ -636,7 +659,7 @@ final class PositionalEngine
             }
 
             $reach = $carrier->pos->distanceTo($mate->pos);
-            if ($reach > self::MAX_PASS || $reach < 0.04) {
+            if ($reach > self::MAX_PASS || $reach < 0.04 || $this->seemsOffside($state, $carrier, $mate)) {
                 continue;
             }
 
@@ -697,13 +720,20 @@ final class PositionalEngine
             ? (self::LANE_RADIUS - $laneDist) / self::LANE_RADIUS * self::LANE_WEIGHT
             : 0.0;
         $fatigue = $carrier->tiredness() * self::PASS_FATIGUE;
-        $threshold = max(0.1, min(0.97, 0.57 + $carrier->attributes->passing / 100 * 0.38 - $pressure - $laneRisk - $fatigue));
+        $threshold = max(0.1, min(0.97, 0.58 + $carrier->attributes->passing / 100 * 0.38 - $pressure - $laneRisk - $fatigue));
         $draw = $rng->next();
         $success = $draw <= $threshold;
 
         $decision = $this->buildDecision($state, $carrier, Geometry::danger($dest, $carrier->side));
-        $roll = new Roll(0.57, $carrier->attributes->passing / 100 * 0.38, $pressure + $laneRisk + $fatigue, $threshold, $draw);
-        $events[] = Events::of($minute, EventType::Pass, $carrier, $target->id, $carrier->pos, $dest, $success, $decision, $roll);
+        $roll = new Roll(0.58, $carrier->attributes->passing / 100 * 0.38, $pressure + $laneRisk + $fatigue, $threshold, $draw);
+        $offside = $success && Offside::flags($state, $carrier, $target);
+        $events[] = Events::of($minute, EventType::Pass, $carrier, $target->id, $carrier->pos, $dest, $success && ! $offside, $decision, $roll);
+
+        if ($offside) {
+            $this->restarts->offside($state, $events, $minute, $carrier, $target);
+
+            return;
+        }
 
         // An errant ball sometimes runs out of play for a throw-in to the other side.
         if (! $success && $rng->next() < self::THROW_CHANCE) {
@@ -749,16 +779,6 @@ final class PositionalEngine
         $best = null;
         $bestScore = 0.05;
 
-        // The offside line: the deepest defending outfielder. A runner beyond it is
-        // offside, so a through-ball to him would not stand.
-        $lastLine = INF;
-        foreach ($state->players as $defender) {
-            if ($defender->side === $carrier->side || $defender->isGoalkeeper() || ! $defender->isPlaying()) {
-                continue;
-            }
-            $lastLine = min($lastLine, $defender->pos->distanceTo($goal));
-        }
-
         foreach ($state->players as $mate) {
             if ($mate->side !== $carrier->side || $mate->id === $carrier->id || $mate->isGoalkeeper() || ! $mate->isPlaying()) {
                 continue;
@@ -774,8 +794,8 @@ final class PositionalEngine
                 continue; // must be ahead of the ball
             }
 
-            if ($mateToGoal < $lastLine - 0.02) {
-                continue; // offside, beyond the last defender
+            if ($this->seemsOffside($state, $carrier, $mate)) {
+                continue; // beyond the line, a through-ball to him would not stand
             }
 
             $space = Geometry::spaceAheadOf($mate, $goal);
@@ -855,7 +875,7 @@ final class PositionalEngine
             }
 
             $reach = $carrier->pos->distanceTo($mate->pos);
-            if ($reach > self::MAX_PASS || $reach < 0.1) {
+            if ($reach > self::MAX_PASS || $reach < 0.1 || $this->seemsOffside($state, $carrier, $mate)) {
                 continue;
             }
 
@@ -884,7 +904,14 @@ final class PositionalEngine
     private function cross(PitchState $state, array &$events, Rng $rng, int $minute, PlayerState $carrier, PlayerState $target): void
     {
         $success = $rng->next() < 0.45;
-        $events[] = Events::of($minute, EventType::Cross, $carrier, $target->id, $carrier->pos, $target->pos, $success);
+        $offside = $success && Offside::flags($state, $carrier, $target);
+        $events[] = Events::of($minute, EventType::Cross, $carrier, $target->id, $carrier->pos, $target->pos, $success && ! $offside);
+
+        if ($offside) {
+            $this->restarts->offside($state, $events, $minute, $carrier, $target);
+
+            return;
+        }
 
         $state->carrierId = PitchState::NO_CARRIER;
         $state->ballKind = 'pass';
@@ -991,7 +1018,7 @@ final class PositionalEngine
         // A miss resolves once the ball reaches goal: the keeper saves and holds,
         // it deflects behind for a corner, or it is off target for a goal kick.
         $roll = $rng->next();
-        if ($roll < 0.4 && $keeper !== null) {
+        if ($roll < 0.38 && $keeper !== null) {
             // Saved and held: the keeper claims it and plays on.
             $events[] = Events::of($minute, EventType::Save, $keeper, null, $goal, null, true);
             $state->ballTo = $keeper->id;
