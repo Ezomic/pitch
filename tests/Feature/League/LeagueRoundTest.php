@@ -309,3 +309,107 @@ it('leaves a solo save alone', function () {
 
     expect($solo->seasons()->count())->toBe(0);
 });
+
+it('moves a round from open to playing to resolved', function () {
+    [$career] = leagueWithClubs(2);
+    $round = app(CurrentRound::class)->handle($career);
+
+    expect($round->status)->toBe(LeagueRound::OPEN);
+
+    $round->markPlaying();
+    expect($round->fresh()->status)->toBe(LeagueRound::PLAYING);
+
+    $round->markResolved();
+    expect($round->fresh()->status)->toBe(LeagueRound::RESOLVED)
+        ->and($round->fresh()->resolved_at)->not->toBeNull();
+});
+
+it('moves a playing round to failed', function () {
+    [$career] = leagueWithClubs(2);
+    $round = app(CurrentRound::class)->handle($career);
+
+    $round->markPlaying();
+    $round->markFailed();
+
+    expect($round->fresh()->status)->toBe(LeagueRound::FAILED)
+        ->and($round->fresh()->resolved_at)->toBeNull();
+});
+
+it('knows exactly four statuses', function () {
+    expect(LeagueRound::STATUSES)->toBe(['open', 'playing', 'resolved', 'failed']);
+});
+
+it('does not resolve a round that is playing or failed', function (string $status) {
+    [$career, $users] = leagueWithClubs(2);
+    readyUp($career, $users[0]);
+    readyUp($career, $users[1]);
+    $round = app(CurrentRound::class)->handle($career);
+    $round->forceFill(['status' => $status])->save();
+
+    expect(app(ResolveRound::class)->handle($round->fresh()))->toBeFalse()
+        ->and($round->season->fixtures()->where('played', true)->count())->toBe(0)
+        ->and($round->fresh()->status)->toBe($status);
+})->with([LeagueRound::PLAYING, LeagueRound::FAILED]);
+
+it('takes no team sheets once a round is playing or failed', function (string $status) {
+    [$career, $users] = leagueWithClubs(2);
+    $round = app(CurrentRound::class)->handle($career);
+    $round->forceFill(['status' => $status])->save();
+
+    $order = app(SubmitOrder::class)->handle($round->fresh(), $career->seatFor($users[0]), '442', 'balanced', true);
+
+    expect($order)->toBeNull()->and($round->orders()->count())->toBe(0);
+})->with([LeagueRound::PLAYING, LeagueRound::FAILED]);
+
+it('shows the status of the current round in the lobby', function (string $status) {
+    [$career, $users] = leagueWithClubs(2);
+    $round = app(CurrentRound::class)->handle($career);
+    $round->forceFill(['status' => $status])->save();
+
+    $this->actingAs($users[1])->get(route('league.show', $career))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('round.matchday', 1)
+            ->where('round.status', $status));
+})->with([LeagueRound::OPEN, LeagueRound::PLAYING, LeagueRound::FAILED]);
+
+it('lists the status of the rounds before the current one', function () {
+    [$career, $users] = leagueWithClubs(2);
+    readyUp($career, $users[0]);
+    readyUp($career, $users[1]);
+    app(ResolveRound::class)->handle(app(CurrentRound::class)->handle($career));
+
+    $this->actingAs($users[0])->get(route('league.show', $career))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('round.matchday', 2)
+            ->where('round.status', LeagueRound::OPEN)
+            ->where('previousRounds', [['matchday' => 1, 'status' => LeagueRound::RESOLVED]]));
+});
+
+it('defaults a career to the zone engine', function () {
+    [$career] = leagueWithClubs(2);
+
+    expect($career->fresh()->engine)->toBe(Career::ZONE)
+        ->and(Career::factory()->create()->fresh()->engine)->toBe(Career::ZONE);
+});
+
+it('resolves a nutmeg career with the zone resolver, to the same scores', function () {
+    [$career, $users] = leagueWithClubs(2);
+    readyUp($career, $users[0], '433', 'attacking');
+    readyUp($career, $users[1], '532', 'defensive');
+    $round = app(CurrentRound::class)->handle($career);
+
+    $scores = fn (): array => $round->season->fixtures()->where('matchday', 1)->where('youth', false)->orderBy('id')
+        ->get()->map(fn (Fixture $f): string => "{$f->seed}:{$f->home_goals}-{$f->away_goals}")->all();
+
+    app(ResolveRound::class)->handle($round);
+    $zone = $scores();
+
+    $round->season->fixtures()->where('matchday', 1)->update(['played' => false, 'home_goals' => null, 'away_goals' => null]);
+    $round->forceFill(['status' => LeagueRound::OPEN, 'resolved_at' => null])->save();
+    $career->forceFill(['engine' => Career::NUTMEG])->save();
+
+    expect(app(ResolveRound::class)->handle($round->fresh()))->toBeTrue()
+        ->and($scores())->toBe($zone)
+        ->and($zone)->not->toBeEmpty();
+});

@@ -58,6 +58,11 @@ class LeagueController extends Controller
             'table' => $table->handle($career, $season),
             'feed' => $feed->handle($career, $season),
             'round' => $round instanceof LeagueRound ? $this->round($round, $seat, $memberships) : null,
+            'previousRounds' => $career->rounds()
+                ->when($round instanceof LeagueRound, fn ($query) => $query->whereKeyNot($round?->id))
+                ->reorder('matchday', 'desc')->limit(3)->get()
+                ->map(fn (LeagueRound $r): array => ['matchday' => $r->matchday, 'status' => $r->status])
+                ->all(),
             'formations' => array_values(array_map(
                 fn (Formation $f): array => ['id' => $f->id, 'name' => $f->name],
                 Formation::all(),
@@ -206,6 +211,7 @@ class LeagueController extends Controller
 
         return [
             'matchday' => $round->matchday,
+            'status' => $round->status,
             'deadlineAt' => $round->deadline_at?->toIso8601String(),
             'waitingOn' => $memberships->whereNotNull('team_id')
                 ->filter(fn (CareerMembership $m): bool => $orders->get($m->id)?->ready !== true)
