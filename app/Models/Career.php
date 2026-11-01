@@ -23,11 +23,12 @@ use Illuminate\Support\Carbon;
  * @property string $type
  * @property string $status
  * @property int $round_hours
+ * @property string $engine
  * @property Carbon|null $last_played_at
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
-#[Fillable(['user_id', 'name', 'type', 'status', 'round_hours', 'last_played_at'])]
+#[Fillable(['user_id', 'name', 'type', 'status', 'round_hours', 'engine', 'last_played_at'])]
 class Career extends Model
 {
     /** @use HasFactory<CareerFactory> */
@@ -42,6 +43,12 @@ class Career extends Model
     /** How long a league waits on a manager before playing the round without them. */
     public const int DEFAULT_ROUND_HOURS = 24;
 
+    /** Matchdays resolved by the fast zone resolver. */
+    public const string ZONE = 'zone';
+
+    /** Matchdays resolved by the Nutmeg runner. */
+    public const string NUTMEG = 'nutmeg';
+
     /**
      * Mirrors the column default so a freshly created career carries the cadence
      * without being read back: a round's deadline is set from it the moment the
@@ -49,7 +56,7 @@ class Career extends Model
      *
      * @var array<string, mixed>
      */
-    protected $attributes = ['round_hours' => self::DEFAULT_ROUND_HOURS];
+    protected $attributes = ['round_hours' => self::DEFAULT_ROUND_HOURS, 'engine' => self::ZONE];
 
     /**
      * @return BelongsTo<User, $this>

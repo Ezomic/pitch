@@ -32,7 +32,13 @@ class LeagueRound extends Model
 {
     public const string OPEN = 'open';
 
+    public const string PLAYING = 'playing';
+
     public const string RESOLVED = 'resolved';
+
+    public const string FAILED = 'failed';
+
+    public const array STATUSES = [self::OPEN, self::PLAYING, self::RESOLVED, self::FAILED];
 
     /**
      * @return BelongsTo<Career, $this>
@@ -71,6 +77,16 @@ class LeagueRound extends Model
     public function orderFor(CareerMembership $seat): ?LeagueOrder
     {
         return $this->orders()->where('career_membership_id', $seat->id)->first();
+    }
+
+    public function markPlaying(): void
+    {
+        $this->forceFill(['status' => self::PLAYING])->save();
+    }
+
+    public function markFailed(): void
+    {
+        $this->forceFill(['status' => self::FAILED])->save();
     }
 
     public function markResolved(): void

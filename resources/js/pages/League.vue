@@ -2,6 +2,7 @@
 import { Head, router, usePage } from '@inertiajs/vue3';
 import { Check, Copy, Crown, UserMinus } from '@lucide/vue';
 import { computed, ref } from 'vue';
+import RoundStatusBadge from '@/components/RoundStatusBadge.vue';
 import { Button } from '@/components/ui/button';
 import { index } from '@/routes/careers';
 import {
@@ -12,6 +13,7 @@ import {
     release,
     remove,
 } from '@/routes/league';
+import type { PreviousRound, RoundStatus } from '@/types';
 
 interface Member {
     id: number;
@@ -47,6 +49,7 @@ interface RoundFixture {
 
 interface Round {
     matchday: number;
+    status: RoundStatus;
     deadlineAt: string | null;
     waitingOn: string[];
     yourOrder: {
@@ -97,6 +100,7 @@ const props = defineProps<{
     availableClubs: Club[];
     invitations: Invitation[];
     round: Round | null;
+    previousRounds: PreviousRound[];
     formations: Choice[];
     mentalities: Choice[];
     table: TableRow[];
@@ -121,6 +125,19 @@ const copied = ref<number | null>(null);
 const formation = ref(props.round?.yourOrder?.formation ?? '442');
 const mentality = ref(props.round?.yourOrder?.mentality ?? 'balanced');
 const hours = ref(props.career.roundHours);
+
+const open = computed(() => props.round?.status === 'open');
+
+const statusNote = computed(() => {
+    switch (props.round?.status) {
+        case 'playing':
+            return 'The matchday is being played. Results appear here when it is done.';
+        case 'failed':
+            return 'This matchday could not be played, so the league is paused on it. It will not run again on its own.';
+        default:
+            return null;
+    }
+});
 
 const deadline = computed(() => {
     const at = props.round?.deadlineAt;
@@ -221,10 +238,11 @@ function kick(member: Member): void {
             <div
                 class="mb-3 flex flex-wrap items-baseline justify-between gap-2"
             >
-                <h2 class="text-sm font-medium">
+                <h2 class="flex items-center gap-2 text-sm font-medium">
                     Matchday {{ props.round.matchday }}
+                    <RoundStatusBadge :status="props.round.status" />
                 </h2>
-                <p class="text-xs text-muted-foreground">
+                <p v-if="open" class="text-xs text-muted-foreground">
                     <template v-if="props.round.waitingOn.length">
                         Waiting on
                         {{ props.round.waitingOn.join(', ') }}
@@ -236,8 +254,24 @@ function kick(member: Member): void {
                 </p>
             </div>
 
+            <p
+                v-if="statusNote"
+                class="mb-3 rounded-md border px-3 py-2 text-sm"
+                :class="
+                    props.round.status === 'failed'
+                        ? 'border-destructive/40 text-destructive'
+                        : 'border-border text-muted-foreground'
+                "
+                role="status"
+            >
+                {{ statusNote }}
+            </p>
+
             <div class="grid gap-4 lg:grid-cols-2">
-                <div v-if="props.yourTeamId" class="flex flex-col gap-2">
+                <div
+                    v-if="open && props.yourTeamId"
+                    class="flex flex-col gap-2"
+                >
                     <div class="flex flex-wrap items-end gap-2">
                         <label class="flex flex-col gap-1">
                             <span class="text-xs text-muted-foreground"
@@ -291,7 +325,7 @@ function kick(member: Member): void {
                         </template>
                     </p>
                 </div>
-                <p v-else class="text-sm text-muted-foreground">
+                <p v-else-if="open" class="text-sm text-muted-foreground">
                     Take a club below and you can name a side for this matchday.
                 </p>
 
@@ -319,6 +353,20 @@ function kick(member: Member): void {
                     </li>
                 </ul>
             </div>
+
+            <ul
+                v-if="props.previousRounds.length"
+                class="mt-4 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground"
+            >
+                <li
+                    v-for="previous in props.previousRounds"
+                    :key="previous.matchday"
+                    class="flex items-center gap-1.5"
+                >
+                    Matchday {{ previous.matchday }}
+                    <RoundStatusBadge :status="previous.status" />
+                </li>
+            </ul>
 
             <div v-if="props.isOwner" class="mt-4 flex items-end gap-2">
                 <label class="flex flex-col gap-1">

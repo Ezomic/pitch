@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\League;
 
+use App\Models\Career;
 use App\Models\CareerMembership;
 use App\Models\Fixture;
 use App\Models\LeagueOrder;
@@ -66,7 +67,7 @@ class ResolveRound
                 }
             }
 
-            $this->playMatchday($round, $byTeam);
+            $this->playMatchday($round, $byTeam, $this->resolverFor($round->career));
 
             $round->markResolved();
         });
@@ -74,10 +75,19 @@ class ResolveRound
         return true;
     }
 
+    /** Nutmeg is not wired in yet, so every engine setting still resolves with the zone resolver. */
+    private function resolverFor(Career $career): FixtureResolver
+    {
+        return match ($career->engine) {
+            Career::NUTMEG => $this->resolver,
+            default => $this->resolver,
+        };
+    }
+
     /**
      * @param  array<int, LeagueOrder|null>  $byTeam
      */
-    private function playMatchday(LeagueRound $round, array $byTeam): void
+    private function playMatchday(LeagueRound $round, array $byTeam, FixtureResolver $resolver): void
     {
         $teams = Team::all()->keyBy('id');
 
@@ -95,7 +105,7 @@ class ResolveRound
                 throw new \RuntimeException("Missing team in fixture {$fixture->id}.");
             }
 
-            $result = $this->resolver->resolve(
+            $result = $resolver->resolve(
                 $this->setup($home, $byTeam[$home->id] ?? null),
                 $this->setup($away, $byTeam[$away->id] ?? null),
                 $fixture->seed,
