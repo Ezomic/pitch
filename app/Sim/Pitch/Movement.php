@@ -45,12 +45,14 @@ final class Movement
     // A run longer than this to the player's target is a sprint, and costs more.
     private const float SPRINT_RUN = 0.1;
 
-    private const float SPRINT_EXTRA = 0.6;
+    public const float SPRINT_EXTRA = 0.6;
 
     // A step shorter than this is standing, and earns a little stamina back.
     private const float IDLE_STEP = 0.002;
 
     private const float RECOVERY = 0.0002;
+
+    public function __construct(private readonly Injuries $injuries = new Injuries) {}
 
     public function setTargets(PitchState $state, int $tick): void
     {
@@ -299,6 +301,7 @@ final class Movement
 
         $effort = $run > self::SPRINT_RUN ? 1.0 + self::SPRINT_EXTRA : 1.0;
         $player->stamina = max(0.0, $player->stamina - $moved * self::DRAIN * $effort);
+        $this->injuries->run($player, $run > self::SPRINT_RUN);
     }
 
     /**

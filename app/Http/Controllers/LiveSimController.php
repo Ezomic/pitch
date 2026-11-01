@@ -23,6 +23,7 @@ use App\Models\User;
 use App\Sim\Analysis\MatchRatings;
 use App\Sim\Analysis\MatchSummary;
 use App\Sim\Engine\Formation;
+use App\Sim\Pitch\PitchState;
 use App\Sim\Pitch\PositionalEngine;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -117,6 +118,7 @@ class LiveSimController extends Controller
                 && ! ($match->pitch_state['secondHalf'] ?? false),
             'halfTick' => PositionalEngine::HALF_TICK,
             'energy' => $this->energy($match),
+            'hurt' => $replay === null ? PitchState::fromSnapshot($match->pitch_state)->hurt(0) : [],
             'homeGoals' => $match->home_goals,
             'awayGoals' => $match->away_goals,
             'moments' => $match->moments,

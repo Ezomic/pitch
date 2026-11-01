@@ -6,6 +6,8 @@ namespace App\Actions\LiveSim;
 
 use App\Models\LiveMatch;
 use App\Sim\Analysis\MatchSummary;
+use App\Sim\Domain\EventType;
+use App\Sim\Domain\MatchEvent;
 use App\Sim\Engine\Rng;
 use App\Sim\Pitch\LivePitch;
 use App\Sim\Pitch\PitchState;
@@ -26,7 +28,7 @@ class AdvanceMatch
     ) {}
 
     /**
-     * @return array{frames: list<array<string, mixed>>, moments: list<array<string, mixed>>, goals: list<array{minute: int, side: int}>, homeGoals: int, awayGoals: int, tick: int, finished: bool, interval: bool, energy: array<int, int>}
+     * @return array{frames: list<array<string, mixed>>, moments: list<array<string, mixed>>, goals: list<array{minute: int, side: int}>, homeGoals: int, awayGoals: int, tick: int, finished: bool, interval: bool, energy: array<int, int>, hurt: array<int, string>}
      */
     public function handle(LiveMatch $match, int $chunkTicks = 30): array
     {
@@ -68,6 +70,7 @@ class AdvanceMatch
             }
         }
         $finished = $to >= $match->total_ticks;
+        $injuries = $this->injuries($match, $result->events, $result->state);
 
         $match->update([
             'current_tick' => $to,
@@ -77,6 +80,7 @@ class AdvanceMatch
             'away_goals' => $result->awayGoals,
             'moments' => array_merge($match->moments, $moments),
             'scorers' => [...$match->scorers ?? [], ...$scorers],
+            'injuries' => [...$match->injuries ?? [], ...$injuries],
             // Tallied per slice and added on, because the events and frames behind
             // it are gone the moment this advance returns.
             'summary' => $this->summary->merge($match->summary, $this->summary->ofSlice($result->events, $result->frames, $this->identity($match))),
@@ -99,11 +103,45 @@ class AdvanceMatch
             'finished' => $finished,
             'interval' => $to === PositionalEngine::HALF_TICK,
             'energy' => $result->state?->energy(0) ?? [],
+            'hurt' => $result->state?->hurt(0) ?? [],
         ];
     }
 
     /**
-     * @return array{frames: list<array<string, mixed>>, moments: list<array<string, mixed>>, goals: list<array{minute: int, side: int}>, homeGoals: int, awayGoals: int, tick: int, finished: bool, interval: bool, energy: array<int, int>}
+     * The manager's players hurt in this slice, with the player in the slot and the
+     * weeks the injury will cost. Recorded now, against the man who was on the
+     * pitch, because he may be replaced before the final whistle.
+     *
+     * @param  list<MatchEvent>  $events
+     * @return list<array{pid: int, slot: int, name: string, minute: int, weeks: int}>
+     */
+    private function injuries(LiveMatch $match, array $events, ?PitchState $state): array
+    {
+        $hurt = [];
+        foreach ($events as $event) {
+            if ($event->type !== EventType::Injury || $event->actorId >= 100) {
+                continue;
+            }
+
+            $slot = $event->actorId % 100;
+            foreach ($match->players as $meta) {
+                if ((int) $meta['s'] === 0 && (int) $meta['slot'] === $slot && ($meta['pid'] ?? null) !== null) {
+                    $hurt[] = [
+                        'pid' => (int) $meta['pid'],
+                        'slot' => $slot,
+                        'name' => (string) ($meta['name'] ?? "Slot {$slot}"),
+                        'minute' => $event->minute,
+                        'weeks' => $state?->players[$event->actorId]->injuryWeeks ?? 1,
+                    ];
+                }
+            }
+        }
+
+        return $hurt;
+    }
+
+    /**
+     * @return array{frames: list<array<string, mixed>>, moments: list<array<string, mixed>>, goals: list<array{minute: int, side: int}>, homeGoals: int, awayGoals: int, tick: int, finished: bool, interval: bool, energy: array<int, int>, hurt: array<int, string>}
      */
     private function done(LiveMatch $match): array
     {
@@ -117,6 +155,7 @@ class AdvanceMatch
             'finished' => true,
             'interval' => false,
             'energy' => [],
+            'hurt' => [],
         ];
     }
 
