@@ -61,6 +61,20 @@ function makeBrittle(LiveMatch $match, int $side, int $slot, int $weeks): void
     $match->save();
 }
 
+/** A friendly draws a random seed, so left alone a second player can be hurt on his own and a test counting injuries flakes. */
+function makeEveryoneSturdy(LiveMatch $match): void
+{
+    foreach (['pitch_state', 'kickoff_state'] as $column) {
+        $state = $match->{$column};
+        foreach ($state['players'] as &$player) {
+            $player['pr'] = 1.0e12;
+        }
+        unset($player);
+        $match->{$column} = $state;
+    }
+    $match->save();
+}
+
 /** @return array{LiveMatch, User} */
 function injuryStarted(bool $league): array
 {
@@ -71,7 +85,10 @@ function injuryStarted(bool $league): array
 
     $matchId = test()->actingAs($user)->get(route('play.show'))->viewData('page')['props']['matchId'];
 
-    return [LiveMatch::query()->findOrFail($matchId), $user];
+    $match = LiveMatch::query()->findOrFail($matchId);
+    makeEveryoneSturdy($match);
+
+    return [$match, $user];
 }
 
 function injuryAdvance(User $user, LiveMatch $match, int $ticks): array
