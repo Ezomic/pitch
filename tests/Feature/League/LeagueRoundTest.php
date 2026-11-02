@@ -7,8 +7,10 @@ use App\Actions\Career\CreateCareer;
 use App\Actions\Career\InviteToLeague;
 use App\Actions\League\CurrentRound;
 use App\Actions\League\EnsureLeagueSeason;
+use App\Actions\League\FinishRound;
 use App\Actions\League\ResolveRound;
 use App\Actions\League\SubmitOrder;
+use App\Jobs\RunFixtureMatch;
 use App\Models\Career;
 use App\Models\CareerMembership;
 use App\Models\Fixture;
@@ -16,9 +18,14 @@ use App\Models\LeagueOrder;
 use App\Models\LeagueRound;
 use App\Models\Team;
 use App\Models\User;
+use App\Sim\Runner\MatchRunner;
+use App\Sim\Runner\MatchRunnerException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\Date;
+use Illuminate\Support\Facades\Queue;
 use Inertia\Testing\AssertableInertia as Assert;
+use Tests\Support\FakeMatchRunner;
 
 uses(RefreshDatabase::class);
 
@@ -393,23 +400,178 @@ it('defaults a career to the zone engine', function () {
         ->and(Career::factory()->create()->fresh()->engine)->toBe(Career::ZONE);
 });
 
-it('resolves a nutmeg career with the zone resolver, to the same scores', function () {
+/**
+ * A nutmeg league with both managers ready, returning the round to resolve.
+ *
+ * @return array{Career, list<User>, LeagueRound}
+ */
+function nutmegLeague(?FakeMatchRunner $runner = null, string $mentality = 'balanced'): array
+{
     [$career, $users] = leagueWithClubs(2);
-    readyUp($career, $users[0], '433', 'attacking');
-    readyUp($career, $users[1], '532', 'defensive');
-    $round = app(CurrentRound::class)->handle($career);
-
-    $scores = fn (): array => $round->season->fixtures()->where('matchday', 1)->where('youth', false)->orderBy('id')
-        ->get()->map(fn (Fixture $f): string => "{$f->seed}:{$f->home_goals}-{$f->away_goals}")->all();
-
-    app(ResolveRound::class)->handle($round);
-    $zone = $scores();
-
-    $round->season->fixtures()->where('matchday', 1)->update(['played' => false, 'home_goals' => null, 'away_goals' => null]);
-    $round->forceFill(['status' => LeagueRound::OPEN, 'resolved_at' => null])->save();
     $career->forceFill(['engine' => Career::NUTMEG])->save();
 
-    expect(app(ResolveRound::class)->handle($round->fresh()))->toBeTrue()
-        ->and($scores())->toBe($zone)
-        ->and($zone)->not->toBeEmpty();
+    app()->instance(MatchRunner::class, $runner ?? new FakeMatchRunner);
+
+    readyUp($career, $users[0], '442', $mentality);
+    readyUp($career, $users[1]);
+
+    return [$career, $users, app(CurrentRound::class)->handle($career)];
+}
+
+it('hands a nutmeg matchday to the runner instead of the zone resolver', function () {
+    Queue::fake();
+    [, , $round] = nutmegLeague();
+
+    expect(app(ResolveRound::class)->handle($round))->toBeTrue()
+        ->and($round->fresh()->status)->toBe(LeagueRound::PLAYING)
+        ->and($round->season->fixtures()->where('played', true)->count())->toBe(0);
+
+    $fixtures = $round->season->fixtures()->where('youth', false)->where('matchday', 1)->count();
+
+    Queue::assertPushed(RunFixtureMatch::class, $fixtures);
+});
+
+it('plays every fixture from the runner result and then resolves the round', function () {
+    $runner = new FakeMatchRunner('win');
+    [, , $round] = nutmegLeague($runner);
+
+    app(ResolveRound::class)->handle($round);
+
+    $fixtures = $round->season->fixtures()->where('youth', false)->where('matchday', 1)->get();
+
+    expect($round->fresh()->status)->toBe(LeagueRound::RESOLVED)
+        ->and($runner->inputs)->toHaveCount($fixtures->count());
+
+    foreach ($fixtures as $fixture) {
+        expect($fixture->played)->toBeTrue()
+            ->and($fixture->home_goals)->toBe(2)
+            ->and($fixture->away_goals)->toBe(1)
+            ->and($fixture->runner_result['home_goals'])->toBe($fixture->home_goals)
+            ->and($fixture->runner_result['away_goals'])->toBe($fixture->away_goals)
+            ->and($fixture->runner_result['stats']['shots'])->toBe([11, 7])
+            ->and($fixture->runner_events)->toHaveCount(3)
+            ->and($fixture->runner_version)->toBe('nutmeg-0.4.2');
+    }
+
+    expect($round->season->fresh()->current_date->toDateString())->toBe($fixtures->first()->scheduled_on->toDateString());
+});
+
+it('sends the manager\'s mentality and the home flag to the runner', function () {
+    $runner = new FakeMatchRunner;
+    [, , $round] = nutmegLeague($runner, 'attacking');
+
+    app(ResolveRound::class)->handle($round);
+
+    $sides = collect($runner->inputs)->flatMap(fn ($i): array => [$i->home, $i->away]);
+    $first = $round->season->fixtures()->where('matchday', 1)->where('youth', false)->orderBy('id')->first();
+
+    expect($sides->contains(fn ($s): bool => $s->mentality->value === 'attacking'))->toBeTrue()
+        ->and($runner->inputs[0]->toArray()['home']['home'])->toBeTrue()
+        ->and($runner->inputs[0]->toArray()['away']['home'])->toBeFalse()
+        ->and($runner->inputs[0]->seed)->toBe($first->seed);
+});
+
+it('leaves zone careers on the zone resolver without a runner result', function () {
+    Queue::fake();
+    [$career, $users] = leagueWithClubs(2);
+    readyUp($career, $users[0]);
+    readyUp($career, $users[1]);
+    $round = app(CurrentRound::class)->handle($career);
+
+    app(ResolveRound::class)->handle($round);
+
+    Queue::assertNothingPushed();
+    $fixture = $round->season->fixtures()->where('youth', false)->where('matchday', 1)->first();
+
+    expect($round->fresh()->status)->toBe(LeagueRound::RESOLVED)
+        ->and($fixture->played)->toBeTrue()
+        ->and($fixture->runner_result)->toBeNull()
+        ->and($fixture->runner_version)->toBeNull();
+});
+
+it('retries a failing fixture and resolves once the runner recovers', function () {
+    config(['queue.default' => 'database', 'pitch.runner.backoff' => [0, 0]]);
+    $runner = new FakeMatchRunner('draw', failures: 2);
+    [, , $round] = nutmegLeague($runner);
+
+    app(ResolveRound::class)->handle($round);
+
+    expect($round->fresh()->status)->toBe(LeagueRound::PLAYING);
+
+    Artisan::call('queue:work', ['--stop-when-empty' => true, '--sleep' => 0, '--memory' => 4096]);
+
+    $played = $round->season->fixtures()->where('youth', false)->where('matchday', 1)->where('played', true)->count();
+
+    expect($round->fresh()->status)->toBe(LeagueRound::RESOLVED)
+        ->and($played)->toBeGreaterThan(0)
+        ->and($runner->failures)->toBe(0);
+});
+
+it('marks the round failed after the third attempt, with no fallback to the zone resolver', function () {
+    config(['queue.default' => 'database', 'pitch.runner.backoff' => [0, 0]]);
+    $runner = new FakeMatchRunner('win', failures: 100);
+    [, , $round] = nutmegLeague($runner);
+
+    app(ResolveRound::class)->handle($round);
+    Artisan::call('queue:work', ['--stop-when-empty' => true, '--sleep' => 0, '--memory' => 4096]);
+
+    $fixtures = $round->season->fixtures()->where('youth', false)->where('matchday', 1)->get();
+
+    expect($round->fresh()->status)->toBe(LeagueRound::FAILED)
+        ->and($fixtures->contains(fn (Fixture $f): bool => $f->played))->toBeFalse()
+        ->and(count($runner->inputs))->toBeGreaterThanOrEqual(3)->toBeLessThanOrEqual(3 * $fixtures->count());
+});
+
+it('does not run a fixture whose round has already failed or that is already played', function () {
+    $runner = new FakeMatchRunner;
+    [, , $round] = nutmegLeague($runner);
+    $fixture = $round->season->fixtures()->where('youth', false)->where('matchday', 1)->first();
+
+    (new RunFixtureMatch($round->id, $fixture->id))->handle($runner, new FinishRound);
+    expect($runner->inputs)->toBe([]);
+
+    $round->markPlaying();
+    $fixture->forceFill(['played' => true])->save();
+    (new RunFixtureMatch($round->id, $fixture->id))->handle($runner, new FinishRound);
+
+    expect($runner->inputs)->toBe([]);
+});
+
+it('fails a fixture that has no club on one side', function () {
+    $runner = new FakeMatchRunner;
+    [, , $round] = nutmegLeague($runner);
+    $round->markPlaying();
+    $fixture = $round->season->fixtures()->where('youth', false)->where('matchday', 1)->first();
+    $fixture->forceFill(['away_team_id' => null])->save();
+
+    (new RunFixtureMatch($round->id, $fixture->id))->handle($runner, new FinishRound);
+})->throws(MatchRunnerException::class, 'Missing team');
+
+it('resolves a nutmeg round that has no fixtures left to run', function () {
+    Queue::fake();
+    [, , $round] = nutmegLeague();
+    $round->season->fixtures()->where('matchday', 1)->update(['played' => true]);
+
+    app(ResolveRound::class)->handle($round);
+
+    expect($round->fresh()->status)->toBe(LeagueRound::RESOLVED);
+    Queue::assertNothingPushed();
+});
+
+it('only finishes a round that is waiting on its fixtures', function () {
+    [, , $round] = nutmegLeague(new FakeMatchRunner);
+
+    $round->markPlaying();
+    expect(app(FinishRound::class)->handle($round))->toBeFalse()
+        ->and($round->fresh()->status)->toBe(LeagueRound::PLAYING);
+
+    $round->season->fixtures()->where('matchday', 1)->update(['played' => true]);
+    expect(app(FinishRound::class)->handle($round))->toBeTrue()
+        ->and(app(FinishRound::class)->handle($round))->toBeFalse();
+});
+
+it('keeps a failed round failed when the failure handler runs for a missing round', function () {
+    (new RunFixtureMatch(999999, 1))->failed(new RuntimeException('gone'));
+
+    expect(LeagueRound::query()->count())->toBe(0);
 });

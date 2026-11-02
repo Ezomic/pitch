@@ -22,6 +22,9 @@ use Illuminate\Support\Carbon;
  * @property int|null $away_goals
  * @property bool $played
  * @property int $seed
+ * @property array<string, mixed>|null $runner_result
+ * @property list<array<string, mixed>>|null $runner_events
+ * @property string|null $runner_version
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  */
@@ -36,6 +39,9 @@ use Illuminate\Support\Carbon;
     'away_goals',
     'played',
     'seed',
+    'runner_result',
+    'runner_events',
+    'runner_version',
 ])]
 class Fixture extends Model
 {
@@ -104,6 +110,8 @@ class Fixture extends Model
             'played' => 'boolean',
             'youth' => 'boolean',
             'scheduled_on' => 'date',
+            'runner_result' => 'array',
+            'runner_events' => 'array',
         ];
     }
 }

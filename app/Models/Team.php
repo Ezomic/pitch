@@ -79,12 +79,13 @@ class Team extends Model
         return $bySlot;
     }
 
-    public function setup(): TeamSetup
+    /** The club as it was told to play, or as it always plays when nobody runs it. */
+    public function setup(?LeagueOrder $order = null): TeamSetup
     {
         return new TeamSetup(
             $this->bySlot(),
-            Formation::fromId($this->formation),
-            Mentality::fromId($this->mentality),
+            Formation::fromId($order->formation ?? $this->formation),
+            Mentality::fromId($order->mentality ?? $this->mentality),
             $this->keeping,
             $this->set_pieces,
         );

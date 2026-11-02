@@ -1,0 +1,14 @@
+{
+    "version": "nutmeg-0.4.2",
+    "home_goals": 2,
+    "away_goals": 1,
+    "stats": {
+        "possession": [54, 46],
+        "shots": [11, 7]
+    },
+    "events": [
+        {"t": 12.5, "type": "goal", "side": "home", "player": 9},
+        {"t": 47.0, "type": "goal", "side": "away", "player": 10},
+        {"t": 83.25, "type": "goal", "side": "home", "player": 8}
+    ]
+}

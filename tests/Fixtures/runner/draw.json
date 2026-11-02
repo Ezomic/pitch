@@ -1,0 +1,10 @@
+{
+    "version": "nutmeg-0.4.2",
+    "home_goals": 0,
+    "away_goals": 0,
+    "stats": {
+        "possession": [50, 50],
+        "shots": [3, 4]
+    },
+    "events": []
+}

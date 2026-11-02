@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Actions\League;
 
+use App\Jobs\RunFixtureMatch;
 use App\Models\Career;
 use App\Models\CareerMembership;
 use App\Models\Fixture;
@@ -13,7 +14,7 @@ use App\Models\Team;
 use App\Sim\Engine\Formation;
 use App\Sim\Engine\Mentality;
 use App\Sim\Squad\FixtureResolver;
-use App\Sim\Squad\TeamSetup;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -29,9 +30,10 @@ class ResolveRound
 {
     public function __construct(
         private readonly FixtureResolver $resolver = new FixtureResolver,
+        private readonly FinishRound $finish = new FinishRound,
     ) {}
 
-    /** True when the matchday was played by this call. */
+    /** True when the matchday was played, or for a nutmeg career handed to the runner, by this call. */
     public function handle(LeagueRound $round): bool
     {
         if (! $round->isOpen()) {
@@ -67,35 +69,55 @@ class ResolveRound
                 }
             }
 
-            $this->playMatchday($round, $byTeam, $this->resolverFor($round->career));
+            if ($round->career->engine === Career::NUTMEG) {
+                $this->dispatchMatchday($round);
 
-            $round->markResolved();
+                return;
+            }
+
+            $this->playMatchday($round, $byTeam);
         });
 
         return true;
     }
 
-    /** Nutmeg is not wired in yet, so every engine setting still resolves with the zone resolver. */
-    private function resolverFor(Career $career): FixtureResolver
+    private function dispatchMatchday(LeagueRound $round): void
     {
-        return match ($career->engine) {
-            Career::NUTMEG => $this->resolver,
-            default => $this->resolver,
-        };
+        $fixtures = $this->matchday($round);
+
+        $round->markPlaying();
+
+        if ($fixtures->isEmpty()) {
+            $this->finish->handle($round);
+
+            return;
+        }
+
+        foreach ($fixtures as $fixture) {
+            RunFixtureMatch::dispatch($round->id, $fixture->id)->afterCommit();
+        }
+    }
+
+    /**
+     * @return Collection<int, Fixture>
+     */
+    private function matchday(LeagueRound $round): Collection
+    {
+        return $round->season->fixtures()
+            ->where('youth', false)
+            ->where('matchday', $round->matchday)
+            ->where('played', false)
+            ->get();
     }
 
     /**
      * @param  array<int, LeagueOrder|null>  $byTeam
      */
-    private function playMatchday(LeagueRound $round, array $byTeam, FixtureResolver $resolver): void
+    private function playMatchday(LeagueRound $round, array $byTeam): void
     {
         $teams = Team::all()->keyBy('id');
 
-        $fixtures = $round->season->fixtures()
-            ->where('youth', false)
-            ->where('matchday', $round->matchday)
-            ->where('played', false)
-            ->get();
+        $fixtures = $this->matchday($round);
 
         foreach ($fixtures as $fixture) {
             $home = $teams->get($fixture->home_team_id);
@@ -105,9 +127,9 @@ class ResolveRound
                 throw new \RuntimeException("Missing team in fixture {$fixture->id}.");
             }
 
-            $result = $resolver->resolve(
-                $this->setup($home, $byTeam[$home->id] ?? null),
-                $this->setup($away, $byTeam[$away->id] ?? null),
+            $result = $this->resolver->resolve(
+                $home->setup($byTeam[$home->id] ?? null),
+                $away->setup($byTeam[$away->id] ?? null),
                 $fixture->seed,
             );
 
@@ -118,23 +140,7 @@ class ResolveRound
             ]);
         }
 
-        $this->advanceSeasonDate($round, $fixtures->first());
-    }
-
-    /** The club as it was told to play, or as it always plays when nobody runs it. */
-    private function setup(Team $team, ?LeagueOrder $order): TeamSetup
-    {
-        if ($order === null) {
-            return $team->setup();
-        }
-
-        return new TeamSetup(
-            $team->bySlot(),
-            Formation::fromId($order->formation),
-            Mentality::fromId($order->mentality),
-            $team->keeping,
-            $team->set_pieces,
-        );
+        $this->finish->handle($round);
     }
 
     private function autoOrder(LeagueRound $round, CareerMembership $seat): LeagueOrder
@@ -162,14 +168,5 @@ class ResolveRound
         }
 
         return $round->orders()->create([...$attributes, 'career_membership_id' => $seat->id]);
-    }
-
-    private function advanceSeasonDate(LeagueRound $round, ?Fixture $fixture): void
-    {
-        if (! $fixture instanceof Fixture || $fixture->scheduled_on === null) {
-            return;
-        }
-
-        $round->season->forceFill(['current_date' => $fixture->scheduled_on])->save();
     }
 }

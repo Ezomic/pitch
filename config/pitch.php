@@ -18,4 +18,21 @@ return [
 
     'engine' => env('PITCH_ENGINE', 'zone'),
 
+    /*
+    |--------------------------------------------------------------------------
+    | Nutmeg runner
+    |--------------------------------------------------------------------------
+    |
+    | The headless Nutmeg binary that resolves league matchdays for careers set
+    | to the nutmeg engine. It reads one JSON match on stdin and writes one JSON
+    | result on stdout. Leave the binary empty until a build exists on the box.
+    |
+    */
+
+    'runner' => [
+        'binary' => env('PITCH_RUNNER_BINARY'),
+        'timeout' => (int) env('PITCH_RUNNER_TIMEOUT', 60),
+        'backoff' => [10, 60],
+    ],
+
 ];
