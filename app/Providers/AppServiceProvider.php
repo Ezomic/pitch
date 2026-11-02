@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Sim\Runner\CliMatchRunner;
+use App\Sim\Runner\MatchRunner;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
@@ -15,7 +17,11 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->bind(MatchRunner::class, function (): CliMatchRunner {
+            $binary = config('pitch.runner.binary');
+
+            return new CliMatchRunner(is_string($binary) ? $binary : null, config()->integer('pitch.runner.timeout'));
+        });
     }
 
     /**
