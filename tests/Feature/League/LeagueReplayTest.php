@@ -97,7 +97,7 @@ it('refuses someone who is not in the league', function () {
 it('refuses a guest', function () {
     [$career, , , $fixture] = replayLeague();
 
-    $this->get(route('league.replay', [$career, $fixture]))->assertRedirect();
+    $this->get(route('league.replay', [$career, $fixture]))->assertRedirect(route('login'));
 });
 
 it('has no replay for a fixture the zone resolver played', function () {

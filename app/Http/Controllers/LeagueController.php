@@ -221,7 +221,7 @@ class LeagueController extends Controller
                 'mentality' => $mine->mentality,
                 'ready' => $mine->ready,
             ],
-            'fixtures' => $round->season->fixtures()
+            'fixtures' => $round->season->fixtures()->withoutRunnerLog()
                 ->where('youth', false)->where('matchday', $round->matchday)
                 ->with(['homeTeam', 'awayTeam'])->get()
                 ->map(fn (Fixture $f): array => [

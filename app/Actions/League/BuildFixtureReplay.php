@@ -30,7 +30,7 @@ class BuildFixtureReplay
         $away = $fixture->awayTeam?->name;
 
         $goals = collect($fixture->runner_events ?? [])
-            ->filter(fn (array $event): bool => ($event['type'] ?? null) === 'goal')
+            ->filter(fn (array $event): bool => ($event['type'] ?? null) === 'goal' && in_array($event['side'] ?? null, ['home', 'away'], true))
             ->sortBy(fn (array $event): float => (float) ($event['t'] ?? 0))
             ->values();
 
@@ -45,7 +45,7 @@ class BuildFixtureReplay
             'moments' => array_values($goals->map(fn (array $event): array => [
                 'minute' => (int) floor((float) ($event['t'] ?? 0)),
                 'kind' => 'goal',
-                'text' => 'Goal for '.(($event['side'] ?? null) === 'home' ? $home : $away),
+                'text' => 'Goal for '.($event['side'] === 'home' ? $home : $away),
             ])->all()),
         ];
     }

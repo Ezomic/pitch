@@ -49,7 +49,7 @@ class LeagueFeed
         /** @var Collection<int, Team> $teams */
         $teams = Team::all()->keyBy('id');
 
-        $played = $season->fixtures()->where('youth', false)->where('played', true)
+        $played = $season->fixtures()->withoutRunnerLog()->where('youth', false)->where('played', true)
             ->where('matchday', '>', max(0, $latest - $matchdays))
             ->orderByDesc('matchday')->orderBy('id')->get();
 
