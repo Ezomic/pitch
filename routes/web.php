@@ -4,6 +4,7 @@ use App\Http\Controllers\Auth\LoginCodeController;
 use App\Http\Controllers\CareerController;
 use App\Http\Controllers\CupController;
 use App\Http\Controllers\LeagueController;
+use App\Http\Controllers\LeagueReplayController;
 use App\Http\Controllers\LiveSimController;
 use App\Http\Controllers\MatchController;
 use App\Http\Controllers\NewsController;
@@ -44,6 +45,7 @@ Route::middleware(['auth'])->group(function () {
     Route::delete('leagues/{career}/members/{member}', [LeagueController::class, 'remove'])->name('league.remove');
     Route::post('leagues/{career}/orders', [LeagueController::class, 'order'])->name('league.order');
     Route::post('leagues/{career}/cadence', [LeagueController::class, 'cadence'])->name('league.cadence');
+    Route::get('leagues/{career}/fixtures/{fixture}/replay', [LeagueReplayController::class, 'show'])->name('league.replay');
 
     Route::get('squad', [SquadController::class, 'edit'])->name('squad.edit');
     Route::get('squad/what-if', [SquadController::class, 'whatIf'])->name('squad.what-if');

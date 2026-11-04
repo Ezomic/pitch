@@ -231,6 +231,7 @@ class LeagueController extends Controller
                     'homeGoals' => $f->home_goals,
                     'awayGoals' => $f->away_goals,
                     'played' => $f->played,
+                    'hasReplay' => $round->status === LeagueRound::RESOLVED && $f->hasStoredReplay(),
                     // A duel is the fixture two managers both have a stake in.
                     'duel' => $names->has($f->home_team_id) && $names->has($f->away_team_id),
                     'yours' => $seat->team_id !== null

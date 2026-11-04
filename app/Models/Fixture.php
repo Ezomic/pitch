@@ -96,6 +96,11 @@ class Fixture extends Model
             ->first();
     }
 
+    public function hasStoredReplay(): bool
+    {
+        return $this->runner_events !== null;
+    }
+
     public function userIsHome(): bool
     {
         return $this->home_team_id === null;
