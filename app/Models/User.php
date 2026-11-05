@@ -20,9 +20,11 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
  * @property int|null $current_career_id
  * @property string $name
  * @property string $email
+ * @property string|null $idp_id
  * @property Carbon|null $email_verified_at
  * @property string|null $login_code_hash
  * @property Carbon|null $login_code_expires_at
+ * @property Carbon|null $sso_logged_out_at
  * @property string|null $two_factor_secret
  * @property string|null $two_factor_recovery_codes
  * @property Carbon|null $two_factor_confirmed_at
@@ -141,6 +143,7 @@ class User extends Authenticatable implements PasskeyUser
         return [
             'email_verified_at' => 'datetime',
             'login_code_expires_at' => 'datetime',
+            'sso_logged_out_at' => 'datetime',
             'two_factor_confirmed_at' => 'datetime',
         ];
     }
