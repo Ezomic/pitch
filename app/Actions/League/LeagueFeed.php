@@ -6,6 +6,7 @@ namespace App\Actions\League;
 
 use App\Models\Career;
 use App\Models\Fixture;
+use App\Models\LeagueRound;
 use App\Models\Season;
 use App\Models\Team;
 use Illuminate\Support\Collection;
@@ -41,14 +42,18 @@ class LeagueFeed
             return [];
         }
 
+        /** @var array<int, int> $resolved */
+        $resolved = array_flip($career->rounds()->where('season_id', $season->id)
+            ->where('status', LeagueRound::RESOLVED)->pluck('matchday')->all());
+
         /** @var Collection<int, Team> $teams */
         $teams = Team::all()->keyBy('id');
 
-        $played = $season->fixtures()->where('youth', false)->where('played', true)
+        $played = $season->fixtures()->withoutRunnerLog()->where('youth', false)->where('played', true)
             ->where('matchday', '>', max(0, $latest - $matchdays))
             ->orderByDesc('matchday')->orderBy('id')->get();
 
-        return array_values($played->map(fn (Fixture $fixture): array => $this->item($fixture, $teams, $managers))->all());
+        return array_values($played->map(fn (Fixture $fixture): array => $this->item($fixture, $teams, $managers, isset($resolved[$fixture->matchday])))->all());
     }
 
     /**
@@ -56,7 +61,7 @@ class LeagueFeed
      * @param  array<int, string>  $managers
      * @return array<string, mixed>
      */
-    private function item(Fixture $fixture, Collection $teams, array $managers): array
+    private function item(Fixture $fixture, Collection $teams, array $managers, bool $resolved): array
     {
         $home = $teams->get($fixture->home_team_id);
         $away = $teams->get($fixture->away_team_id);
@@ -73,6 +78,7 @@ class LeagueFeed
             'homeManager' => $managers[$fixture->home_team_id] ?? null,
             'awayManager' => $managers[$fixture->away_team_id] ?? null,
             'duel' => isset($managers[$fixture->home_team_id], $managers[$fixture->away_team_id]),
+            'hasReplay' => $resolved && $fixture->hasStoredReplay(),
             'upset' => $this->isUpset($home, $away, $homeGoals, $awayGoals),
         ];
     }

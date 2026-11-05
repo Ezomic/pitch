@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\Scope;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -94,6 +95,22 @@ class Fixture extends Model
             ->whereDate('scheduled_on', '<=', $season->current_date)
             ->orderBy('matchday')
             ->first();
+    }
+
+    /**
+     * Lobby lists only need to know whether a log exists, so they skip loading it.
+     *
+     * @param  Builder<Fixture>  $query
+     */
+    #[Scope]
+    protected function withoutRunnerLog(Builder $query): void
+    {
+        $query->select(['id', ...array_diff($this->getFillable(), ['runner_result', 'runner_events'])]);
+    }
+
+    public function hasStoredReplay(): bool
+    {
+        return $this->runner_version !== null;
     }
 
     public function userIsHome(): bool

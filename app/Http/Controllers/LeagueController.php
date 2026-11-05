@@ -221,7 +221,7 @@ class LeagueController extends Controller
                 'mentality' => $mine->mentality,
                 'ready' => $mine->ready,
             ],
-            'fixtures' => $round->season->fixtures()
+            'fixtures' => $round->season->fixtures()->withoutRunnerLog()
                 ->where('youth', false)->where('matchday', $round->matchday)
                 ->with(['homeTeam', 'awayTeam'])->get()
                 ->map(fn (Fixture $f): array => [
@@ -231,6 +231,7 @@ class LeagueController extends Controller
                     'homeGoals' => $f->home_goals,
                     'awayGoals' => $f->away_goals,
                     'played' => $f->played,
+                    'hasReplay' => $round->status === LeagueRound::RESOLVED && $f->hasStoredReplay(),
                     // A duel is the fixture two managers both have a stake in.
                     'duel' => $names->has($f->home_team_id) && $names->has($f->away_team_id),
                     'yours' => $seat->team_id !== null

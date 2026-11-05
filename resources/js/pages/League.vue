@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Head, router, usePage } from '@inertiajs/vue3';
+import { Head, Link, router, usePage } from '@inertiajs/vue3';
 import { Check, Copy, Crown, UserMinus } from '@lucide/vue';
 import { computed, ref } from 'vue';
 import RoundStatusBadge from '@/components/RoundStatusBadge.vue';
@@ -12,6 +12,7 @@ import {
     order,
     release,
     remove,
+    replay,
 } from '@/routes/league';
 import type { PreviousRound, RoundStatus } from '@/types';
 
@@ -43,6 +44,7 @@ interface RoundFixture {
     homeGoals: number | null;
     awayGoals: number | null;
     played: boolean;
+    hasReplay: boolean;
     duel: boolean;
     yours: boolean;
 }
@@ -89,6 +91,7 @@ interface FeedItem {
     homeManager: string | null;
     awayManager: string | null;
     duel: boolean;
+    hasReplay: boolean;
     upset: boolean;
 }
 
@@ -350,6 +353,18 @@ function kick(member: Member): void {
                         <span class="truncate text-right">{{
                             fixture.away
                         }}</span>
+                        <Link
+                            v-if="fixture.hasReplay"
+                            :href="
+                                replay({
+                                    career: props.career.id,
+                                    fixture: fixture.id,
+                                })
+                            "
+                            class="shrink-0 text-xs text-primary underline-offset-4 hover:underline"
+                        >
+                            Replay
+                        </Link>
                     </li>
                 </ul>
             </div>
@@ -602,6 +617,18 @@ function kick(member: Member): void {
                             </span>
                             {{ item.away }}
                         </span>
+                        <Link
+                            v-if="item.hasReplay"
+                            :href="
+                                replay({
+                                    career: props.career.id,
+                                    fixture: item.fixtureId,
+                                })
+                            "
+                            class="shrink-0 text-xs text-primary underline-offset-4 hover:underline"
+                        >
+                            Replay
+                        </Link>
                         <span
                             v-if="item.duel"
                             class="shrink-0 rounded bg-primary/15 px-1.5 py-0.5 text-xs text-primary"
