@@ -9,11 +9,13 @@ import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
 import { login, register } from '@/routes';
 import { send, verify } from '@/routes/login/code';
+import { redirect as ssoRedirect } from '@/routes/sso';
 
 defineOptions({
     layout: {
         title: 'Log in to your account',
-        description: 'Sign in with a passkey, or get a one-time code by email',
+        description:
+            'Sign in with Thijssensoftware ID, a passkey, or a one-time code by email',
     },
 });
 
@@ -33,6 +35,22 @@ defineProps<{
     >
         {{ status }}
     </div>
+
+    <template v-if="!codeSent">
+        <Button class="w-full" as-child>
+            <a :href="ssoRedirect().url" data-test="sso-sign-in">
+                Sign in with Thijssensoftware ID
+            </a>
+        </Button>
+
+        <div
+            class="flex items-center gap-3 text-xs text-muted-foreground uppercase"
+        >
+            <span class="h-px flex-1 bg-border" />
+            or
+            <span class="h-px flex-1 bg-border" />
+        </div>
+    </template>
 
     <PasskeyVerify />
 
