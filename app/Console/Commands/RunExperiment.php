@@ -17,7 +17,8 @@ class RunExperiment extends Command
 
     public function handle(ExperimentHarness $harness): int
     {
-        $attribute = (string) $this->argument('attribute');
+        $attribute = $this->argument('attribute');
+        $attribute = is_string($attribute) ? $attribute : '';
         $delta = (int) $this->option('delta');
         $seeds = max(1, (int) $this->option('seeds'));
         $rating = (int) $this->option('rating');
