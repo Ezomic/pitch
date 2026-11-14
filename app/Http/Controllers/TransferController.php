@@ -31,10 +31,11 @@ class TransferController extends Controller
                 'wageBill' => $wageBill,
                 'net' => $squad->weekly_income - $wageBill,
             ],
-            'market' => Player::query()->where('is_free_agent', true)
+            'market' => Player::query()->onMarketFor($squad->career_id)
                 ->orderByDesc('vision')->orderBy('name')->get()
                 ->map(fn (Player $player) => $this->card($player, $squad))->all(),
-            'owned' => Player::query()->where('career_id', $squad->career_id)->where('is_youth', false)
+            'owned' => Player::query()->where('career_id', $squad->career_id)->where('user_id', $squad->user_id)
+                ->where('is_youth', false)->where('is_free_agent', false)
                 ->orderBy('name')->get()
                 ->map(fn (Player $player) => $this->card($player, $squad))->all(),
         ]);

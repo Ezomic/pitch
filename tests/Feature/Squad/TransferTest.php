@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Actions\Squad\EnsureSquad;
 use App\Actions\Squad\SellPlayer;
 use App\Actions\Squad\SignPlayer;
+use App\Models\Career;
 use App\Models\Player;
 use App\Models\Squad;
 use App\Models\User;
@@ -25,8 +26,70 @@ it('signs a free agent, spending bank money and taking ownership', function () {
     $agent->refresh();
     expect($agent->is_free_agent)->toBeFalse()
         ->and($agent->user_id)->toBe($user->id)
+        ->and($agent->career_id)->toBe($squad->career_id)
         ->and($squad->refresh()->bank)->toBe(300 - $price)
-        ->and(Player::query()->selectableFor($user->id)->pluck('id'))->toContain($agent->id);
+        ->and(Player::query()->selectableFor($squad->career_id)->pluck('id'))->toContain($agent->id);
+});
+
+it('keeps a signed free agent out of every other career', function () {
+    $buyer = User::factory()->create();
+    $squad = app(EnsureSquad::class)->handle($buyer);
+    $squad->forceFill(['bank' => 1000])->save();
+    $agent = Player::factory()->create(['is_free_agent' => true, 'user_id' => null]);
+
+    app(SignPlayer::class)->handle($squad, $agent);
+
+    $other = Career::factory()->create();
+
+    expect(Player::query()->selectableFor($other->id)->pluck('id'))->not->toContain($agent->id);
+
+    $this->actingAs($buyer)
+        ->get(route('transfers.index'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('owned', fn ($owned) => collect($owned)->pluck('id')->contains($agent->id)),
+        );
+});
+
+it('keeps a player sold in one career off every other career\'s market', function () {
+    $seller = User::factory()->create();
+    $sellerSquad = app(EnsureSquad::class)->handle($seller);
+    $player = Player::factory()->create(['user_id' => $seller->id, 'is_youth' => false]);
+    app(SellPlayer::class)->handle($sellerSquad, $player);
+
+    $buyer = User::factory()->create();
+    $buyerSquad = app(EnsureSquad::class)->handle($buyer);
+    $buyerSquad->forceFill(['bank' => 1000])->save();
+
+    $this->actingAs($buyer)
+        ->get(route('transfers.index'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('market', fn ($market) => ! collect($market)->pluck('id')->contains($player->id)),
+        );
+
+    expect(fn () => app(SignPlayer::class)->handle($buyerSquad, $player))
+        ->toThrow(ValidationException::class);
+    expect($player->refresh()->career_id)->toBe($sellerSquad->career_id)
+        ->and($player->is_free_agent)->toBeTrue();
+
+    $this->actingAs($seller)
+        ->get(route('transfers.index'))
+        ->assertInertia(fn (Assert $page) => $page
+            ->where('market', fn ($market) => collect($market)->pluck('id')->contains($player->id))
+            ->where('owned', fn ($owned) => ! collect($owned)->pluck('id')->contains($player->id)),
+        );
+});
+
+it('gives players signed before career stamping back to their career', function () {
+    $user = User::factory()->create();
+    $squad = app(EnsureSquad::class)->handle($user);
+    $signed = Player::factory()->create(['is_free_agent' => false]);
+    $signed->forceFill(['user_id' => $user->id, 'career_id' => null])->save();
+    $pool = Player::factory()->create(['is_free_agent' => false, 'user_id' => null]);
+
+    (require database_path('migrations/2026_11_14_120000_claim_signed_players_for_their_career.php'))->up();
+
+    expect($signed->refresh()->career_id)->toBe($squad->career_id)
+        ->and($pool->refresh()->career_id)->toBeNull();
 });
 
 it('refuses to sign beyond the bank', function () {

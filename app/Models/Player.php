@@ -150,6 +150,20 @@ class Player extends Model
     }
 
     /**
+     * Free agents a career can sign: the unclaimed world market plus anyone
+     * released or sold within this save. A player let go keeps the save he was
+     * in, so another career never buys him and that save's rollover never ages
+     * him out of somebody else's squad.
+     *
+     * @param  Builder<self>  $query
+     */
+    public function scopeOnMarketFor(Builder $query, ?int $careerId): void
+    {
+        $query->where('is_free_agent', true)
+            ->where(fn (Builder $scoped) => $scoped->whereNull('career_id')->orWhere('career_id', $careerId));
+    }
+
+    /**
      * Everything belonging to one save, owned or in its pool.
      *
      * @param  Builder<self>  $query
