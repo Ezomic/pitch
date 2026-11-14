@@ -18,10 +18,17 @@ class AssignSquadSlot
      * slot, the two players swap slots (cost-neutral); otherwise the player in
      * the target slot is replaced and leaves the squad, subject to the budget.
      *
-     * @throws ValidationException when a replacement would exceed the budget
+     * @throws ValidationException when the player cannot be fielded by this
+     *                             career or would put the squad over budget
      */
     public function handle(Squad $squad, int $slot, int $playerId): void
     {
+        $incoming = Player::query()->selectableFor($squad->career_id)->whereKey($playerId)->first();
+
+        if ($incoming === null) {
+            throw ValidationException::withMessages(['player_id' => 'That player is not available.']);
+        }
+
         $assignments = $squad->assignments()->with('player')->get();
 
         $target = $assignments->firstWhere('slot', $slot);
@@ -31,10 +38,9 @@ class AssignSquadSlot
             return;
         }
 
-        if ($target !== null && $existing === null) {
-            $incoming = Player::findOrFail($playerId);
+        if ($existing === null) {
             $spent = $assignments->sum(fn ($assignment) => $assignment->player->value());
-            $newTotal = $spent - $target->player->value() + $incoming->value();
+            $newTotal = $spent - ($target?->player->value() ?? 0) + $incoming->value();
 
             if ($newTotal > $squad->budget) {
                 throw ValidationException::withMessages([

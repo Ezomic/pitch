@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Models\Career;
 use App\Models\Player;
 use App\Models\Squad;
 use App\Models\User;
@@ -101,6 +102,62 @@ it('rejects an unknown player', function () {
     $this->actingAs($user)
         ->patch(route('squad.assign'), ['slot' => 3, 'player_id' => 99999])
         ->assertSessionHasErrors('player_id');
+});
+
+it('refuses a player from another career', function () {
+    $rival = Career::factory()->create();
+    $foreign = Player::factory()->create(['position' => Position::Forward, 'career_id' => $rival->id]);
+
+    $user = User::factory()->create();
+    $this->actingAs($user)->get(route('squad.edit'));
+    $squad = $user->squad()->first();
+    $squad->update(['budget' => 100000]);
+    $before = slotMap($squad);
+
+    $this->actingAs($user)
+        ->patch(route('squad.assign'), ['slot' => 3, 'player_id' => $foreign->id])
+        ->assertSessionHasErrors('player_id');
+
+    expect(slotMap($squad->refresh()))->toBe($before);
+});
+
+it('refuses free agents, academy players and the injured', function (array $state) {
+    $player = Player::factory()->create(['position' => Position::Forward, ...$state]);
+
+    $user = User::factory()->create();
+    $this->actingAs($user)->get(route('squad.edit'));
+    $squad = $user->squad()->first();
+    $squad->update(['budget' => 100000]);
+
+    $this->actingAs($user)
+        ->patch(route('squad.assign'), ['slot' => 3, 'player_id' => $player->id])
+        ->assertSessionHasErrors('player_id');
+
+    expect(slotMap($squad->refresh())[3])->not->toBe($player->id);
+})->with([
+    'free agent' => [['is_free_agent' => true]],
+    'academy' => [['is_youth' => true]],
+    'injured' => [['injured_weeks' => 2]],
+    'suspended' => [['suspended_weeks' => 1]],
+]);
+
+it('applies the budget when filling an empty slot', function () {
+    $user = User::factory()->create();
+    $this->actingAs($user)->get(route('squad.edit'));
+    $squad = $user->squad()->first();
+    $squad->assignments()->where('slot', 3)->delete();
+
+    $spent = (int) $squad->assignments()->with('player')->get()->sum(fn ($a) => $a->player->value());
+    $squad->update(['budget' => $spent]);
+
+    $assignedIds = $squad->assignments()->pluck('player_id')->all();
+    $incoming = Player::query()->whereNotIn('id', $assignedIds)->firstOrFail();
+
+    $this->actingAs($user)
+        ->patch(route('squad.assign'), ['slot' => 3, 'player_id' => $incoming->id])
+        ->assertSessionHasErrors('player_id');
+
+    expect($squad->assignments()->where('slot', 3)->exists())->toBeFalse();
 });
 
 it('requires authentication', function () {
