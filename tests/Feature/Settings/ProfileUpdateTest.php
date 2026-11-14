@@ -13,13 +13,13 @@ it('displays the profile page', function () {
     $this->actingAs($user)->get(route('profile.edit'))->assertOk();
 });
 
-it('updates the profile information', function () {
-    $user = User::factory()->create();
+it('updates the name but never the email address', function () {
+    $user = User::factory()->create(['email' => 'owner@example.com']);
 
     $this->actingAs($user)
         ->patch(route('profile.update'), [
             'name' => 'Test User',
-            'email' => 'test@example.com',
+            'email' => 'victim@example.com',
         ])
         ->assertSessionHasNoErrors()
         ->assertRedirect(route('profile.edit'));
@@ -27,7 +27,7 @@ it('updates the profile information', function () {
     $user->refresh();
 
     expect($user->name)->toBe('Test User')
-        ->and($user->email)->toBe('test@example.com');
+        ->and($user->email)->toBe('owner@example.com');
 });
 
 it('deletes the account without a password', function () {

@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Spinner } from '@/components/ui/spinner';
-import { login, register } from '@/routes';
+import { login } from '@/routes';
 import { send, verify } from '@/routes/login/code';
 import { redirect as ssoRedirect } from '@/routes/sso';
 
@@ -79,11 +79,6 @@ defineProps<{
             <Spinner v-if="processing" />
             Email me a login code
         </Button>
-
-        <div class="text-center text-sm text-muted-foreground">
-            Don't have an account?
-            <TextLink :href="register()">Sign up</TextLink>
-        </div>
     </Form>
 
     <Form
