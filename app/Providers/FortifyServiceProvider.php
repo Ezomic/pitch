@@ -2,7 +2,6 @@
 
 namespace App\Providers;
 
-use App\Actions\Fortify\CreateNewUser;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -39,8 +38,6 @@ class FortifyServiceProvider extends ServiceProvider
         // Passwordless: users have no password. Fortify's credential login is disabled;
         // sign-in happens through email login codes or passkeys only.
         Fortify::authenticateUsing(fn () => null);
-
-        Fortify::createUsersUsing(CreateNewUser::class);
     }
 
     /**
@@ -53,8 +50,6 @@ class FortifyServiceProvider extends ServiceProvider
             'email' => $request->session()->get('login_email'),
             'codeSent' => (bool) $request->session()->get('code_sent'),
         ]));
-
-        Fortify::registerView(fn () => Inertia::render('auth/Register'));
 
         Fortify::twoFactorChallengeView(fn () => Inertia::render('auth/TwoFactorChallenge'));
     }

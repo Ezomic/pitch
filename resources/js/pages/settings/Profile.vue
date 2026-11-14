@@ -34,7 +34,7 @@ const user = computed(() => page.props.auth.user);
         <Heading
             variant="small"
             title="Profile"
-            description="Update your name and email address"
+            description="Update your name. Your email address is managed by Thijssensoftware ID."
         />
 
         <Form
@@ -62,13 +62,10 @@ const user = computed(() => page.props.auth.user);
                     id="email"
                     type="email"
                     class="mt-1 block w-full"
-                    name="email"
                     :default-value="user.email"
-                    required
+                    readonly
                     autocomplete="username"
-                    placeholder="Email address"
                 />
-                <InputError class="mt-2" :message="errors.email" />
             </div>
 
             <div class="flex items-center gap-4">

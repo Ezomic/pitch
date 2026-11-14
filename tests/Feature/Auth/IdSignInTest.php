@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Testing\TestResponse;
 use Laravel\Socialite\Contracts\Factory as Socialite;
 use Laravel\Socialite\Contracts\Provider;
@@ -64,6 +65,14 @@ it('links an existing pitch account to the ID user with the same email and signs
 
     expect(Auth::id())->toBe($user->id)
         ->and($user->fresh()->idp_id)->toBe('idp-42');
+});
+
+it('offers no local sign-up that could claim an email ID later links by', function () {
+    expect(Route::has('register'))->toBeFalse();
+
+    $this->post('/register', ['name' => 'Attacker', 'email' => 'victim@example.test'])->assertNotFound();
+
+    expect(User::query()->where('email', 'victim@example.test')->exists())->toBeFalse();
 });
 
 it('provisions a pitch account for an ID user who has none', function () {
