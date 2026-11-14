@@ -20,7 +20,7 @@ class SignPlayer
      */
     public function handle(Squad $squad, Player $player): void
     {
-        if (! $player->is_free_agent) {
+        if (! Player::query()->onMarketFor($squad->career_id)->whereKey($player->id)->exists()) {
             throw ValidationException::withMessages(['transfer' => 'That player is not on the market.']);
         }
 
@@ -31,7 +31,11 @@ class SignPlayer
         }
 
         DB::transaction(function () use ($squad, $player, $price): void {
-            $player->forceFill(['user_id' => $squad->user_id, 'is_free_agent' => false])->save();
+            $player->forceFill([
+                'user_id' => $squad->user_id,
+                'career_id' => $squad->career_id,
+                'is_free_agent' => false,
+            ])->save();
             $squad->forceFill(['bank' => $squad->bank - $price])->save();
         });
     }
